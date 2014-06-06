@@ -60,10 +60,10 @@ try:
 	NumDirections = 8
 	NumZones = 5
 	TransDistance = 8
-	LCRaster = "D:/Projects/RestorationExample/Raster/LiDAR/veg_ht_int" # This would either be Landcover height or codes
+	LCRaster = "D:/Projects/RestorationExample/Raster/LiDAR/veg_ht_int" # This is either landcover height or codes
 	CanopyDataType = "CanopyCover"
-	#CanopyRaster = "D:/ArcGis/LIDAR/yachats/VegHt/meters/veght_yach_m_i.img # OPTIONAL This would either be canopy cover or LAI
-	#kRaster = # OPTIONAL This would be the k value for LAI
+	CanopyRaster = "" # OPTIONAL This is either canopy cover or a LAI raster
+	kRaster = "" # OPTIONAL This is the k value for LAI
 	EleRaster = "D:/Projects/RestorationExample/Raster/LiDAR/be" 
 	outtable_final = "D:/ArcGis/LIDAR/yachats/output/yachats_wedges_CCC.shp"
 	# End Fill in Data
@@ -86,7 +86,9 @@ try:
 	ZONE = []
 	SAMPLE_X = []
 	SAMPLE_Y = []
+	LDZ = {}
 	VALUE = []
+	ID = []
 	
 	i=0
 	InRows = arcpy.SearchCursor(inPoint,"","","LENGTH; POINT_X; POINT_Y","")
@@ -103,13 +105,13 @@ try:
 	if unitCode == 9005: #Clarke's foot
 		units_con = 3.280869330266635653352551371
 
-	if CanopyDataTyupe == "Codes":        
-		type = ['LC']
+	if CanopyDataType == "Codes":        
+		type = ['LC','ELE']
 	if CanopyDataType == "LAI":  #Use LAI methods
-		type = ['LC','LAI','k']
+		type = ['HEIGHT','LAI','k','ELE']
 		emergentlabel ='LAI_EMERGENT'
 	if CanopyDataType == "Canopy Cover":  #Use Canopy Cover methods
-		type = ['LC','CCV']
+		type = ['HEIGHT','CCV','ELE']
 		emergentlabel = 'CCV_EMERGENT'			
 			      
 	if NumDirections == 999:  #999 is a flag indicating the model should use the heat source 8 methods (same as 8 directions but no north)
@@ -137,84 +139,39 @@ try:
 	#keeping track of time
 	startTime= time.time()
 	
-	for i in range(start,end):
+	i = 0
+	for l in range(start,end):
 		for d in range(0,len(dir)):
 			Angle = d * Angle_Incr
 			for z in range(0,len(zone)):
-				Dis = (z + 0) * TransDistance * units_con
-				pntObj.X = (Dis * sin(radians(Angle))) + origin_x[i]
-				pntObj.Y = (Dis * cos(radians(Angle))) + origin_y[i]				
-		
-
-		#Create an empty output polygon with the same projection as the input points
-		outpoly_temp = os.path.dirname(outpoly_final) + "/out_temp_wedge_%s.shp" % i
-		arcpy.CreateFeatureclass_management(os.path.dirname(outpoly_temp),os.path.basename(outpoly_temp), "POINT","","DISABLED","DISABLED",proj)
-		arcpy.AddField_management(outpoly_temp, "LWV", "TEXT","","", 30, "", "NULLABLE", "NON_REQUIRED")
-		arcpy.AddField_management(outpoly_temp, "LENGTH", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")
-		arcpy.AddField_management(outpoly_temp, "DIR", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")
-		arcpy.AddField_management(outpoly_temp, "ZONE", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")
-				
-		# read in iterate through each wedge and vegzone to create a polygon
-		OutRows = arcpy.InsertCursor(outpoly_temp)
-		for wzone in xrange(WedgeZones):
-			AngleStart = ((wzone + 1) * Angle_Incr) - (Angle_Incr / 2)
-			Angle = AngleStart
-			for vzone in xrange(VegZones):
-				BotDis = (vzone + 0) * TransDistance * units_con
-				TopDis = (vzone + 1) * TransDistance * units_con
-				#iterate through each vertex X/Y to complete the polygon
-				if vzone == 0: # First veg zone that is a triangle shape
-					for vertex in range(7):
-						if vertex in [0]: #bottom Start Angle
-							pntObj.X = (BotDis * sin(radians(AngleStart))) + origin_x[i]
-							pntObj.Y = (BotDis * cos(radians(AngleStart))) + origin_y[i]
-						if vertex in [1]: #top Start Angle
-							pntObj.X = (TopDis * sin(radians(AngleStart))) + origin_x[i]
-							pntObj.Y = (TopDis * cos(radians(AngleStart))) + origin_y[i]
-						if vertex in [2,3,4,5]: #top 2-5
-							Angle = Angle + Angle_Incr_sub
-							pntObj.X = (TopDis * sin(radians(Angle))) + origin_x[i]
-							pntObj.Y = (TopDis * cos(radians(Angle))) + origin_y[i]
-						if vertex in [6]: #bottom End Angle
-							pntObj.X = (BotDis * cos(radians(Angle))) + origin_x[i]
-							pntObj.Y = (BotDis * cos(radians(Angle))) + origin_y[i]
-							Angle = Angle - (Angle_Incr_sub * 4)
-						polyArray.add(pntObj)
-				if vzone != 0:
-					for vertex in range(11):
-						if vertex in [0]: #bottom Start Angle
-							pntObj.X = (BotDis * sin(radians(AngleStart))) + origin_x[i]
-							pntObj.Y = (BotDis * cos(radians(AngleStart))) + origin_y[i]
-						if vertex in [1]: #top Start Angle
-							pntObj.X = (TopDis * sin(radians(AngleStart))) + origin_x[i]
-							pntObj.Y = (TopDis * cos(radians(AngleStart))) + origin_y[i]
-						if vertex in [2,3,4,5]: #top 2-5
-							Angle = Angle + Angle_Incr_sub
-							pntObj.X = (TopDis * sin(radians(Angle))) + origin_x[i]
-							pntObj.Y = (TopDis * cos(radians(Angle))) + origin_y[i]
-						if vertex in [6]: #bottom End Angle
-							pntObj.X = (BotDis * sin(radians(Angle))) + origin_x[i]
-							pntObj.Y = (BotDis * cos(radians(Angle))) + origin_y[i]
-						if vertex in [7,8,9,10]: #bottom 7-10
-							Angle =  Angle - Angle_Incr_sub
-							pntObj.X = (BotDis * sin(radians(Angle))) + origin_x[i]
-							pntObj.Y = (BotDis * cos(radians(Angle))) + origin_y[i]
-						polyArray.add(pntObj)
-				del vertex
-				gc.collect()
-				feat = OutRows.newRow()
-				feat.LWV = "000000" + str((Length[i] * 10000) + ((wzone +1) * 100) + vzone + 1)
-				feat.LENGTH = Length[i]
-				feat.WZONE = wzone + 1
-				feat.VZONE = vzone + 1
-				feat.shape = polyArray
-				OutRows.insertRow(feat)
-				polyArray.removeAll()
-			del vzone
-			gc.collect()
-		del wzone
-		del OutRows
-		gc.collect()
+				for t in range(0,len(type)):
+					# Determine Sample location, create point object
+					Dis = (z + 0) * TransDistance * units_con
+					SAMPLE_X[i] = (Dis * sin(radians(Angle))) + origin_x[i]
+					SAMPLE_Y[i] = (Dis * cos(radians(Angle))) + origin_y[i]
+					pointList = arcpy.Point(SAMPLE_X[i], SAMPLE_Y[i])					
+					
+					# Sample the point
+					if type[t] == "ELE":
+						VALUE[i] = ExtractByPoints(EleRaster, pointList,"INSIDE")					
+					if type[t] in ["LC","HEIGHT"]:
+						VALUE[i] = ExtractByPoints(LCRaster, pointList,"INSIDE")					
+					if type[t] in ["LAI","CCV"]:
+						VALUE[i] = ExtractByPoints(CanopyRaster, pointList,"INSIDE")					
+					if type[t] = "k":
+						VALUE[i] = ExtractByPoints(kRaster, pointList,"INSIDE")					
+					# Extract all the other info
+					COLNAME[i] = type[t]+'_'+dir[d]+'_'+str(zone[z])
+					VARIABLE[i] = type[t]
+					DIRECTION[i] = dir[d]
+					ZONE[i] = zone[z]
+					LDZ[i] = (Length[i] * 10000) + ((dir[i] +1) * 100) + (zone[i] + 1)
+					ID[i] = i
+					i = i +1
+	
+	del(l,d,z,t,i)			
+	gc.collect()
+	
 
 	
 # For arctool errors
@@ -236,4 +193,4 @@ except:
 	#arcpy.AddError(msgs)
 	
 	print(pymsg)
-	print(msgs)	
+	print(msgs)
