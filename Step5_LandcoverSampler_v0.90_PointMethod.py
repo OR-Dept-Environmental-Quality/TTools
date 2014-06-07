@@ -56,42 +56,38 @@ try:
 	#outtable_veg_final = arcpy.GetParameterAsText(7) #os.path.dirname(outpoly_final) + "/out_table_veg_final.dbf"
 	
 	# Start Fill in Data
-	inPoint = "D:/Projects/RestorationExample/Shapefiles/V8_Star/McFee_TTools756_post_star.shp"
+	inPoint = "D:/Projects/RestorationExample/Shapefiles/V8_Star/McFee_TTools756_post_star_HARN.shp"
 	NumDirections = 8
 	NumZones = 5
 	TransDistance = 8
-	LCRaster = "D:/Projects/RestorationExample/Raster/LiDAR/veg_ht_int" # This is either landcover height or codes
-	CanopyDataType = "CanopyCover"
+	LCRaster = "D:/Projects/RestorationExample/Raster/LiDAR/veg_ht_int/veght_lidar" # This is either landcover height or codes
+	CanopyDataType = "Codes"
 	CanopyRaster = "" # OPTIONAL This is either canopy cover or a LAI raster
 	kRaster = "" # OPTIONAL This is the k value for LAI
-	EleRaster = "D:/Projects/RestorationExample/Raster/LiDAR/be" 
-	outtable_final = "D:/ArcGis/LIDAR/yachats/output/yachats_wedges_CCC.shp"
+	EleRaster = "D:/Projects/RestorationExample/Raster/LiDAR/be/be_lidar" 
+	outtable_final = "D:/Projects/RestorationExample/"
 	# End Fill in Data
 
 	#Add X and Y fields to inpoints
 	#arcpy.AddMessage("Adding X/Y")
 	print("Adding X/Y")
 	arcpy.AddXY_management(inPoint)
-
-	Angle_Incr = 360.0 / NumDirections / 2
-
-	pointArray = arcpy.Array()
-	pntObj = arcpy.Point()
-	Length = {}
-	origin_x = {}
-	origin_y = {}
-	COLNAME = []
-	VARIABLE = []
-	DIRECTION = []
-	ZONE = []
-	SAMPLE_X = []
-	SAMPLE_Y = []
-	LDZ = {}
-	VALUE = []
-	ID = []
 	
-	i=0
+	length = {}
+	origin_x = {}
+	origin_y = {}	
+
 	InRows = arcpy.SearchCursor(inPoint,"","","LENGTH; POINT_X; POINT_Y","")
+		
+	i=0		
+	for row in InRows:
+	# Get the raw values from the input points
+	# Should put an X/Y field checker here and add/calculate those fields if not present
+		length[i] = [row.getValue("LENGTH")]
+		origin_x[i] = row.getValue("POINT_X")
+		origin_y[i] = row.getValue("POINT_Y")
+		i= i + 1		
+	del InRows
 	
 	# Determine input spatial units and set conversion factor to get from meters to the input spatial units
 	proj = arcpy.Describe(inPoint).SpatialReference
@@ -103,14 +99,14 @@ try:
 	if unitCode == 9003: #US Survey foot
 		units_con = 3937/1200
 	if unitCode == 9005: #Clarke's foot
-		units_con = 3.280869330266635653352551371
-
+		units_con = 3.280869330266635653352551371	
+	
 	if CanopyDataType == "Codes":        
 		type = ['LC','ELE']
 	if CanopyDataType == "LAI":  #Use LAI methods
 		type = ['HEIGHT','LAI','k','ELE']
 		emergentlabel ='LAI_EMERGENT'
-	if CanopyDataType == "Canopy Cover":  #Use Canopy Cover methods
+	if CanopyDataType == "CanopyCover":  #Use Canopy Cover methods
 		type = ['HEIGHT','CCV','ELE']
 		emergentlabel = 'CCV_EMERGENT'			
 			      
@@ -118,18 +114,17 @@ try:
 		dir = ['NE','E','SE','S','SW','W','NW']
 	else:        
 		dir = ['DIR' + str(x) for x in range(1,NumDirections+ 1)]
+		dirnum = [x for x in range(1,NumDirections+ 1)]
 			
-	zone = range(1,int(NumZones)+1)
-			
-	for row in InRows:
-	# Get the raw values from the input points
-	# Should put an X/Y field checker here and add/calculate those fields if not present
-		Length[i] = row.getValue("LENGTH")
-		origin_x[i] = row.getValue("POINT_X")
-		origin_y[i] = row.getValue("POINT_Y")
-		i= i + 1		
-	del InRows
-
+	zone = range(1,int(NumZones)+1)	
+	
+	en = i * (len(dirnum)+1) * (len(zone)+1) * (len(type)+1)
+	
+	dictkeys = ["LENGTH","VARIABLE","DIRECTION","ZONE","SAMPLE_X","SAMPLE_Y","VALUE"]
+	DATA = [dict.fromkeys(dictkeys)]
+	
+	Angle_Incr = 360.0 / NumDirections / 2
+	
 	# for maunal starts
 	start = 0 #use the first wedge node FID
 	end = i # use the last wedge node FID + 1
@@ -141,34 +136,36 @@ try:
 	
 	i = 0
 	for l in range(start,end):
-		for d in range(0,len(dir)):
-			Angle = d * Angle_Incr
+		for d in range(0,len(dirnum)):
+			Angle = dirnum[d] * Angle_Incr
 			for z in range(0,len(zone)):
 				for t in range(0,len(type)):
 					# Determine Sample location, create point object
-					Dis = (z + 0) * TransDistance * units_con
-					SAMPLE_X[i] = (Dis * sin(radians(Angle))) + origin_x[i]
-					SAMPLE_Y[i] = (Dis * cos(radians(Angle))) + origin_y[i]
-					pointList = arcpy.Point(SAMPLE_X[i], SAMPLE_Y[i])					
+					
+					SAMPLE_X[i] = (zone[z] * TransDistance * units_con * sin(radians(Angle))) + origin_x[l]
+					SAMPLE_Y[i] = (zone[z] * TransDistance * units_con * cos(radians(Angle))) + origin_y[l]
+					xypoint = str(SAMPLE_X[i]) + " " + str(SAMPLE_Y[i])
+					
+					#pointList = [arcpy.Point(SAMPLE_X[i], SAMPLE_Y[i])]					
 					
 					# Sample the point
 					if type[t] == "ELE":
-						VALUE[i] = ExtractByPoints(EleRaster, pointList,"INSIDE")					
+						VALUE[i] = arcpy.GetCellValue_management(EleRaster, xypoint)					
 					if type[t] in ["LC","HEIGHT"]:
-						VALUE[i] = ExtractByPoints(LCRaster, pointList,"INSIDE")					
+						VALUE[i] = arcpy.GetCellValue_management(LCRaster, "688532.341757 1340594.77506",1)					
 					if type[t] in ["LAI","CCV"]:
-						VALUE[i] = ExtractByPoints(CanopyRaster, pointList,"INSIDE")					
-					if type[t] = "k":
-						VALUE[i] = ExtractByPoints(kRaster, pointList,"INSIDE")					
+						VALUE[i] = arcpy.GetCellValue_management(CanopyRaster, xypoint)					
+					if type[t] == "k":
+						VALUE[i] =arcpy.GetCellValue_management(kRaster, xypoint)					
 					# Extract all the other info
 					COLNAME[i] = type[t]+'_'+dir[d]+'_'+str(zone[z])
 					VARIABLE[i] = type[t]
-					DIRECTION[i] = dir[d]
+					DIRECTION[i] = dirnum[d]
 					ZONE[i] = zone[z]
-					LDZ[i] = (Length[i] * 10000) + ((dir[i] +1) * 100) + (zone[i] + 1)
+					LDZ[i] = (Length[l] * 10000) + ((dirnum[d] +1) * 100) + (zone[z] + 1)
 					ID[i] = i
 					i = i +1
-	
+		
 	del(l,d,z,t,i)			
 	gc.collect()
 	
