@@ -16,12 +16,16 @@
 
 # parameter values
 # 0: input TTools point file (inPoint)
-# 1: input Number of directions to sample (WedgeZones)
-# 2: input Number of vegetation (transverse) samples in each direction (VegZones)
-# 3: Input vegetation height Raster (VegRaster)
-# 4: input The distance between transverse samples (TransDistance)
-# 5: output polygon file name/path (outpoly_final)
-# 6: output table file name/path (outtable_final)
+# 1: input number of directions to sample (NumDirections)
+# 2: input number of vegetation (transverse) samples in each direction (NumZones)
+# 3: input The distance between transverse samples (TransDistance)
+# 4: input canopy data type. 1.Codes, 2.Canopy Cover, or 3.LAI (CanopyData)
+# 5: input landcover code or height raster (LCRaster)
+# 6: input (optional) canopy cover or LAI raster (CanopyRaster)
+# 7: input (optional) k coeffcient raster (kRaster)
+# 8: input elevation raster (EleRaster)
+# 9: output sample point file name/path (outpoint_final)
+# 10: output csv file name/path (outcsv_final)
 
 # Import system modules
 from __future__ import division, print_function
@@ -44,16 +48,15 @@ try:
 
 	#inPoint = arcpy.GetParameterAsText(0)
 	#NumDirections = long(arcpy.GetParameterAsText(1))
-	#VegZones = long(arcpy.GetParameterAsText(2))
+	#NumZones = long(arcpy.GetParameterAsText(2))
         #TransDistance = long(arcpy.GetParameterAsText(3))
 	#CanopyData = = arcpy.GetParameterAsText(4) # One of these: 1.Codes, 2.Canopy Cover, or 3.LAI
 	#LCRaster = arcpy.GetParameterAsText(5) # This is either landcover height or codes
 	#CanopyRaster = arcpy.GetParameterAsText(6) # OPTIONAL This is either canopy cover or LAI raster
 	#kRaster = arcpy.GetParameterAsText(7) # OPTIONAL The k value raster for LAI
 	#EleRaster = arcpy.GetParameterAsText(8)
-
-	#outpoly_final = arcpy.GetParameterAsText(6)
-	#outtable_veg_final = arcpy.GetParameterAsText(7) #os.path.dirname(outpoly_final) + "/out_table_veg_final.dbf"
+	#outpoint_final = arcpy.GetParameterAsText(9)
+	#outcsv_final = arcpy.GetParameterAsText(10)
 	
 	# Start Fill in Data
 	inPoint = "D:/Projects/RestorationExample/Shapefiles/V8_Star/McFee_TTools756_post_star_HARN.shp"
@@ -65,7 +68,8 @@ try:
 	CanopyRaster = "" # OPTIONAL This is either canopy cover or a LAI raster
 	kRaster = "" # OPTIONAL This is the k value for LAI
 	EleRaster = "D:/Projects/RestorationExample/Raster/LiDAR/be/be_lidar" 
-	outtable_final = "D:/Projects/RestorationExample/"
+	outpoint_final = "D:/Projects/RestorationExample/out_samplepoint.shp"
+	outcsv_final = "D:/Projects/RestorationExample/out_sampledata.csv"
 	# End Fill in Data
 
 	#Add X and Y fields to inpoints
@@ -112,18 +116,22 @@ try:
 			      
 	if NumDirections == 999:  #999 is a flag indicating the model should use the heat source 8 methods (same as 8 directions but no north)
 		dir = ['NE','E','SE','S','SW','W','NW']
+		dirnum = [45,90,135,180,225,270,315]
 	else:        
 		dir = ['DIR' + str(x) for x in range(1,NumDirections+ 1)]
 		dirnum = [x for x in range(1,NumDirections+ 1)]
 			
 	zone = range(1,int(NumZones)+1)	
 	
+	#Calculate the unique number of dictionary values
 	en = i * (len(dirnum)+1) * (len(zone)+1) * (len(type)+1)
 	
+	# TODO need to fix dictionary so it is easier to extract values based on i for each key.
+	# TODO needs to be is initilized with number of unique values (en) .
 	dictkeys = ["LENGTH","VARIABLE","DIRECTION","ZONE","SAMPLE_X","SAMPLE_Y","VALUE"]
 	DATA = [dict.fromkeys(dictkeys)]
 	
-	Angle_Incr = 360.0 / NumDirections / 2
+	Angle_Incr = 360.0 / NumDirections	
 	
 	# for maunal starts
 	start = 0 #use the first wedge node FID
@@ -137,14 +145,18 @@ try:
 	i = 0
 	for l in range(start,end):
 		for d in range(0,len(dirnum)):
-			Angle = dirnum[d] * Angle_Incr
+			if NumDirections == 999:
+				Angle = dirnum[d]
+			else:
+				Angle = dirnum[d] * Angle_Incr
+			 
 			for z in range(0,len(zone)):
 				for t in range(0,len(type)):
 					# Determine Sample location, create point object
 					
 					SAMPLE_X[i] = (zone[z] * TransDistance * units_con * sin(radians(Angle))) + origin_x[l]
 					SAMPLE_Y[i] = (zone[z] * TransDistance * units_con * cos(radians(Angle))) + origin_y[l]
-					xypoint = str(SAMPLE_X[i]) + " " + str(SAMPLE_Y[i])
+					xypoint = str(SAMPLE_X[i]) + " " + str(SAMPLE_Y[i]) # TODO i don't think this works. check weird arc requiremetns for GetCellValue
 					
 					#pointList = [arcpy.Point(SAMPLE_X[i], SAMPLE_Y[i])]					
 					
@@ -152,7 +164,7 @@ try:
 					if type[t] == "ELE":
 						VALUE[i] = arcpy.GetCellValue_management(EleRaster, xypoint)					
 					if type[t] in ["LC","HEIGHT"]:
-						VALUE[i] = arcpy.GetCellValue_management(LCRaster, "688532.341757 1340594.77506",1)					
+						VALUE[i] = arcpy.GetCellValue_management(LCRaster, xypoint)					
 					if type[t] in ["LAI","CCV"]:
 						VALUE[i] = arcpy.GetCellValue_management(CanopyRaster, xypoint)					
 					if type[t] == "k":
@@ -169,6 +181,9 @@ try:
 	del(l,d,z,t,i)			
 	gc.collect()
 	
+	# build the point file for each sample using sample x/y
+	# rehape dictionary into wide format for heatsource import
+	# output csv and point files.
 
 	
 # For arctool errors
