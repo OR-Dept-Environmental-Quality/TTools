@@ -137,12 +137,22 @@ try:
 	
 	i=0
 	NODES = tree()
+	#for l in length:
+		#for t in type:
+			#for a in azimuths:
+				#for z in zone:
+					#NODES[l][t][a][z] = i
+					#i = i +1
+
+	# New test	
+	type2 = type + ['SAMPLE_X','SAMPLE_Y']
 	for l in length:
-		for t in type:
-			for a in azimuths:
-				for z in zone:
-					NODES[l][t][a][z] = i
+		for a in azimuths:
+			for z in zone:
+				for t in type2:
+					NODES[l][a][z][t] = i
 					i = i +1
+
 
 	del(i,x,d,l,t,a,z)	
 	
@@ -162,9 +172,14 @@ try:
 				
 					DATA['LENGTH'][i] = length[l]					
 					# Determine Sample location,
-					DATA['SAMPLE_X'][i] = (zone[z] * TransDistance * units_con * sin(radians(azimuths[a]))) + origin_x[l]
-					DATA['SAMPLE_Y'][i] = (zone[z] * TransDistance * units_con * cos(radians(azimuths[a]))) + origin_y[l]
-					xypoint = str(DATA['SAMPLE_X'][i]) + " " + str(DATA['SAMPLE_Y'][i]) # TODO Check weird arc requiremetns for GetCellValue
+					_X_ = (zone[z] * TransDistance * units_con * sin(radians(azimuths[a]))) + origin_x[l]
+					_Y_ = (zone[z] * TransDistance * units_con * cos(radians(azimuths[a]))) + origin_y[l]
+					
+					DATA['SAMPLE_X'][i] = _X_
+					DATA['SAMPLE_Y'][i] = _Y_
+					NODES[length[l]][azimuths[a]][z]['SAMPLE_X'] = _X_
+					NODES[length[l]][azimuths[a]][z]['SAMPLE_Y'] = _Y_
+					xypoint = str(_X_) + " " + str(_Y_) # string requiremetns for GetCellValue
 					
 					# Sample the point value from the raster
 					if type[t] == "ELE":
@@ -176,7 +191,8 @@ try:
 					if type[t] == "k":
 						thevalue =arcpy.GetCellValue_management(kRaster, xypoint)[_dict_]
 					DATA['VALUE'][i] = float(thevalue.getOutput(0))
-					NODES[length[l]][type[t]][azimuths[a]][z] = float(thevalue.getOutput(0))
+					#NODES[length[l]][type[t]][azimuths[a]][z] = float(thevalue.getOutput(0))
+					NODES[length[l]][azimuths[a]][z][type[t]] = float(thevalue.getOutput(0))
 					# other data
 					DATA['VARIABLE'][i] = type[t]
 					DATA['AZIMUTH'][i] = azimuths[a]
@@ -224,7 +240,9 @@ try:
 	NODE_keys = NODES.keys()
 	NODE_keys.sort()
 	
-	NODES_csv = [[NODES[l][t][a][z] for t in type for a in azimuths for z in zone] for l in length]
+	#NODES_csv = [[NODES[l][t][a][z] for t in type for a in azimuths for z in zone] for l in length]
+	# new test
+	NODES_csv = [[NODES[l][a][z][t] for t in type for a in azimuths for z in zone] for l in length]
 	
 	# add in the stream km at the beginning of the list
 	for l in range(0,len(NODE_keys)):
