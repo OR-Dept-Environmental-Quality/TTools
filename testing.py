@@ -2,7 +2,7 @@ from collections import defaultdict
 
 length = [0.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 429.645497802]
 azimuths = [x * 360.0 / 8 for x in range(1,8+ 1)]
-zone = range(0,int(5))
+zone = range(1,int(5))
 type = ['LC','ELE']
 
 #Calculate the unique number of dictionary values
