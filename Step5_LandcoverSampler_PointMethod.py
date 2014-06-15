@@ -150,45 +150,43 @@ try:
 	
 	#keeping track of time
 	startTime= time.time()
-	end = len(length)
 	
 	#arcpy.AddMessage("Extracting values")
 	print("Extracting raster values")	
 	i = 0
 	for l in range(0,len(length)):
-		print("Processing Node %s of %s" % (l+1, end))
+		print("Processing Node %s of %s" % (l+1, len(length)))
 		#arcpy.AddMessage("Process Node %s of %s" % (l+1, len(length)))	
-		for a in range(0,len(azimuths)):
-			for z in range(0,len(zone)):
-				for t in range(0,len(type)):		
+		for a in azimuths:
+			for z in zone):
+				for t in type:		
 				
 					DATA['LENGTH'][i] = length[l]					
 					# Determine Sample location,
-					_X_ = (zone[z] * TransDistance * units_con * sin(radians(azimuths[a]))) + origin_x[l]
-					_Y_ = (zone[z] * TransDistance * units_con * cos(radians(azimuths[a]))) + origin_y[l]
+					_X_ = (z * TransDistance * units_con * sin(radians(a))) + origin_x[l]
+					_Y_ = (z * TransDistance * units_con * cos(radians(a))) + origin_y[l]
 					
 					DATA['SAMPLE_X'][i] = _X_
 					DATA['SAMPLE_Y'][i] = _Y_
-					NODES[length[l]][azimuths[a]][z]['SAMPLE_X'] = _X_
-					NODES[length[l]][azimuths[a]][z]['SAMPLE_Y'] = _Y_
-					xypoint = str(_X_) + " " + str(_Y_) # string requirements for GetCellValue
+					NODES[length[l]][a][z]['SAMPLE_X'] = _X_
+					NODES[lenght[l]][a][z]['SAMPLE_Y'] = _Y_
+					xypoint = str(_X_) + " " + str(_Y_) # string requirements for arcpy.GetCellValue
 					
 					# Sample the point value from the raster
-					if type[t] == "ELE":
+					if t == "ELE":
 						thevalue = arcpy.GetCellValue_management(EleRaster, xypoint)
-					if type[t] in ["LC","HEIGHT"]:
+					if t in ["LC","HEIGHT"]:
 						thevalue = arcpy.GetCellValue_management(LCRaster, xypoint)
-					if type[t] in ["LAI","CCV"]:
+					if t in ["LAI","CCV"]:
 						thevalue = arcpy.GetCellValue_management(CanopyRaster, xypoint)
-					if type[t] == "k":
-						thevalue =arcpy.GetCellValue_management(kRaster, xypoint)[_dict_]
+					if t == "k":
+						thevalue =arcpy.GetCellValue_management(kRaster, xypoint)
 					DATA['VALUE'][i] = float(thevalue.getOutput(0))
-					#NODES[length[l]][type[t]][azimuths[a]][z] = float(thevalue.getOutput(0))
-					NODES[length[l]][azimuths[a]][z][type[t]] = float(thevalue.getOutput(0))
+					NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
 					# other data
-					DATA['VARIABLE'][i] = type[t]
-					DATA['AZIMUTH'][i] = azimuths[a]
-					DATA['ZONE'][i] = zone[z]
+					DATA['VARIABLE'][i] = t
+					DATA['AZIMUTH'][i] = a
+					DATA['ZONE'][i] = z
 	
 					i = i +1
 			
