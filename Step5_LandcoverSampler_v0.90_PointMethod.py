@@ -156,13 +156,12 @@ try:
 	
 	#keeping track of time
 	startTime= time.time()
-	end = len(length)
 	
 	#arcpy.AddMessage("Extracting values")
 	print("Extracting raster values")	
 	i = 0
 	for l in range(0,len(length)):
-		print("Processing Node %s of %s" % (l+1, end))
+		print("Processing Node %s of %s" % (l+1, len(length)))
 		#arcpy.AddMessage("Process Node %s of %s" % (l+1, len(length)))	
 		for a in azimuths:
 			for z in zone:
@@ -188,7 +187,7 @@ try:
 					if t in ["LAI","CCV"]:
 						thevalue = arcpy.GetCellValue_management(CanopyRaster, xypoint)
 					if t == "k":
-						thevalue =arcpy.GetCellValue_management(kRaster, xypoint)[_dict_]
+						thevalue =arcpy.GetCellValue_management(kRaster, xypoint)
 					DATA['VALUE'][i] = float(thevalue.getOutput(0))
 					NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
 					# other data

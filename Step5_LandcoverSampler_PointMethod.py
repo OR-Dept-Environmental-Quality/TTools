@@ -16,14 +16,15 @@
 # 0: input TTools point file (inPoint)
 # 1: input number of directions to sample (NumDirections)
 # 2: input number of vegetation (transverse) samples in each direction (NumZones)
-# 3: input The distance between transverse samples (TransDistance)
-# 4: input canopy data type. 1."Codes", 2."CanopyCover", or 3."LAI" (CanopyData)
-# 5: input landcover code or height raster (LCRaster)
-# 6: input (optional) canopy cover or LAI raster (CanopyRaster)
-# 7: input (optional) k coeffcient raster (kRaster)
-# 8: input elevation raster (EleRaster)
-# 9: output sample point file name/path (outpoint_final)
-# 10: output csv file name/path (outcsv_final)
+# 3: include stream sample (TRUE/FALSE)
+# 4: input The distance between transverse samples (TransDistance)
+# 5: input canopy data type. 1."Codes", 2."CanopyCover", or 3."LAI" (CanopyData)
+# 6: input landcover code or height raster (LCRaster)
+# 7: input (optional) canopy cover or LAI raster (CanopyRaster)
+# 8: input (optional) k coeffcient raster (kRaster)
+# 9: input elevation raster (EleRaster)
+# 10: output sample point file name/path (outpoint_final)
+# 11: output csv file name/path (outcsv_final)
 
 # Import system modules
 from __future__ import division, print_function
@@ -52,19 +53,21 @@ try:
 	#inPoint = arcpy.GetParameterAsText(0)
 	#NumDirections = long(arcpy.GetParameterAsText(1))
 	#NumZones = long(arcpy.GetParameterAsText(2))
-        #TransDistance = long(arcpy.GetParameterAsText(3))
-	#CanopyData = = arcpy.GetParameterAsText(4) # One of these: 1."Codes", 2."CanopyCover", or 3."LAI"
-	#LCRaster = arcpy.GetParameterAsText(5) # This is either landcover height or codes
-	#CanopyRaster = arcpy.GetParameterAsText(6) # OPTIONAL This is either canopy cover or LAI raster
-	#kRaster = arcpy.GetParameterAsText(7) # OPTIONAL The k value raster for LAI
-	#EleRaster = arcpy.GetParameterAsText(8)
-	#outpoint_final = arcpy.GetParameterAsText(9)
-	#outcsv_final = arcpy.GetParameterAsText(10)
+	#StreamSample = arcpy.GetParameterAsText(3) TRUE/FALSE
+        #TransDistance = long(arcpy.GetParameterAsText(4))
+	#CanopyData = = arcpy.GetParameterAsText(5) # One of these: 1."Codes", 2."CanopyCover", or 3."LAI"
+	#LCRaster = arcpy.GetParameterAsText(6) # This is either landcover height or codes
+	#CanopyRaster = arcpy.GetParameterAsText(7) # OPTIONAL This is either canopy cover or LAI raster
+	#kRaster = arcpy.GetParameterAsText(8) # OPTIONAL The k value raster for LAI
+	#EleRaster = arcpy.GetParameterAsText(9)
+	#outpoint_final = arcpy.GetParameterAsText(10)
+	#outcsv_final = arcpy.GetParameterAsText(11)
 	
 	# Start Fill in Data
 	inPoint = "D:/Projects/RestorationExample/Shapefiles/V8_Star/McFee_TTools756_post_star_HARN.shp"
 	NumDirections = 8
-	NumZones = 6 # includes stream sample
+	NumZones = 4 
+	StreamSample = 'FALSE' # include stream sample in number of zones? (TRUE/FALSE)
 	TransDistance = 8
 	LCRaster = "D:/Projects/RestorationExample/Raster/LiDAR/veg_ht_int/veght_lidar" # This is either landcover height or codes
 	CanopyDataType = "Codes"
@@ -111,8 +114,11 @@ try:
 		azimuths = [45,90,135,180,225,270,315]
 	else:        
 		azimuths = [x * 360.0 / NumDirections for x in range(1,NumDirections+ 1)]
-			
-	zone = range(0,int(NumZones))	
+	
+	if StreamSample == "TRUE":
+		zone = range(0,int(NumZones))
+	else:
+		zone = range(1,int(NumZones+1))
 	
 	i=0		
 	for row in InRows:
@@ -124,14 +130,14 @@ try:
 		i= i + 1		
 	del(InRows,row)	
 	#Calculate the unique number of dictionary values
-	N = len(length) * len(azimuths) * len(zone) * len(type)
+	#N = len(length) * len(azimuths) * len(zone) * len(type)
 	
 	# Build the Dictionarys
-	dictkeys = ["LENGTH","SAMPLE_X","SAMPLE_Y","VARIABLE","AZIMUTH","ZONE","VALUE"]
-	DATA = defaultdict(list)
-	for d in dictkeys:
-		for i in range(0,N):
-			DATA[d].append(i)	
+	#dictkeys = ["LENGTH","SAMPLE_X","SAMPLE_Y","VARIABLE","AZIMUTH","ZONE","VALUE"]
+	#DATA = defaultdict(list)
+	#for d in dictkeys:
+		#for i in range(0,N):
+			#DATA[d].append(i)	
 	
 	def tree(): return defaultdict(tree)
 	
@@ -161,18 +167,19 @@ try:
 			for z in zone):
 				for t in type:		
 				
-					DATA['LENGTH'][i] = length[l]					
+					#DATA['LENGTH'][i] = length[l]					
 					# Determine Sample location,
 					_X_ = (z * TransDistance * units_con * sin(radians(a))) + origin_x[l]
 					_Y_ = (z * TransDistance * units_con * cos(radians(a))) + origin_y[l]
-					
-					DATA['SAMPLE_X'][i] = _X_
-					DATA['SAMPLE_Y'][i] = _Y_
-					NODES[length[l]][a][z]['SAMPLE_X'] = _X_
-					NODES[lenght[l]][a][z]['SAMPLE_Y'] = _Y_
+					#DATA['SAMPLE_X'][i] = _X_
+					#DATA['SAMPLE_Y'][i] = _Y_
 					xypoint = str(_X_) + " " + str(_Y_) # string requirements for arcpy.GetCellValue
 					
-					# Sample the point value from the raster
+					# Sample the point value from the appropriate raster
+					if t == "SAMPLE_X":
+						NODES[length[l]][a][z]['SAMPLE_X'] = _X_
+					if t == "SAMPLE_Y":
+						NODES[lenght[l]][a][z]['SAMPLE_Y'] = _Y_
 					if t == "ELE":
 						thevalue = arcpy.GetCellValue_management(EleRaster, xypoint)
 					if t in ["LC","HEIGHT"]:
@@ -181,14 +188,14 @@ try:
 						thevalue = arcpy.GetCellValue_management(CanopyRaster, xypoint)
 					if t == "k":
 						thevalue =arcpy.GetCellValue_management(kRaster, xypoint)
-					DATA['VALUE'][i] = float(thevalue.getOutput(0))
+					#DATA['VALUE'][i] = float(thevalue.getOutput(0))
 					NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
 					# other data
-					DATA['VARIABLE'][i] = t
-					DATA['AZIMUTH'][i] = a
-					DATA['ZONE'][i] = z
+					#DATA['VARIABLE'][i] = t
+					#DATA['AZIMUTH'][i] = a
+					#DATA['ZONE'][i] = z
 	
-					i = i +1
+					#i = i +1
 			
 	del(l,a,z,t,i,thevalue)			
 	gc.collect()
@@ -254,10 +261,9 @@ try:
 	with open(outcsv_final, "wb") as f:
 		writer = csv.writer(f)
 		writer.writerows(NODES_csv)	
-	
-	
-	#csvout = sorted(data_csv, key=itemgetter(0,1,2,3))	
+
 	####################################################################################################### 
+	
 	endTime = time.time()
 	elapsedmin= (endTime - startTime) / 60	
 	# output csv and point files

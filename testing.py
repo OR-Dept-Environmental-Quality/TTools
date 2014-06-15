@@ -43,9 +43,9 @@ NODE_keys.sort()
 shapekeys = ["LENGTH","SAMPLE_X","SAMPLE_Y","VARIABLE","AZIMUTH","ZONE","VALUE","SAMPLE_X","SAMPLE_Y"]
 DATA_shp = [[DATA[k][row] for k in shapekeys] for row in range(0,N)]
 
-AA = [[l,a ,z] for l in length for a in azimuths for z in zone]
+laz = [[l,a,z] for l in length for a in azimuths for z in zone]
 
-NODES_shp = [AA[row] + [NODES[AA[row][0]][AA[row][1]][AA[row][2]][t] for t in type3] for row in range(0,len(AA))]
+NODES_shp = [AA[row] + [NODES[la[row][0]][laz[row][1]][laz[row][2]][t] for t in type3] for row in range(0,len(laz))]
 
 
 ####################################################################################################### 
