@@ -1,6 +1,6 @@
 #######################################################################################
 # TTools
-# Step 5: Sample Landcover - Point Method v 0.93
+# Step 5: Sample Landcover - Point Method v 0.94
 #
 # This script will take a point input (from Step 1) and sample a landcover raster
 # in a user specificed number of cardianal directions with point samples spaced at a user defined distance
