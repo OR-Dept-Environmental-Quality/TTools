@@ -18,8 +18,8 @@
 
 # parameter values
 # 0: input TTools point file (inPoint)
-# 1: input Number of directions to sample (WedgeZones)
-# 2: input Number of vegetation (transverse) samples in each direction (VegZones)
+# 1: input Number of directions to sample (NumDirections)
+# 2: input Number of vegetation (transverse) samples in each direction (NumZones)
 # 3: Input vegetation height Raster (VegRaster)
 # 4: input The distance between transverse samples (TransDistance)
 # 5: output polygon file name/path (outpoly_final)
@@ -44,8 +44,8 @@ gc.enable()
 try:
 
 	#inPoint = arcpy.GetParameterAsText(0)
-	#WedgeZones = long(arcpy.GetParameterAsText(1))
-	#VegZones = long(arcpy.GetParameterAsText(2))
+	#NumDirections = long(arcpy.GetParameterAsText(1))
+	#NumZones = long(arcpy.GetParameterAsText(2))
         #TransDistance = long(arcpy.GetParameterAsText(3))
 	#VegRaster = arcpy.GetParameterAsText(4)
 	#EleRaster = arcpy.GetParameterAsText(5)
@@ -55,15 +55,15 @@ try:
         #outtable_ele_final = arcpy.GetParametersAsText(8) #os.path.dirname(outpoly_final) + "/out_table_ele_final.dbf"
 	
 	# Start Fill in Data
-	inPoint = "D:/ArcGis/LIDAR/yachats/Yachats_TTools_756_HARN.shp"
-	WedgeZones = 8
-	VegZones = 5
+	inPoint = r"D:\Projects\RestorationExample\Shapefiles\V8_Star\McFee_TTools756_post_star_HARN.shp"
+	NumDirections = 8
+	NumZones = 4 	
 	TransDistance = 8
-	VegRaster = "D:/ArcGis/LIDAR/yachats/VegHt/meters/veght_yach_m_i.img"
-	EleRaster = "D:/ArcGis/LIDAR/yachats/BareEarth/meters/be_yach_m"
-	outpoly_final = "D:/ArcGis/LIDAR/yachats/output/yachats_wedges_CCC.shp"
-	outtable_veg_final = "D:/ArcGis/LIDAR/yachats/output/yachats_outtable_CCC_veght_m.dbf"
-	outtable_ele_final = "D:/ArcGis/LIDAR/yachats/output/yachats_outtable_CCC_be_m.dbf"
+	VegRaster = r"D:\Projects\RestorationExample\Raster\LiDAR\veg_ht_int\veght_lidar"
+	EleRaster = r"D:\Projects\RestorationExample\Raster\LiDAR\be\be_lidar" 
+	outpoly_final = r"D:\Projects\RestorationExample\out_wedges.shp"
+	outtable_veg_final = r"D:\Projects\RestorationExample\out_table_veght_m.dbf"
+	outtable_ele_final = r"D:\Projects\RestorationExample\out_table_be_m.dbf"
 	# End Fill in Data
 
 	#Add X and Y fields to inpoints
@@ -71,7 +71,7 @@ try:
 	print("Adding X/Y")
 	arcpy.AddXY_management(inPoint)
 
-	Angle_Incr = 360.0 / WedgeZones
+	Angle_Incr = 360.0 / NumDirections
 	Angle_Incr_sub = Angle_Incr / 4.0
 
 	polyArray = arcpy.Array()
@@ -123,19 +123,20 @@ try:
 		startTime= time.time()
 
 		#Create an empty output polygon with the same projection as the input points
-		outpoly_temp = os.path.dirname(outpoly_final) + "/out_temp_wedge_%s.shp" % i
+		outpoly_temp = os.path.dirname(outpoly_final) + r"\out_temp_wedge_%s.shp" % i
 		arcpy.CreateFeatureclass_management(os.path.dirname(outpoly_temp),os.path.basename(outpoly_temp), "POLYGON","","DISABLED","DISABLED",proj)
 		arcpy.AddField_management(outpoly_temp, "LWV", "TEXT","","", 30, "", "NULLABLE", "NON_REQUIRED")
+		#arcpy.AddField_management(outpoly_temp, "LWV", "DOUBLE", 30, "", "", "", "NULLABLE", "NON_REQUIRED")
 		arcpy.AddField_management(outpoly_temp, "LENGTH", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")
 		arcpy.AddField_management(outpoly_temp, "WZONE", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")
 		arcpy.AddField_management(outpoly_temp, "VZONE", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")
 		
 		# read in iterate through each wedge and vegzone to create a polygon
 		OutRows = arcpy.InsertCursor(outpoly_temp)
-		for wzone in xrange(WedgeZones):
+		for wzone in xrange(NumDirections):
 			AngleStart = ((wzone + 1) * Angle_Incr) - (Angle_Incr / 2)
 			Angle = AngleStart
-			for vzone in xrange(VegZones):
+			for vzone in xrange(NumZones):
 				BotDis = (vzone + 0) * TransDistance * units_con
 				TopDis = (vzone + 1) * TransDistance * units_con
 				#iterate through each vertex X/Y to complete the polygon
@@ -179,8 +180,8 @@ try:
 				del vertex
 				gc.collect()
 				feat = OutRows.newRow()
-				feat.LWV = "000000" + str((Length[i] * 10000) + ((wzone +1) * 100) + vzone + 1)
-				feat.LENGTH = Length[i]
+				feat.LWV = "000000" + str((length[i] * 10000) + ((wzone +1) * 100) + vzone + 1)
+				feat.LENGTH = length[i]
 				feat.WZONE = wzone + 1
 				feat.VZONE = vzone + 1
 				feat.shape = polyArray
@@ -217,14 +218,14 @@ try:
 		## Display progress
 		endTime = time.time()
 		elapsedsec= endTime - startTime
-		a = Length[i]
+		a = length[i]
 		z = i + 1
 		minremain = int(((n-z)* elapsedsec/60) + 1)
 		#arcpy.AddMessage("Completed record %s of %s in - %s minutes remaining" % (z, n, minremain))
 		print("Completed record %s of %s - %s minutes remaining" % (z, n, minremain))
 
 
-	del Length
+	del length
 	del origin_x
 	del origin_y
 	gc.collect()

@@ -64,18 +64,18 @@ try:
 	#outcsv_final = arcpy.GetParameterAsText(11)
 	
 	# Start Fill in Data
-	inPoint = "D:/Projects/RestorationExample/Shapefiles/V8_Star/McFee_TTools756_post_star_HARN.shp"
+	inPoint = r"D:\Projects\RestorationExample\Shapefiles\V8_Star\McFee_TTools756_post_star_HARN.shp"
 	NumDirections = 8
 	NumZones = 4 
 	StreamSample = 'FALSE' # include stream sample in number of zones? (TRUE/FALSE)
 	TransDistance = 8
-	LCRaster = "D:/Projects/RestorationExample/Raster/LiDAR/veg_ht_int/veght_lidar" # This is either landcover height or codes
+	LCRaster = r"D:\Projects\RestorationExample\Raster\LiDAR\veg_ht_int\veght_lidar" # This is either landcover height or codes
 	CanopyDataType = "Codes"
 	CanopyRaster = "" # OPTIONAL This is either canopy cover or a LAI raster
 	kRaster = "" # OPTIONAL This is the k value for LAI
-	EleRaster = "D:/Projects/RestorationExample/Raster/LiDAR/be/be_lidar" 
-	outpoint_final = "D:/Projects/RestorationExample/out_samplepoint.shp"
-	outcsv_final = "D:/Projects/RestorationExample/out_sampledata.csv"
+	EleRaster = r"D:\Projects\RestorationExample\Raster\LiDAR\be\be_lidar" 
+	outpoint_final = r"D:\Projects\RestorationExample\out_samplepoint.shp"
+	outcsv_final = r"D:\Projects\RestorationExample\out_sampledata.csv"
 	# End Fill in Data
 
 	#Add X and Y fields to inpoints
