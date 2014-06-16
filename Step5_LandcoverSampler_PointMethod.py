@@ -1,13 +1,13 @@
 #######################################################################################
 # TTools
-# Step 5: Sample Landcover - Point Method v 0.94
+# Step 5: Sample Landcover - Point Method v 0.95
 #
 # This script will take a point input (from Step 1) and sample a landcover raster
 # in a user specificed number of cardianal directions with point samples spaced at a user defined distance
 # moving away from the stream.
 
 # This version is for manual starts from within python.
-# This script requires Python 2.6 and ArcGIS 10.0 SP3 or higher to run.
+# This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
 #
 # Ryan Michie
 #######################################################################################
@@ -132,13 +132,7 @@ try:
 	#Calculate the unique number of dictionary values
 	#N = len(length) * len(azimuths) * len(zone) * len(type)
 	
-	# Build the Dictionarys
-	#dictkeys = ["LENGTH","SAMPLE_X","SAMPLE_Y","VARIABLE","AZIMUTH","ZONE","VALUE"]
-	#DATA = defaultdict(list)
-	#for d in dictkeys:
-		#for i in range(0,N):
-			#DATA[d].append(i)	
-	
+	# build the NODES nested dictionary
 	def tree(): return defaultdict(tree)
 	
 	i=0
@@ -152,52 +146,45 @@ try:
 					i = i +1
 
 
-	del(i,x,d,l,t,a,z)	
+	del(i,x,l,t,a,z)	
 	
 	#keeping track of time
 	startTime= time.time()
 	
 	#arcpy.AddMessage("Extracting values")
 	print("Extracting raster values")	
-	i = 0
+
 	for l in range(0,len(length)):
 		print("Processing Node %s of %s" % (l+1, len(length)))
 		#arcpy.AddMessage("Process Node %s of %s" % (l+1, len(length)))	
 		for a in azimuths:
-			for z in zone):
-				for t in type:		
-				
-					#DATA['LENGTH'][i] = length[l]					
-					# Determine Sample location,
+			for z in zone:
+				for t in type2:		
+								
+					# Calculate the x and y sample location
 					_X_ = (z * TransDistance * units_con * sin(radians(a))) + origin_x[l]
 					_Y_ = (z * TransDistance * units_con * cos(radians(a))) + origin_y[l]
-					#DATA['SAMPLE_X'][i] = _X_
-					#DATA['SAMPLE_Y'][i] = _Y_
-					xypoint = str(_X_) + " " + str(_Y_) # string requirements for arcpy.GetCellValue
+					xypoint = str(_X_) + " " + str(_Y_) # xy string requirement for arcpy.GetCellValue
 					
-					# Sample the point value from the appropriate raster
+					# Sample the point value from the appropriate raster and add to NODES dictionary
 					if t == "SAMPLE_X":
 						NODES[length[l]][a][z]['SAMPLE_X'] = _X_
 					if t == "SAMPLE_Y":
-						NODES[lenght[l]][a][z]['SAMPLE_Y'] = _Y_
+						NODES[length[l]][a][z]['SAMPLE_Y'] = _Y_
 					if t == "ELE":
 						thevalue = arcpy.GetCellValue_management(EleRaster, xypoint)
+						NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
 					if t in ["LC","HEIGHT"]:
 						thevalue = arcpy.GetCellValue_management(LCRaster, xypoint)
+						NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
 					if t in ["LAI","CCV"]:
 						thevalue = arcpy.GetCellValue_management(CanopyRaster, xypoint)
+						NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
 					if t == "k":
 						thevalue =arcpy.GetCellValue_management(kRaster, xypoint)
-					#DATA['VALUE'][i] = float(thevalue.getOutput(0))
-					NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
-					# other data
-					#DATA['VARIABLE'][i] = t
-					#DATA['AZIMUTH'][i] = a
-					#DATA['ZONE'][i] = z
-	
-					#i = i +1
+						NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
 			
-	del(l,a,z,t,i,thevalue)			
+	del(l,a,z,t,thevalue,_X_,_Y_)			
 	gc.collect()
 		
 	
@@ -207,32 +194,26 @@ try:
 	print("Exporting Data")	
 	
 	#Create an empty output with the same projection as the input points
-	cursorfields = ["LENGTH","SAMPLE_X","SAMPLE_Y","VARIABLE","AZIMUTH","ZONE","VALUE","SHAPE@X","SHAPE@Y"]
-	#shapekeys = ["LENGTH","SAMPLE_X","SAMPLE_Y","VARIABLE","AZIMUTH","ZONE","VALUE","SAMPLE_X","SAMPLE_Y"]
+	cursorfields = ["LENGTH","AZIMUTH","ZONE"] + type2 + ["SHAPE@X","SHAPE@Y"]
 	arcpy.CreateFeatureclass_management(os.path.dirname(outpoint_final),os.path.basename(outpoint_final), "POINT","","DISABLED","DISABLED",proj)
 	
 	#Add Fields
 	arcpy.AddField_management(outpoint_final, "LENGTH", "DOUBLE", 16, 3, "", "", "NULLABLE", "NON_REQUIRED")
-	arcpy.AddField_management(outpoint_final, "SAMPLE_X", "DOUBLE", 16, "", "", "", "NULLABLE", "NON_REQUIRED")
-	arcpy.AddField_management(outpoint_final, "SAMPLE_Y", "DOUBLE", 16, "", "", "", "NULLABLE", "NON_REQUIRED")
-	arcpy.AddField_management(outpoint_final, "VARIABLE", "TEXT", "", "", "30", "", "NULLABLE", "NON_REQUIRED")
 	arcpy.AddField_management(outpoint_final, "AZIMUTH", "DOUBLE", 16, 2, "", "", "NULLABLE", "NON_REQUIRED")
-	arcpy.AddField_management(outpoint_final, "ZONE", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")
-	arcpy.AddField_management(outpoint_final, "VALUE", "DOUBLE", 16, 3, "", "", "NULLABLE", "NON_REQUIRED")	
+	arcpy.AddField_management(outpoint_final, "ZONE", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")	
+	for t in type2:
+		arcpy.AddField_management(outpoint_final, t, "DOUBLE", 16, "", "", "", "NULLABLE", "NON_REQUIRED")	
 	
-	# put the dictionary in a list form needed to build the output point feature class
-	#data = [[DATA[k][row] for k in shapekeys] for row in range(0,N)]
-	
-	type3 = ["SAMPLE_X","SAMPLE_Y"] + type2
+	# put the dictionary in list form needed to build the output point feature class
+	type3 = type2 + ["SAMPLE_X","SAMPLE_Y"]
 	laz = [[l,a,z] for l in length for a in azimuths for z in zone]
 	NODES_shp = [laz[row] + [NODES[laz[row][0]][laz[row][1]][laz[row][2]][t] for t in type3] for row in range(0,len(laz))]	
 	
 	cursor = arcpy.da.InsertCursor(outpoint_final, cursorfields)                  
-		
-	#for row in data:
-	or row in NODES_shp:
+	
+	for row in NODES_shp:
 		cursor.insertRow(row)
-	del cursor
+	del(cursor,l,a,z,laz,row)
 	
 	####################################################################################################### 
 	# output csv
