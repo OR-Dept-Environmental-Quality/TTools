@@ -1,6 +1,6 @@
 #######################################################################################
 # TTools
-# Step 5: Sample Landcover - Zone Method v 0.96
+# Step 5: Sample Landcover - Star Pattern, Zone Method v 0.96
 #
 # This script will take a point input (from Step 1) and generate a series of pie shapped
 # polygon zones extending outward from the point. The number of polygon zones and the 

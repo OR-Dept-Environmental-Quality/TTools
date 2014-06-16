@@ -1,15 +1,22 @@
 #######################################################################################
 # TTools
-# Step 5: Sample Landcover - Point Method v 0.95
-#
-# This script will take a point input (from Step 1) and sample a landcover raster
+# Step 5: Sample Landcover - Star Pattern, Point Method v 0.95
+# Ryan Michie
+
+# This script will take an input point feature (from Step 1) and sample input landcover rasters
 # in a user specificed number of cardianal directions with point samples spaced at a user defined distance
 # moving away from the stream.
 
+# The outputs include a point feature class for each x/y sample and the sample raster values 
+# and a csv file formatted for input into heat source 9.
+
+# Future Updates
+# Topo is not included in the csv output. Might have to read in the topo csv output and concatenate it to landcover output.
+# Add the sampled raster values back into the input point feature class like previous versions of TTools.
+
 # This version is for manual starts from within python.
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
-#
-# Ryan Michie
+
 #######################################################################################
 
 # parameter values
@@ -46,7 +53,6 @@ env.overwriteOutput = True
 
 #enable garbage collection
 gc.enable()
-
 
 try:
 
@@ -119,20 +125,19 @@ try:
 		zone = range(0,int(NumZones))
 	else:
 		zone = range(1,int(NumZones+1))
-	
-	i=0		
+		
 	for row in InRows:
 	# Get the raw values from the input points
 	# Should put an X/Y field checker here and add/calculate those fields if not present
 		length.append(row.getValue("LENGTH"))
 		origin_x.append(row.getValue("POINT_X"))
 		origin_y.append(row.getValue("POINT_Y"))
-		i= i + 1		
+		
 	del(InRows,row)	
 	#Calculate the unique number of dictionary values
 	#N = len(length) * len(azimuths) * len(zone) * len(type)
 	
-	# build the NODES nested dictionary
+	# build the NODES nested dictionary and save a generic i value
 	def tree(): return defaultdict(tree)
 	
 	i=0
@@ -189,7 +194,7 @@ try:
 		
 	
 	####################################################################################################### 
-	# build the point feature class uisng the data from the dictionary
+	# build the output= point feature class using the data from the NODES dictionary
 	#arcpy.AddMessage("Exporting Data")
 	print("Exporting Data")	
 	
@@ -197,7 +202,7 @@ try:
 	cursorfields = ["LENGTH","AZIMUTH","ZONE"] + type2 + ["SHAPE@X","SHAPE@Y"]
 	arcpy.CreateFeatureclass_management(os.path.dirname(outpoint_final),os.path.basename(outpoint_final), "POINT","","DISABLED","DISABLED",proj)
 	
-	#Add Fields
+	# Add attribute fields
 	arcpy.AddField_management(outpoint_final, "LENGTH", "DOUBLE", 16, 3, "", "", "NULLABLE", "NON_REQUIRED")
 	arcpy.AddField_management(outpoint_final, "AZIMUTH", "DOUBLE", 16, 2, "", "", "NULLABLE", "NON_REQUIRED")
 	arcpy.AddField_management(outpoint_final, "ZONE", "DOUBLE", 16, 0, "", "", "NULLABLE", "NON_REQUIRED")	
@@ -216,7 +221,7 @@ try:
 	del(cursor,l,a,z,laz,row)
 	
 	####################################################################################################### 
-	# output csv
+	# Output the csv file
 	
 	# Get the stream km dictionary keys and sort them
 	NODE_keys = NODES.keys()
