@@ -252,7 +252,6 @@ try:
 	
 	endTime = time.time()
 	elapsedmin= (endTime - startTime) / 60	
-	# output csv and point files
 	print("Process Complete in %s minutes" % (elapsedmin))
 	#arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))
 
