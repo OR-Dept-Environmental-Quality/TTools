@@ -13,6 +13,9 @@
 # a "LENGTH" field with the distance in meters from the downstream end of the stream, and
 # "STREAM_KM", X, and Y.
 
+# Future Updates
+# make many of these tasks into methods.
+
 # This version is for manual starts from within python.
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
 
@@ -79,7 +82,7 @@ try:
 			positions = [node * NodeDistance / LineLength for node in nodes] # list of Lengths in meters
 			for position in positions:
 				XY = row[0].positionAlongLine(position,True).centroid
-				# list of "NODE_ID",SIDname,"LENGTH","STREAM_KM","X","Y","SHAPE@X","SHAPE@Y"
+				# list of "NODE_ID",SIDname,"LENGTH","STREAM_KM","POINT_X","POINT_Y","SHAPE@X","SHAPE@Y"
 				NODES_shp.append((NID, row[1], int(position * LineLength), float(position * LineLength /1000), XY.X, XY.Y, XY.X, XY.Y ))
 				NID = NID + 1
 		#arcpy.SetProgressorPosition()
@@ -95,7 +98,7 @@ try:
 	print("Exporting Data")	
 	
 	#Create an empty output with the same projection as the input polyline
-	cursorfields = ["NODE_ID",SIDname,"LENGTH","STREAM_KM","X","Y","SHAPE@X","SHAPE@Y"]
+	cursorfields = ["NODE_ID",SIDname,"LENGTH","STREAM_KM","POINT_X","POINT_Y","SHAPE@X","SHAPE@Y"]
 	arcpy.CreateFeatureclass_management(os.path.dirname(outpoint_final),os.path.basename(outpoint_final), "POINT","","DISABLED","DISABLED",proj)
 	
 	# Add attribute fields
@@ -103,8 +106,8 @@ try:
 	arcpy.AddField_management(outpoint_final, SIDname, SIDtype, SIDprecision, SIDscale, SIDlength, "", "NULLABLE", "NON_REQUIRED")
 	arcpy.AddField_management(outpoint_final, "LENGTH", "LONG", "","", "", "", "NULLABLE", "NON_REQUIRED")
 	arcpy.AddField_management(outpoint_final, "STREAM_KM", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-	arcpy.AddField_management(outpoint_final, "X", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-	arcpy.AddField_management(outpoint_final, "Y", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+	arcpy.AddField_management(outpoint_final, "POINT_X", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+	arcpy.AddField_management(outpoint_final, "POINT_Y", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
 	
 	cursor = arcpy.da.InsertCursor(outpoint_final, cursorfields)                  
 	
@@ -119,7 +122,7 @@ try:
 	NODES_csv = [NODES_shp[row][0:6] for row in range(0,len(NODES_shp))]	
 	
 	# Add the header row
-	LC_Header = ["NODE_ID",SIDname,"LENGTH","Stream_KM","X","Y"]
+	LC_Header = ["NODE_ID",SIDname,"LENGTH","Stream_KM","POINT_X","POINT_Y"]
 	NODES_csv.insert(0,LC_Header)
 	
 	# Export to csv
