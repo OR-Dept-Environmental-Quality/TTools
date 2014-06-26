@@ -55,6 +55,23 @@ env.overwriteOutput = True
 #enable garbage collection
 gc.enable()
 
+
+def GetLinearUnitConversion(inFeature):
+  """Get the conversion factor to get from meters to the input spatial units"""
+  unitCode = arcpy.Describe(inFeature).SpatialReference.linearUnitCode
+  if unitCode == 9001: #International meter
+	  units_con = 1 
+  if unitCode == 9002: #International foot
+	  units_con = 3.280839895013123359580052493
+  if unitCode == 9003: #US Survey foot
+	  units_con = 3937/1200
+  if unitCode == 9005: #Clarke's foot
+	  units_con = 3.280869330266635653352551371
+  if unitCode not in [9001,9002,9003,9005]:
+	  system.exit("Unreconized spatial reference. Use projection with units of feet or meters.")   
+  return units_con
+
+
 try:
 
 	#inPoint = arcpy.GetParameterAsText(0)
@@ -100,15 +117,7 @@ try:
 	
 	# Determine input spatial units and set conversion factor to get from meters to the input spatial units
 	proj = arcpy.Describe(inPoint).SpatialReference
-	unitCode = arcpy.Describe(inPoint).SpatialReference.linearUnitCode
-	if unitCode == 9001: #International meter
-		units_con = 1 
-	if unitCode == 9002: #International foot
-		units_con = 3.280839895013123359580052493
-	if unitCode == 9003: #US Survey foot
-		units_con = 3937/1200
-	if unitCode == 9005: #Clarke's foot
-		units_con = 3.280869330266635653352551371	
+	units_con = GetLinearUnitConversion(inPoint)
 	
 	if CanopyDataType == "Codes":        
 		type = ['LC','ELE']
@@ -119,7 +128,7 @@ try:
 		type = ['HEIGHT','CCV','ELE']
 		emergentlabel = 'CCV_EMERGENT'			
 	
-	# Set the converstion factor to make sure the iput elevation z units are in meters
+	# Set the converstion factor to make sure the input elevation z units are in meters
 	if EleUnits == "Meters": #International meter
 		ele_con = 1 
 	if EleUnits == "Feet": #International foot
