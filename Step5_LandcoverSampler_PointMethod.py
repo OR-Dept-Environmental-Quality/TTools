@@ -30,8 +30,9 @@
 # 7: input (optional) canopy cover or LAI raster (CanopyRaster)
 # 8: input (optional) k coeffcient raster (kRaster)
 # 9: input elevation raster (EleRaster)
-# 10: output sample point file name/path (outpoint_final)
-# 11: output csv file name/path (outcsv_final)
+# 10: input elvation raster units (EleUnits) 1. "Feet", 2. "Meters" 3. "Other"
+# 11: output sample point file name/path (outpoint_final)
+# 12: output csv file name/path (outcsv_final)
 
 # Import system modules
 from __future__ import division, print_function
@@ -66,8 +67,9 @@ try:
 	#CanopyRaster = arcpy.GetParameterAsText(7) # OPTIONAL This is either canopy cover or LAI raster
 	#kRaster = arcpy.GetParameterAsText(8) # OPTIONAL The k value raster for LAI
 	#EleRaster = arcpy.GetParameterAsText(9)
-	#outpoint_final = arcpy.GetParameterAsText(10)
-	#outcsv_final = arcpy.GetParameterAsText(11)
+	#EleUnits = arcpy.GetParameterAsText(10)
+	#outpoint_final = arcpy.GetParameterAsText(11)
+	#outcsv_final = arcpy.GetParameterAsText(12)
 	
 	# Start Fill in Data
 	inPoint = r"D:\Projects\RestorationExample\Shapefiles\V8_Star\McFee_TTools756_post_star_HARN.shp"
@@ -79,7 +81,8 @@ try:
 	CanopyDataType = "Codes"
 	CanopyRaster = "" # OPTIONAL This is either canopy cover or a LAI raster
 	kRaster = "" # OPTIONAL This is the k value for LAI
-	EleRaster = r"D:\Projects\RestorationExample\Raster\LiDAR\be\be_lidar" 
+	EleRaster = r"D:\Projects\RestorationExample\Raster\LiDAR\be\be_lidar"
+	EleUnits = "Feet"
 	outpoint_final = r"D:\Projects\RestorationExample\out_samplepoint.shp"
 	outcsv_final = r"D:\Projects\RestorationExample\out_sampledata.csv"
 	# End Fill in Data
@@ -115,6 +118,15 @@ try:
 	if CanopyDataType == "CanopyCover":  #Use Canopy Cover methods
 		type = ['HEIGHT','CCV','ELE']
 		emergentlabel = 'CCV_EMERGENT'			
+	
+	# Set the converstion factor to make sure the iput elevation z units are in meters
+	if EleUnits == "Meters": #International meter
+		ele_con = 1 
+	if EleUnits == "Feet": #International foot
+		ele_con = 3.280839895013123359580052493
+	if EleUnits == "Other": #Some other units
+		sys.exit("Please modify your raster elevation units so they are either in meters or feet")	
+	
 			      
 	if NumDirections == 999:  #999 is a flag indicating the model should use the heat source 8 methods (same as 8 directions but no north)
 		azimuths = [45,90,135,180,225,270,315]
@@ -178,7 +190,7 @@ try:
 						NODES[length[l]][a][z]['SAMPLE_Y'] = _Y_
 					if t == "ELE":
 						thevalue = arcpy.GetCellValue_management(EleRaster, xypoint)
-						NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
+						NODES[length[l]][a][z][t] = float(thevalue.getOutput(0)) * ele_con
 					if t in ["LC","HEIGHT"]:
 						thevalue = arcpy.GetCellValue_management(LCRaster, xypoint)
 						NODES[length[l]][a][z][t] = float(thevalue.getOutput(0))
