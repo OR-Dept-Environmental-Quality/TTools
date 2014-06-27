@@ -132,7 +132,7 @@ try:
 	if EleUnits == "Meters": #International meter
 		ele_con = 1 
 	if EleUnits == "Feet": #International foot
-		ele_con = 3.280839895013123359580052493
+		ele_con = 0.3048
 	if EleUnits == "Other": #Some other units
 		sys.exit("Please modify your raster elevation units so they are either in meters or feet")	
 	

@@ -51,16 +51,16 @@ env.overwriteOutput = True
 gc.enable()
 
 def GetLinearUnitConversion(inFeature):
-  """Get the conversion factor to get from meters to the input spatial units"""
+  """Get the conversion factor to get from the input spatial units to meters"""
   unitCode = arcpy.Describe(inFeature).SpatialReference.linearUnitCode
   if unitCode == 9001: #International meter
 	  units_con = 1 
   if unitCode == 9002: #International foot
-	  units_con = 3.280839895013123359580052493
+	  units_con = 0.3048
   if unitCode == 9003: #US Survey foot
-	  units_con = 3937/1200
+	  units_con = 1200/3937
   if unitCode == 9005: #Clarke's foot
-	  units_con = 3.280869330266635653352551371 
+	  units_con =  0.3047972654 
   if unitCode not in [9001,9002,9003,9005]:
           system.exit("Unreconized spatial reference. Use projection with units of feet or meters.") 
   return units_con
@@ -80,28 +80,39 @@ try:
 	Directions = 1
 	MaxSearchDistance_km = 2
 	EleRaster = r"D:\Projects\RestorationExample\Raster\LiDAR\be\be_lidar"
-	EleUnits = "Feet"
+	EleUnits = 1
 	outpoint_final = r"D:\Projects\RestorationExample\topo_samplepoint.shp"
 	outcsv_final = r"D:\Projects\RestorationExample\out_nodes.csv"
 	# End Fill in Data
 
-	#Add X and Y fields to inpoints
-	#arcpy.AddMessage("Adding X/Y")
-	print("Adding X/Y")
-	arcpy.AddXY_management(inPoint)
-
 	# Determine input point spatial units and set conversion factor to get from the raster units to the input spatial units
 	proj = arcpy.Describe(inPoint).SpatialReference	
 	rasterproj = arcpy.Describe(EleRaster).SpatialReference
-	mto_node_con = GetLinearUnitConversion(inPoint)
-	mto_Ele_con = GetLinearUnitConversion(EleRaster)
-	units_con=  mto_node_con / mto_Ele_con
-	MaxSearchDistance = MaxSearchDistance_km * mto_node_con * 1000
 	
-	if EleUnits = "Feet":
-	       eleZ_to_m = 3.280839895013123359580052493
-	else:
-	       eleZ_to_m = 1
+	if proj.factoryCode != rasterproj.factoryCode:
+	      inPoint_rp = os.path.dirname(inPoint) + "\\rp_" + os.path.basename(inPoint)
+	      arcpy.Project_management(inPoint,inPoint_rp,rasterproj)
+	      inPoint = inPoint_rp
+	  
+	      #system.exit("Input points are not in the same projection as the elevation Raster. Please fix before proceeding")
+	  
+	#Add X and Y fields to inpoints
+	#arcpy.AddMessage("Adding X/Y")
+	print("Adding X/Y")
+	arcpy.AddXY_management(inPoint)	
+
+	nodexy_to_m = GetLinearUnitConversion(inPoint)
+	Elexy_to_m = GetLinearUnitConversion(EleRaster)
+	units_con=  nodexy_to_m / Elexy_to_m
+	MaxSearchDistance = MaxSearchDistance_km * 1/nodexy_to_m * 1000
+	
+	# Determine the elevation Z units converstion into meters
+	if EleUnits == 1: # Feet
+	      eleZ_to_m = 0.3048
+	if EleUnits == 2: # Meters
+	      eleZ_to_m = 1
+	if EleUnits == 3: # Other
+	      system.exit("Please modify your raster elevtion units to feet or meters.") 	
 	
 	# Get the elevation raster cell size
 	CellSizeResult = arcpy.GetRasterProperties_management(EleRaster, "CELLSIZEX")
@@ -117,6 +128,7 @@ try:
 		
 	Incursorfields = ["SHAPE@XY","NODE_ID"]
 	NODES = []
+	NODES_shp = []
 	
 	with arcpy.da.SearchCursor(inPoint,Incursorfields) as Inrows:
 		#arcpy.SetProgressor("step", "Creating Nodes", 0, Inrows, 1)
@@ -133,27 +145,29 @@ try:
 	for node in NODES:
 		print("Processing Node %s of %s" % (n+1, len(NODES)))
 		#arcpy.AddMessage("Process Node %s of %s" % (n+1, len(NODES)))
-		node_x = node[0][0]
-		node_y = node[0][1]
+		node_x = float(node[0][0])
+		node_y = float(node[0][1])
+		SreamNode_ID = node[1]
 		nodexy = str(node_x) + " " + str(node_y) # xy string requirement for arcpy.GetCellValue	
 		thevalue = arcpy.GetCellValue_management(EleRaster, nodexy)
-		nodeZ = float(thevalue.getOutput(0)) * ele_con		
+		nodeZ = float(thevalue.getOutput(0)) *  eleZ_to_m		
 		SearchDistance = 0
 		MaxShadeAngle = 0
+		i = 0
 		for a in azimuths:
 			while not SearchDistance > MaxSearchDistance:
 			  # This is the Skippy algorithm from Greg Pelletier
 			  if i <= 10:
 				  SearchDistance = SearchDistance + (CellSize * units_con)
-			  if i <= 20:
+			  if 10 < i <= 20:
 				  SearchDistance = SearchDistance + (CellSize * units_con * 3)
-			  if i <= 40:
+			  if 20 < i <= 40:
 				  SearchDistance = SearchDistance + (CellSize * units_con * 6)
-			  if i <= 50:
+			  if 40 < i <= 50:
 				  SearchDistance = SearchDistance + (CellSize * units_con * 12)
-			  if i <= 60:
+			  if 50 < i <= 60:
 				  SearchDistance = SearchDistance + (CellSize * units_con * 25)
-			  else:
+			  if i > 60:
 				  SearchDistance = SearchDistance + (CellSize * units_con * 50)
 			  i = i + 1			  
 			  
@@ -164,17 +178,18 @@ try:
 					
 			  # Sample the elevation value from the elevation raster
 			  thevalue = arcpy.GetCellValue_management(EleRaster, samplexy)
-			  sampleZ= float(thevalue.getOutput(0)) * ele_con
+			  sampleZ= float(thevalue.getOutput(0)) *  eleZ_to_m
 			    
 			  #calculate the topographic shade angle (in degrees)
-			  ShadeAngle = atn((sampleZ - nodeZ) / SearchDistance)
+			  ShadeAngle = atan((sampleZ - nodeZ) / SearchDistance * nodexy_to_m)
 			  if ShadeAngle > MaxShadeAngle:
+			        MaxZChange = sampleZ - nodeZ
 			        MaxShadeAngle = ShadeAngle
 				MaxShadeAngle_X = sample_x
 				MaxShadeAngle_Y = sample_y
 			
-			Node
-	del(l,a,z,t,thevalue,_X_,_Y_)			
+		        NODES_shp.append(SreamNode_ID,a,MaxShadeAngle,MaxZChange, MaxShadeAngle_X,MaxShadeAngle_Y)
+	del(node,a,MaxShadeAngle,MaxZChange, MaxShadeAngle_X,MaxShadeAngle_Y)			
 	gc.collect()
 		
 	
