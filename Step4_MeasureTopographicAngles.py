@@ -188,7 +188,7 @@ try:
 				MaxShadeAngle_X = sample_x
 				MaxShadeAngle_Y = sample_y
 			
-		        NODES_shp.append(SreamNode_ID,a,MaxShadeAngle,MaxZChange, MaxShadeAngle_X,MaxShadeAngle_Y)
+		        NODES_shp.append(SreamNode_ID,a,MaxShadeAngle,MaxZChange,MaxShadeAngle_X,MaxShadeAngle_Y)
 	del(node,a,MaxShadeAngle,MaxZChange, MaxShadeAngle_X,MaxShadeAngle_Y)			
 	gc.collect()
 		
