@@ -11,7 +11,7 @@
 # 0: input TTools point file (inPoint)
 # 1: input number of directions to sample (NumDirections)
 # 2: input number of transverse vegetation samples in each azimuth direction (NumZones)
-# 3: include stream sample (TRUE/FALSE)
+# 3: include stream sample (True/False)
 # 4: input The distance between transverse samples (TransDistance)
 # 5: input canopy data type. 1."Codes", 2."CanopyCover", or 3."LAI" (CanopyData)
 # 6: input landcover code or height raster (LCRaster)
@@ -52,7 +52,7 @@ env.overwriteOutput = True
 #inPoint = arcpy.GetParameterAsText(0)
 #NumDirections = long(arcpy.GetParameterAsText(1))
 #NumZones = long(arcpy.GetParameterAsText(2))
-#StreamSample = arcpy.GetParameterAsText(3) TRUE/FALSE
+#StreamSample = arcpy.GetParameterAsText(3) True/False
 #TransDistance = long(arcpy.GetParameterAsText(4))
 #CanopyData = = arcpy.GetParameterAsText(5) # One of these: 1."Codes", 2."CanopyCover", or 3."LAI"
 #LCRaster = arcpy.GetParameterAsText(6) # This is either landcover height or codes
@@ -66,7 +66,7 @@ env.overwriteOutput = True
 inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 NumDirections = 8
 NumZones = 4 
-StreamSample = 'FALSE' # include stream sample in number of zones? (TRUE/FALSE)
+StreamSample = 'True' # include stream sample in number of zones? (True/False)
 TransDistance = 8
 LCRaster = r"D:\Projects\TTools_9\Example_data.gdb\veght_lidar_ft" # This is either landcover height or codes
 CanopyDataType = "Codes"
@@ -118,9 +118,9 @@ def UpdatePointFile(pointDict, pointfile, AddFields):
     
     with arcpy.da.UpdateCursor(pointfile,["NODE_ID"] + AddFields) as cursor:
 	for row in cursor:
-	    for f in xrange(0,len(AddFields)):
+	    for f in range(0,len(AddFields)):
 		node =row[0]
-		row[f+1] = NODES[node][AddFields[f]]
+		row[f+1] = pointDict[node][AddFields[f]]
 		cursor.updateRow(row)
 
 def FromMetersUnitConversion(inFeature):
@@ -202,7 +202,7 @@ try:
 	xypoint = str(origin_x) + " " + str(origin_y) 
 	
 	# Sample the stream/emergent
-	if StreamSample == "TRUE":
+	if StreamSample == "True":
 	    for t in type:
 		LCkey = t+"_EMERGENT"
 		# Sample the point value from the appropriate raster and add to NODES dictionary
@@ -270,7 +270,7 @@ try:
     LCpointlist = [naz[row] + [NODES[naz[row][0]][t+'_'+str(int(naz[row][1]))+'_Z'+str(naz[row][2])] for t in type2] for row in range(0,len(naz))]
     # add the emergent samples
     
-    if StreamSample == "TRUE":
+    if StreamSample == "True":
 	type_emergent = [t+"_EMERGENT" for t in type] + ["POINT_X","POINT_Y","POINT_X","POINT_Y"]
 	naz_e= [[n,a,z] for n in NODES for a in [0] for z in [0]]
 	LCpointlist = LCpointlist + [naz_e[row] + [NODES[naz_e[row][0]][t] for t in type_emergent] for row in range(0,len(naz_e))]
@@ -279,20 +279,24 @@ try:
     ####################################################################################################### 
     
     # Create the landcover headers by concatenating the type, azimuth direction, and zone
-    LCHeaders = ["LC_EMERGENT"]
+    
+    if StreamSample == "True":
+	LCHeaders = ["LC_EMERGENT"]
+    else:
+	LCHeaders = []
     for t in type:
 	for a in range(0,len(azimuths)):
 	    for z in range(0,len(zone)):
-		if t in ["CCV","LAI","k"] and a==0 and z==0:
+		if StreamSample == "True" and t in ["CCV","LAI","k"] and a==0 and z==0:
 		    LCHeaders.append(t+'_EMERGENT') # add this when we are at the beginning of the LAI/Canopy cover series
 		    LCHeaders.append(t+'_'+str(int(azimuths[a]))+'_Z'+str(zone[z]))
 		else:
 		    LCHeaders.append(t+'_'+str(int(azimuths[a]))+'_Z'+str(zone[z]))     
     
-    LCHeaders.append(["NUM_DIR","NUM_ZONES","SAMPLE_DIS"]) 
+    LCHeaders = LCHeaders + ["NUM_DIR","NUM_ZONES","SAMPLE_DIS"]
     
     # Write the landcover data to the TTools point feature class
-    UpdatePointFile(NODES, inPoint, LCHeaders)	    	
+    UpdatePointFile(NODES, inPoint, LCHeaders)
 
     ####################################################################################################### 
 	

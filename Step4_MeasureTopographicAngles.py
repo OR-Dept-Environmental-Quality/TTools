@@ -102,7 +102,7 @@ def UpdatePointFile(pointDict, pointfile, AddFields):
 	for row in cursor:
 	    for f in xrange(0,len(AddFields)):
 		node =row[0]
-		row[f+1] = NODES[node][AddFields[f]]
+		row[f+1] = pointDict[node][AddFields[f]]
 		cursor.updateRow(row)
 
 def ToMetersUnitConversion(inFeature):
