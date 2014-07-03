@@ -1,10 +1,19 @@
 #######################################################################################
 # TTools
-# Convert to csv - v 0.1
+# Convert to csv - v 0.6
 # Ryan Michie
 
 # This script will take an input point feature and output a csv file in the landcover
 # data format for heatsource 9.
+
+# INPUTS
+# 0: input TTools point file (inPoint)
+# 1: create seperate csv files for each STREAM_ID (multiplecsv) True/False. if True will appends stream ID to csv name.
+# 2: path directory where output csv file will be saved (outcsv_dir)
+# 3: name of the csv file (outcsv_file)
+
+# OUTPUTS
+# csv file, with the same columns and order as the input point file (minus a few feature class specfic columns)
 
 # This version is for manual starts from within python.
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
@@ -16,30 +25,42 @@ from __future__ import division, print_function
 import sys, os, string, gc, shutil, time
 import arcpy
 from collections import defaultdict
+from operator import itemgetter
 import csv
 
-# parameter values
-# 0: input TTools point file (inPoint)
-# 1: output csv file to write to name/path outcsv_final)
-
-def NestedDictTree(): 
-    """Build a nested dictionary"""
-    return defaultdict(NestedDictTree)
+#inPoint = arcpy.GetParameterAsText(0)
+#multiplecsv = arcpy.GetParameterAsText(1)
+#outcsv_final = arcpy.GetParameterAsText(2)
+    
+# Start Fill in Data
+inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
+multiplecsv = "True"
+outcsv_dir = r"D:\Projects\TTools_9"
+outcsv_file = "out_nodes.csv"
+# End Fill in Data
 
 def read_pointfile(pointfile, readfields):
     """Reads an input point file and returns the NODE ID and X/Y coordinates as a nested dictionary"""
     pnt_dict = NestedDictTree()
-    Incursorfields = ["STREAM_ID","NODE_ID","SHAPE@X","SHAPE@Y"] + readfields
+    Incursorfields = ["STREAM_ID","NODE_ID"] + readfields
     # Determine input point spatial units
     proj = arcpy.Describe(inPoint).spatialReference
     with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
 	for row in Inrows:
-	    pnt_dict[row[0]]["POINT_X"] = row[1]
-	    pnt_dict[row[0]]["POINT_Y"] = row[2] 
 	    for f in xrange(0,len(readfields)):
-		pnt_dict[row[0]][readfields[f]] = row[3+f]
+		pnt_dict[row[0]][row[1]][readfields[f]] = row[2+f]
     return(pnt_dict)
 
+def write_csv(csvlist, csvfile):
+    """write the input list to csv"""
+    with open(outcsv_final, "wb") as f:
+	writer = csv.writer(f)
+	writer.writerows(csv_out)    
+
+def NestedDictTree(): 
+    """Build a nested dictionary"""
+    return defaultdict(NestedDictTree)
+    
 def read_csv(csvfile):
     """Reads an input csv file and returns the header row as a list and the data as a nested dictionary"""
     csv_dict = NestedDictTree()
@@ -53,16 +74,14 @@ def read_csv(csvfile):
 		csv_dict[row[0]][header[key]] = row[key]
     return(header,csv_dict)
 
-try:
+#enable garbage collection
+gc.enable()
 
-    #inPoint = arcpy.GetParameterAsText(0)
-    #outcsv_final = arcpy.GetParameterAsText(1)
-	
-    # Start Fill in Data
-    inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
-    outcsv_final = "D:\Projects\TTools_9\out_nodes.csv"
-    # End Fill in Data
-    removelist = [u"OBJECTID",u"Id",u"Shape",u"NODE_ID",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
+try:
+    #keeping track of time
+    startTime= time.time()    
+
+    removelist = [u"OBJECTID",u"Id",u"Shape",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
 	
     # Get all the column headers in the point file and remove the ones in removelist
     header = [field.name for field in arcpy.Describe(inPoint).fields]
@@ -74,19 +93,45 @@ try:
     # Output the csv file
 	
     # Get the stream km dictionary keys and sort them
-    NODE_keys = NODES.keys()
-    NODE_keys.sort()    
+    #NODE_keys = NODES.keys()
+    #NODE_keys.sort()    
     
-    # make a wide format list by node ID from the nested dictionary 
-    csv_out = [[NODES[nodeID][h] for h in csv_header] for nodeID in NODE_keys]
+    # make a wide format list by node ID from the nested dictionary
+    
+    if multiplecsv == "True":
+	for streamID in NODES:
+	    csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for nodeID in NODES[streamID]]
+	    outcsv_final = outcsv_dir + "\\" + outcsv_file.replace(".csv", "") + "_" + str(streamID) + ".csv"
+	    
+	    #sort the list by stream km
+	    csv_out = sorted(csv_out, key=itemgetter(1), reverse=True)
+	    
+	    # Add the header row
+	    csv_out.insert(0,header_clean)	    
+	    
+	    # write it
+	    write_csv(csv_out,outcsv_final)
 
-    # Add the header row
-    csv_out.insert(0,csv_header)
+    else:
+	csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for streamID in NODES for nodeID in NODES[streamID]]
+	outcsv_final = outcsv_dir+ "\\" + outcsv_file
 	
-    # Export to csv
-    with open(outcsv_final, "wb") as f:
-	writer = csv.writer(f)
-	writer.writerows(csv_out3)	
+	
+	#sort the list by stream ID and then stream km
+	csv_out = sorted(csv_out, key=itemgetter(1,2), reverse=True)	
+
+	# Add the header row
+	csv_out.insert(0,header_clean)
+	
+	# write it
+	write_csv(csv_out,outcsv_final)
+    
+    gc.collect()
+	    
+    endTime = time.time()
+    elapsedmin= (endTime - startTime) / 60	
+    print("Process Complete in %s minutes" % (elapsedmin))
+    #arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))    
 	
 # For arctool errors
 except arcpy.ExecuteError:
