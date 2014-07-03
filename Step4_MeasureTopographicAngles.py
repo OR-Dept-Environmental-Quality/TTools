@@ -1,6 +1,6 @@
 #######################################################################################
 # TTools
-# Step 4: Measure Topographic Angles - v 0.5
+# Step 4: Measure Topographic Angles - v 0.9
 # Ryan Michie
 
 # This script will take an input point feature (from Step 1) and calculate the maximum
@@ -15,8 +15,8 @@
 # 5: output sample point file name/path (outpoint_final)
 
 # OUTPUTS
-# point feature class - Added fields with topographic shade angles for each direction at each node
-# point feature class - for each x/y location of the maximum elevation.
+# point feature class (edit inPoint) - Added fields with topographic shade angles for each direction at each node
+# point feature class (new) - point for each x/y location of the maximum elevation.
 
 # Future Updates
 #
@@ -56,13 +56,13 @@ EleUnits = 1
 outpoint_final = r"D:\Projects\TTools_9\Example_data.gdb\topo_samplepoint"
 # End Fill in Data
 
-def tree(): 
+def NestedDictTree(): 
     """Build a nested dictionary"""
-    return defaultdict(tree)
+    return defaultdict(NestedDictTree)
 
 def ReadPointFile(pointfile):
     """Reads the input point file and returns the NODE_ID and X/Y coordinates as a nested dictionary"""
-    pnt_dict = tree()
+    pnt_dict = NestedDictTree()
     Incursorfields = ["NODE_ID", "SHAPE@X","SHAPE@Y"]
     # Determine input point spatial units
     proj = arcpy.Describe(inPoint).spatialReference
@@ -83,7 +83,10 @@ def CreateTopoPointFile(pointList, pointfile, proj):
 
     # Add attribute fields # TODO add dictionary of field types so they aren't all double
     for f in cursorfields:
-	arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+	if f == "AZIMUTH":
+	    arcpy.AddField_management(pointfile, f, "TEXT", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+	else:
+	    arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
 	    
     with arcpy.da.InsertCursor(pointfile, cursorfields + ["SHAPE@X","SHAPE@Y"]) as cursor:
 	for row in pointList:
@@ -156,6 +159,8 @@ try:
 	azimuths = [45,90,135,180,225,270,315]
     else:        
 	azimuths = [270,180,90]	
+    
+    azimuthdict = {45:"NE",90:"E",135:"SE",180:"S",225:"SW",270:"W",315:"NW",365:"N"}
 	
     # read the data into a nested dictionary
     NODES = ReadPointFile(inPoint)
@@ -217,8 +222,8 @@ try:
 		    MaxShadeAngle_X = sample_x
 		    MaxShadeAngle_Y = sample_y
 	    
-	    TOPO_fc.append([nodeID, azimuths[a], MaxShadeAngle, SampleZFinal, MaxZChange,FinalSearchDistance, MaxSearchDistance * nodexy_to_m, offRasterSamples, MaxShadeAngle_X, MaxShadeAngle_Y, MaxShadeAngle_X,MaxShadeAngle_Y])
-	    NODES[nodeID]["TOPO_"+ str(azimuths[a])]= MaxShadeAngle
+	    TOPO_fc.append([nodeID, azimuthdict[azimuths[a]], MaxShadeAngle, SampleZFinal, MaxZChange,FinalSearchDistance, MaxSearchDistance * nodexy_to_m, offRasterSamples, MaxShadeAngle_X, MaxShadeAngle_Y, MaxShadeAngle_X,MaxShadeAngle_Y])
+	    NODES[nodeID]["TOPO_"+ str(azimuthdict[azimuths[a]])]= MaxShadeAngle
 	    #NODES[node].append(MaxShadeAngle)
     
     del(i,nodeID,a,ShadeAngle,MaxShadeAngle,MaxZChange, MaxShadeAngle_X,MaxShadeAngle_Y,thevalue,SampleZFinal,offRasterSamples, FinalSearchDistance)			
@@ -230,7 +235,7 @@ try:
 
     ####################################################################################################### 
     # Write the topo angles to the TTools point feature class
-    AddFields = ["TOPO_"+ str(a) for a in azimuths]
+    AddFields = ["TOPO_"+ azimuthdict[a] for a in azimuths]
     UpdatePointFile(NODES, inPoint, AddFields)		
     
     endTime = time.time()

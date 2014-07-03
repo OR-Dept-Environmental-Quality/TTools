@@ -1,6 +1,6 @@
 #######################################################################################
 # TTools
-# Step 1: Create Stream Nodes  version 0.7
+# Step 1: Create Stream Nodes  version 0.9
 # Ryan Michie
 
 # This script will take an input polyline feature with unique stream IDs and generate 
@@ -39,6 +39,7 @@ from arcpy import env
 from math import radians, sin, cos
 from collections import defaultdict
 from operator import itemgetter
+
 
 env.overwriteOutput = True
 
@@ -90,19 +91,27 @@ def CreatePointFile(pointList,pointfile, SIDname, proj):
     SIDlength = arcpy.ListFields(inLine,SIDname)[0].length    
     
     #Create an empty output with the same projection as the input polyline
-    cursorfields = ["NODE_ID","STREAM_ID","STREAM_KM","POINT_X","POINT_Y","SHAPE@X","SHAPE@Y"]
+    cursorfields = ["NODE_ID","STREAM_ID","STREAM_KM","LONGITUDE","LATITUDE","SHAPE@X","SHAPE@Y"]
     arcpy.CreateFeatureclass_management(os.path.dirname(pointfile),os.path.basename(pointfile), "POINT","","DISABLED","DISABLED",proj)
 
     # Add attribute fields
     arcpy.AddField_management(pointfile, "NODE_ID", "LONG", "", "", "", "", "NULLABLE", "NON_REQUIRED")
     arcpy.AddField_management(pointfile, "STREAM_ID", SIDtype, SIDprecision, SIDscale, SIDlength, "", "NULLABLE", "NON_REQUIRED")
     arcpy.AddField_management(pointfile, "STREAM_KM", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(pointfile, "POINT_X", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(pointfile, "POINT_Y", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+    arcpy.AddField_management(pointfile, "LONGITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+    arcpy.AddField_management(pointfile, "LATITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
 	    
     with arcpy.da.InsertCursor(pointfile, cursorfields) as cursor:
 	for row in pointList:
 	    cursor.insertRow(row)
+    
+    #Change X/Y from input spatial units to decimal degrees
+    proj_dd = arcpy.SpatialReference(4269) #GCS_North_American_1983 
+    with arcpy.da.UpdateCursor(pointfile,["SHAPE@X","SHAPE@Y","LONGITUDE","LATITUDE"],"",proj_dd) as cursor:
+	for row in cursor:
+	    row[2] = row[0] # LONGITUDE
+	    row[3] = row[1] # LATITUDE
+	    cursor.updateRow(row)
 
 #enable garbage collection
 gc.enable()
@@ -113,6 +122,9 @@ try:
 	
     # Create the stream nodes and return them as a list
     NODES = CreateNodes(inLine)
+    
+    #sort the list by stream ID and then stream km
+    NODES = sorted(NODES, key=itemgetter(1,2), reverse=True)
 	
     # Get the spatial projecton of the input stream lines
     proj = arcpy.Describe(inLine).SpatialReference
