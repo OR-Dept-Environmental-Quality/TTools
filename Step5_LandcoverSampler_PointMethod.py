@@ -1,9 +1,9 @@
 #######################################################################################
 # TTools
-# Step 5: Sample Landcover - Star Pattern, Point Method v 0.97
+# Step 5: Sample Landcover - Star Pattern, Point Method v 0.98
 # Ryan Michie
 
-# This script will take an input point feature (from Step 1) and sample input landcover rasters
+# Sample_Landcover_PointMethod will take an input point feature (from Step 1) and sample input landcover rasters
 # in a user specificed number of cardianal directions with point samples spaced at a user defined distance
 # moving away from the stream.
 
@@ -40,7 +40,6 @@ from arcpy import env
 from math import radians, sin, cos
 from collections import defaultdict
 from operator import itemgetter
-import csv
 
 # Check out the ArcGIS Spatial Analyst extension license
 arcpy.CheckOutExtension("Spatial")
@@ -49,18 +48,19 @@ from arcpy.management import *
 
 env.overwriteOutput = True
 
-#inPoint = arcpy.GetParameterAsText(0)
-#NumDirections = long(arcpy.GetParameterAsText(1))
-#NumZones = long(arcpy.GetParameterAsText(2))
-#StreamSample = arcpy.GetParameterAsText(3) True/False
-#TransDistance = long(arcpy.GetParameterAsText(4))
-#CanopyData = = arcpy.GetParameterAsText(5) # One of these: 1."Codes", 2."CanopyCover", or 3."LAI"
-#LCRaster = arcpy.GetParameterAsText(6) # This is either landcover height or codes
-#CanopyRaster = arcpy.GetParameterAsText(7) # OPTIONAL This is either canopy cover or LAI raster
-#kRaster = arcpy.GetParameterAsText(8) # OPTIONAL The k value raster for LAI
-#EleRaster = arcpy.GetParameterAsText(9)
-#EleUnits = arcpy.GetParameterAsText(10)
-#outpoint_final = arcpy.GetParameterAsText(11)
+# Parameter fields for python toolbox
+#inPoint = parameters[0].valueAsText
+#NumDirections = parameters[1].valueAsText # LONG
+#NumZones = parameters[2].valueAsText # LONG
+#StreamSample = parameters[3].valueAsText True/False
+#TransDistance = parameters[4].valueAsText # LONG
+#CanopyData = = parameters[5].valueAsText One of these: 1."Codes", 2."CanopyCover", or 3."LAI"
+#LCRaster = parameters[6].valueAsText # This is either landcover height or codes
+#CanopyRaster = parameters[7].valueAsText # OPTIONAL This is either canopy cover or LAI raster
+#kRaster = parameters[8].valueAsText # OPTIONAL The k value raster for LAI
+#EleRaster = parameters[9].valueAsText
+#EleUnits = parameters[10].valueAsText
+#outpoint_final = aparameters[11].valueAsText
     
 # Start Fill in Data
 inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
@@ -95,7 +95,7 @@ def ReadPointFile(pointfile):
 
 def CreateLCPointFile(pointList, LCFields, pointfile, proj):
     """Creates the output landcover sample point feature class using the data from the nodes list"""
-    #arcpy.AddMessage("Exporting Data")
+    arcpy.AddMessage("Exporting Data")
     print("Exporting Data")
     
     arcpy.CreateFeatureclass_management(os.path.dirname(pointfile),os.path.basename(pointfile), "POINT","","DISABLED","DISABLED",proj)
@@ -185,6 +185,9 @@ try:
 
     for n in NODES:
 	print("Processing Node %s of %s" % (n+1, len(NODES)))
+	# Set the progressor
+	arcpy.SetProgressor("step","",0, len(NODES), 1)
+	arcpy.SetProgressorLabel("Process Node %s of %s" % (n+1, len(NODES)))	
 	#arcpy.AddMessage("Process Node %s of %s" % (n+1, len(NODES)))
 	
 	#Add input metadata
@@ -249,7 +252,8 @@ try:
 		    if t == "k":
 			thevalue =arcpy.GetCellValue_management(kRaster, xypoint)
 			NODES[n][LCkey] = float(thevalue.getOutput(0))
-			
+	arcpy.SetProgressorPosition()
+    arcpy.ResetProgressor()
     del(n,a,z,t,thevalue,origin_x,origin_y,xypoint,_X_,_Y_)			
     gc.collect()
     
