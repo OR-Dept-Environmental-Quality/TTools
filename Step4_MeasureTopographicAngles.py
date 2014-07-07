@@ -1,6 +1,6 @@
 #######################################################################################
 # TTools
-# Step 4: Measure Topographic Angles - v 0.92
+# Step 4: Measure Topographic Angles - v 0.93
 # Ryan Michie
 
 # Measure_Topographic_Angles will take an input point feature (from Step 1) and calculate the maximum
@@ -31,7 +31,7 @@ from __future__ import division, print_function
 import sys, os, string, gc, shutil, time
 import arcpy
 from arcpy import env
-from math import radians, sin, cos, atan
+from math import radians, sin, cos, atan, ceil
 from collections import defaultdict
 #from operator import itemgetter
 
@@ -168,12 +168,14 @@ try:
     # read the data into a nested dictionary
     NODES = ReadPointFile(inPoint)
     TOPO_fc = []
+    n = 0
 	
     for nodeID in NODES:
-	print("Processing Node %s of %s" % (nodeID + 1, len(NODES)))
+	startNodeTime= time.time()
+	print("Processing Node %s of %s. %s minutes remaining" % (n+1, len(NODES), elapsedNodemin * (len(NODES) - n)))
 	# Set the progressor
 	arcpy.SetProgressor("step", "",0, len(NODES), 1)
-	arcpy.SetProgressorLabel("Processing Node %s of %s" % (nodeID+1, len(NODES)))
+	arcpy.SetProgressorLabel("Processing Node %s of %s. %s minutes remaining" % (n+1, len(NODES), elapsedNodemin * (len(NODES) - n)))
 	#arcpy.AddMessage("Processing Node %s of %s" % (nodeID+1, len(NODES)))
 	node_x = float(NODES[nodeID]["POINT_X"])
 	node_y = float(NODES[nodeID]["POINT_Y"])
@@ -184,12 +186,18 @@ try:
 	    sys.exit("There is no elevation to sample at sample node %s Please check your elevation raster and the spatial coordinates of your input data.") % (SreamNode_ID)
 	else:
 	    sampleZ= float(thevalue.getOutput(0)) *  eleZ_to_m		
-	nodeZ = float(thevalue.getOutput(0)) *  eleZ_to_m		
+	    nodeZ = float(thevalue.getOutput(0)) *  eleZ_to_m		
 	for a in xrange(0,len(azimuths)):
 	    SearchDistance = 0
 	    MaxShadeAngle = 0
 	    offRasterSamples = 0
-	    i = 0		  
+	    i = 0
+	    MaxZChange = 0
+	    SampleZFinal = nodeZ
+	    MaxShadeAngle = 0
+	    FinalSearchDistance = 0
+	    MaxShadeAngle_X = node_x
+	    MaxShadeAngle_Y = node_y		  
 	    while not SearchDistance > MaxSearchDistance:
 		# This is the skippy algorithm from Greg Pelletier
 		if i <= 10:
@@ -230,7 +238,10 @@ try:
 	    
 	    TOPO_fc.append([nodeID, azimuthdict[azimuths[a]], MaxShadeAngle, SampleZFinal, MaxZChange,FinalSearchDistance, MaxSearchDistance * nodexy_to_m, offRasterSamples, MaxShadeAngle_X, MaxShadeAngle_Y, MaxShadeAngle_X,MaxShadeAngle_Y])
 	    NODES[nodeID]["TOPO_"+ str(azimuthdict[azimuths[a]])]= MaxShadeAngle
+	    endNodeTime = time.time()
+	    elapsedNodemin = ceil(((endNodeTime - startNodeTime) / 60)* 10)/10	
 	arcpy.SetProgressorPosition()
+	n = n + 1
     arcpy.ResetProgressor()
     del(i,nodeID,a,ShadeAngle,MaxShadeAngle,MaxZChange, MaxShadeAngle_X,MaxShadeAngle_Y,thevalue,SampleZFinal,offRasterSamples, FinalSearchDistance)			
     gc.collect()
@@ -245,9 +256,9 @@ try:
     UpdatePointFile(NODES, inPoint, AddFields)		
     
     endTime = time.time()
-    elapsedmin= (endTime - startTime) / 60	
+    elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10	
     print("Process Complete in %s minutes" % (elapsedmin))
-    arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))
+    arcpy.AddMessage("Process Complete in %s minutes" % (elapsedmin))
 
 	
 # For arctool errors
