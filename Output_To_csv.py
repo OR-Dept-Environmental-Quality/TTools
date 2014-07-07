@@ -1,10 +1,10 @@
 #######################################################################################
 # TTools
-# Convert to csv - v 0.6
+# Output_To_csv - v 0.91
 # Ryan Michie
 
-# This script will take an input point feature and output a csv file in the landcover
-# data format for heatsource 9.
+# Output_To_csv will take the point feature created from using steps 1-5 and output a landcover data csv file formatted 
+# for heat source 9.
 
 # INPUTS
 # 0: input TTools point file (inPoint)
@@ -28,10 +28,12 @@ from collections import defaultdict
 from operator import itemgetter
 import csv
 
-#inPoint = arcpy.GetParameterAsText(0)
-#multiplecsv = arcpy.GetParameterAsText(1)
-#outcsv_final = arcpy.GetParameterAsText(2)
-    
+# Parameter fields for python toolbox
+#inPoint = parameters[0].valueAsText
+#multiplecsv = parameters[1].valueAsText
+#outcsv_dir = parameters[2].valueAsText
+#outcsv_file = parameters[3].valueAsText
+
 # Start Fill in Data
 inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 multiplecsv = "True"
@@ -79,7 +81,8 @@ gc.enable()
 
 try:
     #keeping track of time
-    startTime= time.time()    
+    startTime= time.time()
+    arcpy.AddMessage("Export to csv") 
 
     removelist = [u"OBJECTID",u"Id",u"Shape",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
 	
@@ -131,7 +134,7 @@ try:
     endTime = time.time()
     elapsedmin= (endTime - startTime) / 60	
     print("Process Complete in %s minutes" % (elapsedmin))
-    #arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))    
+    arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))    
 	
 # For arctool errors
 except arcpy.ExecuteError:
