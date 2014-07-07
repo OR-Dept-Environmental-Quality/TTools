@@ -1,6 +1,6 @@
 #######################################################################################
 # TTools
-# Step 1: Create Stream Nodes  version 0.9
+# Step 1: Create Stream Nodes  version 0.92
 # Ryan Michie
 
 # This script will take an input polyline feature with unique stream IDs and generate 
@@ -43,11 +43,11 @@ from operator import itemgetter
 
 env.overwriteOutput = True
 
-# Get data from arcscript
-#inLine = arcpy.GetParameterAsText(0)
-#StreamIDfield = arcpy.GetParameterAsText(1)
-#NodeDistance = arcpy.GetParameterAsText(2)
-#outpoint_final = arcpy.GetParameterAsText(3)
+# Parameter fields for python toolbox
+#inLine = parameters[0].valueAsText
+#StreamIDfield = parameters[1].valueAsText
+#NodeDistance = parameters[2].valueAsText
+#outpoint_final = parameters[3].valueAsText
 
 # Start Fill in Data
 inLine = r"D:\Projects\TTools_9\Example_data.gdb\McFee_flowline"
@@ -64,19 +64,20 @@ def CreateNodes(inLine):
     # Determine input point spatial units
     proj = arcpy.Describe(inLine).spatialReference
     with arcpy.da.SearchCursor(inLine,Incursorfields,"",proj) as Inrows:
-	#arcpy.SetProgressor("step", "Creating Nodes", 0, Inrows, 1)
 	print("Creating Nodes")	
 	for row in Inrows:
 	    LineLength = row[0].getLength("PRESERVE_SHAPE")
 	    numNodes = int(LineLength / NodeDistance)
 	    nodes = range(0,numNodes+1)
+	    arcpy.SetProgressor("step", "Creating Nodes", 0, numNodes+1, 1)
 	    positions = [n * NodeDistance / LineLength for n in nodes] # list of Lengths in meters
 	    for position in positions:
 		node = row[0].positionAlongLine(position,True).centroid
 		# list of "NODE_ID",STREAM_ID,"STREAM_KM","POINT_X","POINT_Y","SHAPE@X","SHAPE@Y"
 		NODES.append((NID, row[1], float(position * LineLength /1000), node.X, node.Y, node.X, node.Y ))
 		NID = NID + 1
-	    #arcpy.SetProgressorPosition()
+	    arcpy.SetProgressorPosition()
+    arcpy.ResetProgressor()
     return(NODES)
 
 def CreatePointFile(pointList,pointfile, SIDname, proj):
@@ -118,7 +119,7 @@ gc.enable()
 
 try:
     #keeping track of time
-    startTime= time.time()	
+    startTime= time.time()   
 	
     # Create the stream nodes and return them as a list
     NODES = CreateNodes(inLine)
