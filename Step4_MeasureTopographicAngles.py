@@ -1,10 +1,10 @@
 #######################################################################################
 # TTools
-# Step 4: Measure Topographic Angles - v 0.9
+# Step 4: Measure Topographic Angles - v 0.92
 # Ryan Michie
 
-# This script will take an input point feature (from Step 1) and calculate the maximum
-# topographic elevation and the the slope angle from the point in different directions.
+# Measure_Topographic_Angles will take an input point feature (from Step 1) and calculate the maximum
+# topographic elevation and the the slope angle from each node in different directions.
 
 # INPUTS
 # 0: input TTools point file (inPoint)
@@ -40,12 +40,13 @@ arcpy.CheckOutExtension("Spatial")
 
 env.overwriteOutput = True
 
-#inPoint = arcpy.GetParameterAsText(0)
-#Directions = long(arcpy.GetParameterAsText(1))
-#MaxSearchDistance_km = long(arcpy.GetParameterAsText(2))
-#EleRaster = arcpy.GetParameterAsText(3)
-#EleUnits = arcpy.GetParameterAsText(4)
-#outpoint_final = arcpy.GetParameterAsText(5)
+# Parameter fields for python toolbox
+#inPoint = parameters[0].valueAsText
+#Directions = parameters[1].valueAsText # Needs to be a long
+#MaxSearchDistance_km = parameters[2].valueAsText
+#EleRaster = parameters[3].valueAsText
+#EleUnits = parameters[4].valueAsText
+#outpoint_final = parameters[5].valueAsText
 
 # Start Fill in Data
 inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
@@ -74,7 +75,7 @@ def ReadPointFile(pointfile):
 
 def CreateTopoPointFile(pointList, pointfile, proj):
     """Creates the output topo point feature class using the data from the nodes list"""
-    #arcpy.AddMessage("Exporting Data")
+    arcpy.AddMessage("Exporting Data")
     print("Exporting Data")
     
     #Create an empty output with the same projection as the input polyline
@@ -117,7 +118,8 @@ def ToMetersUnitConversion(inFeature):
     if unitCode == 9005: #Clarke's foot
 	units_con =  0.3047972654 
     if unitCode not in [9001,9002,9003,9005]:
-	system.exit("Unrecognized spatial reference. Use projection with units of feet or meters.") 
+	arcpy.AddError("{0} has an unrecognized spatial reference. Use projection with units of feet or meters.".format(inFeature))
+	system.exit("Unrecognized spatial reference. Use projection with units of feet or meters.")
     return units_con
 
 #enable garbage collection
@@ -133,6 +135,7 @@ try:
 	
     # Check to make sure the raster and input points are in the same projection.
     if proj.name != proj_ele.name:
+	arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(inPoint,EleRaster))
 	sys.exit("Input points and elevation raster do not have the same projection. Please reproject your data.")
 	# reproject the inpoints
 	#inPoint_rp = os.path.dirname(inPoint) + "\\rp_" + os.path.basename(inPoint)
@@ -168,7 +171,10 @@ try:
 	
     for nodeID in NODES:
 	print("Processing Node %s of %s" % (nodeID + 1, len(NODES)))
-	#arcpy.AddMessage("Process Node %s of %s" % (nodeID+1, len(NODES)))
+	# Set the progressor
+	arcpy.SetProgressor("step", "",0, len(NODES), 1)
+	arcpy.SetProgressorLabel("Processing Node %s of %s" % (nodeID+1, len(NODES)))
+	#arcpy.AddMessage("Processing Node %s of %s" % (nodeID+1, len(NODES)))
 	node_x = float(NODES[nodeID]["POINT_X"])
 	node_y = float(NODES[nodeID]["POINT_Y"])
     
@@ -224,8 +230,8 @@ try:
 	    
 	    TOPO_fc.append([nodeID, azimuthdict[azimuths[a]], MaxShadeAngle, SampleZFinal, MaxZChange,FinalSearchDistance, MaxSearchDistance * nodexy_to_m, offRasterSamples, MaxShadeAngle_X, MaxShadeAngle_Y, MaxShadeAngle_X,MaxShadeAngle_Y])
 	    NODES[nodeID]["TOPO_"+ str(azimuthdict[azimuths[a]])]= MaxShadeAngle
-	    #NODES[node].append(MaxShadeAngle)
-    
+	arcpy.SetProgressorPosition()
+    arcpy.ResetProgressor()
     del(i,nodeID,a,ShadeAngle,MaxShadeAngle,MaxZChange, MaxShadeAngle_X,MaxShadeAngle_Y,thevalue,SampleZFinal,offRasterSamples, FinalSearchDistance)			
     gc.collect()
 	
@@ -241,7 +247,7 @@ try:
     endTime = time.time()
     elapsedmin= (endTime - startTime) / 60	
     print("Process Complete in %s minutes" % (elapsedmin))
-    #arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))
+    arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))
 
 	
 # For arctool errors
