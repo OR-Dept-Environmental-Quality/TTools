@@ -31,7 +31,7 @@ from __future__ import division, print_function
 import sys, os, string, gc, shutil, time
 import arcpy
 from arcpy import env
-from math import radians, sin, cos, atan, ceil
+from math import degrees, radians, sin, cos, atan, ceil
 from collections import defaultdict
 #from operator import itemgetter
 
@@ -227,7 +227,7 @@ try:
 		    sampleZ= float(thevalue.getOutput(0)) *  eleZ_to_m
 		
 		#calculate the topographic shade angle (in degrees)
-		ShadeAngle = atan((sampleZ - nodeZ) / SearchDistance * nodexy_to_m)
+		ShadeAngle = degrees(atan((sampleZ - nodeZ) / SearchDistance * nodexy_to_m))
 		if ShadeAngle > MaxShadeAngle:
 		    MaxZChange = sampleZ - nodeZ
 		    SampleZFinal = sampleZ
