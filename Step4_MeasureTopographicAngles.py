@@ -106,6 +106,21 @@ def UpdatePointFile(pointDict, pointfile, AddFields):
 		row[f+1] = pointDict[node][AddFields[f]]
 		cursor.updateRow(row)
 
+def UpdatePointFile2(pointDict, pointfile, AddFields): 
+    """Updates the input point feature class with data from the nodes dictionary"""
+    # Add attribute fields # TODO add a check to se if the field already exists. if yes ask to overwrite.
+    for f in AddFields:
+	arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+	
+    whereclause = """%s = %s""" % arcpy.AddFieldDelimiters(pointfile, "NODE_ID"), nodeID
+    
+    with arcpy.da.UpdateCursor(pointfile,["NODE_ID"] + AddFields, whereclause) as cursor:
+	for row in pointDict:
+	    for f in xrange(0,len(AddFields)):
+		node =row[0]
+		row[f+1] = pointDict[node][AddFields[f]]
+		cursor.updateRow(row)
+
 def ToMetersUnitConversion(inFeature):
     """Returns the conversion factor to get from the input spatial units to meters"""
     unitCode = arcpy.Describe(inFeature).SpatialReference.linearUnitCode
@@ -169,7 +184,7 @@ try:
     NODES = ReadPointFile(inPoint)
     TOPO_fc = []
     n = 0
-	
+    elapsedNodemin = 0.2
     for nodeID in NODES:
 	startNodeTime= time.time()
 	print("Processing Node %s of %s. %s minutes remaining" % (n+1, len(NODES), elapsedNodemin * (len(NODES) - n)))
@@ -238,8 +253,8 @@ try:
 	    
 	    TOPO_fc.append([nodeID, azimuthdict[azimuths[a]], MaxShadeAngle, SampleZFinal, MaxZChange,FinalSearchDistance, MaxSearchDistance * nodexy_to_m, offRasterSamples, MaxShadeAngle_X, MaxShadeAngle_Y, MaxShadeAngle_X,MaxShadeAngle_Y])
 	    NODES[nodeID]["TOPO_"+ str(azimuthdict[azimuths[a]])]= MaxShadeAngle
-	    endNodeTime = time.time()
-	    elapsedNodemin = ceil(((endNodeTime - startNodeTime) / 60)* 10)/10	
+	endNodeTime = time.time()
+	elapsedNodemin = ceil(((endNodeTime - startNodeTime) / 60)* 10)/10	
 	arcpy.SetProgressorPosition()
 	n = n + 1
     arcpy.ResetProgressor()
