@@ -13,7 +13,7 @@
 # Step 3: Sample Stream Elevations/ Gradient TBA
 # Step 4: Measure Topographic Angles - v 0.92
 # Step 5: Sample Landcover - Star Pattern, Point Method v 0.98
-# Convert to csv - v 0.91
+# Output To csv - v 0.91
 
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
 
@@ -262,8 +262,38 @@ class Output_To_csv(object):
 
     def getParameterInfo(self):
         """Define parameter definitions"""
-        params = None
-        return params
+	
+	inPoint =arcpy.Parameter(
+	    name="inPoint",
+	    displayName="Input TTools point feature class",
+	    direction="Input",
+	    datatype="GPFeatureLayer",
+	    parameterType="Required")	
+        
+        multiplecsv = arcpy.Parameter(
+	    name="multiplecsv",
+	    displayName="Create seperate csv files for each STREAM_ID",
+	    direction="Input",
+	    datatype="GPBoolean",
+	    parameterType="Required")
+	
+	outcsv_dir = arcpy.Parameter(
+	    name="outcsv_dir",
+	    displayName="Path directory where output csv file will be saved",
+	    direction="Input",
+	    datatype="GPString",
+	    parameterType="Required")
+	
+	outcsv_file = arcpy.Parameter(
+	    name="outcsv_file",
+	    displayName="Name of the csv file",
+	    direction="Input",
+	    datatype="GPString",
+	    parameterType="Required")	
+        
+	parameters = [inPoint, multiplecsv, outcsv_dir, outcsv_file]
+		
+	return parameters
 
     def updateParameters(self, parameters):
         """Modify the values and properties of parameters before internal
@@ -278,6 +308,101 @@ class Output_To_csv(object):
 
     def execute(self, parameters, messages):
         """The source code of the tool."""
+	
+	inPoint = parameters[0].valueAsText
+	multiplecsv = parameters[1].valueAsText
+	outcsv_dir = parameters[2].valueAsText
+	outcsv_file = parameters[3].valueAsText	
+	
+	def read_pointfile(pointfile, readfields):
+	    """Reads an input point file and returns the NODE ID and X/Y coordinates as a nested dictionary"""
+	    pnt_dict = NestedDictTree()
+	    Incursorfields = ["STREAM_ID","NODE_ID"] + readfields
+	    # Determine input point spatial units
+	    proj = arcpy.Describe(inPoint).spatialReference
+	    with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
+		for row in Inrows:
+		    for f in xrange(0,len(readfields)):
+			pnt_dict[row[0]][row[1]][readfields[f]] = row[2+f]
+	    return(pnt_dict)
+	
+	def write_csv(csvlist, csvfile):
+	    """write the input list to csv"""
+	    with open(outcsv_final, "wb") as f:
+		writer = csv.writer(f)
+		writer.writerows(csv_out)    
+	
+	def NestedDictTree(): 
+	    """Build a nested dictionary"""
+	    return defaultdict(NestedDictTree)	
+	
+	try:
+	    #keeping track of time
+	    startTime= time.time()
+	    arcpy.AddMessage("Export to csv") 
+	
+	    removelist = [u"OBJECTID",u"Id",u"Shape",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
+		
+	    # Get all the column headers in the point file and remove the ones in removelist
+	    header = [field.name for field in arcpy.Describe(inPoint).fields]
+	    header_clean = [h for h in header if h not in removelist]
+		
+	    NODES = read_pointfile(inPoint, header_clean)
+	
+	    # make a wide format list by node ID from the nested dictionary
+	    if multiplecsv == "True":
+		for streamID in NODES:
+		    csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for nodeID in NODES[streamID]]
+		    outcsv_final = outcsv_dir + "\\" + outcsv_file.replace(".csv", "") + "_" + str(streamID) + ".csv"
+		    
+		    #sort the list by stream km
+		    csv_out = sorted(csv_out, key=itemgetter(1), reverse=True)
+		    
+		    # Add the header row
+		    csv_out.insert(0,header_clean)	    
+		    
+		    # write it
+		    write_csv(csv_out,outcsv_final)
+	
+	    else:
+		csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for streamID in NODES for nodeID in NODES[streamID]]
+		outcsv_final = outcsv_dir+ "\\" + outcsv_file
+		
+		#sort the list by stream ID and then stream km
+		csv_out = sorted(csv_out, key=itemgetter(1,2), reverse=True)	
+	
+		# Add the header row
+		csv_out.insert(0,header_clean)
+		
+		# write it
+		write_csv(csv_out,outcsv_final)
+	    
+	    gc.collect()
+		    
+	    endTime = time.time()
+	    elapsedmin= (endTime - startTime) / 60	
+	    print("Process Complete in %s minutes" % (elapsedmin))
+	    arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))    
+		
+	# For arctool errors
+	except arcpy.ExecuteError:
+		msgs = arcpy.GetMessages(2)
+		arcpy.AddError(msgs)
+		print(msgs)
+		
+	# For other errors
+	except:
+		import traceback, sys
+		tb = sys.exc_info()[2]
+		tbinfo = traceback.format_tb(tb)[0]
+		    
+		pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" + str(sys.exc_info()[1])
+		msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
+		
+		arcpy.AddError(pymsg)
+		arcpy.AddError(msgs)
+		
+		print(pymsg)
+		print(msgs)	
+	
         return
-        
-      
