@@ -8,7 +8,7 @@
 # moving away from the stream.
 
 # INPUTS
-# 0: input TTools point file (inPoint)
+# 0: Input TTools point feature class (inPoint)
 # 1: input number of directions to sample (NumDirections)
 # 2: input number of transverse vegetation samples in each azimuth direction (NumZones)
 # 3: include stream sample (True/False)

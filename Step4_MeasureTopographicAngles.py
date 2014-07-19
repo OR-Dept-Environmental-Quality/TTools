@@ -7,7 +7,7 @@
 # topographic elevation and the the slope angle from each node in different directions.
 
 # INPUTS
-# 0: input TTools point file (inPoint)
+# 0: Input TTools point feature class (inPoint)
 # 1: input the directions to sample (Directions) 1. [W,S,E], 2. [NE,E,SE,S,SW,W,NW]
 # 2: input the maximum km distance to search (MaxSearchDistance_km)
 # 3: input elevation raster (EleRaster)

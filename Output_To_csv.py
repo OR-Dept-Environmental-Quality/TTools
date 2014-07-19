@@ -7,7 +7,7 @@
 # for heat source 9.
 
 # INPUTS
-# 0: input TTools point file (inPoint)
+# 0: Input TTools point feature class (inPoint)
 # 1: create seperate csv files for each STREAM_ID (multiplecsv) True/False. if True will appends stream ID to csv name.
 # 2: path directory where output csv file will be saved (outcsv_dir)
 # 3: name of the csv file (outcsv_file)
