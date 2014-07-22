@@ -341,7 +341,7 @@ class Output_To_csv(object):
 	    startTime= time.time()
 	    arcpy.AddMessage("Export to csv") 
 	
-	    removelist = [u"OBJECTID",u"Id",u"Shape",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
+	    removelist = [u"OBJECTID",u"Id",u"Shape",u"ELEVATION",u"GRADIENT",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
 		
 	    # Get all the column headers in the point file and remove the ones in removelist
 	    header = [field.name for field in arcpy.Describe(inPoint).fields]
@@ -381,14 +381,12 @@ class Output_To_csv(object):
 		    
 	    endTime = time.time()
 	    elapsedmin= (endTime - startTime) / 60	
-	    print("Process Complete in %s minutes" % (elapsedmin))
 	    arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))    
 		
 	# For arctool errors
 	except arcpy.ExecuteError:
 		msgs = arcpy.GetMessages(2)
 		arcpy.AddError(msgs)
-		print(msgs)
 		
 	# For other errors
 	except:
@@ -400,9 +398,5 @@ class Output_To_csv(object):
 		msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
 		
 		arcpy.AddError(pymsg)
-		arcpy.AddError(msgs)
-		
-		print(pymsg)
-		print(msgs)	
-	
+		arcpy.AddError(msgs)	
         return

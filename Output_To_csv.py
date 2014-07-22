@@ -84,7 +84,7 @@ try:
     startTime= time.time()
     arcpy.AddMessage("Export to csv") 
 
-    removelist = [u"OBJECTID",u"Id",u"Shape",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
+    removelist = [u"OBJECTID",u"Id",u"Shape",u"ELEVATION",u"GRADIENT",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
 	
     # Get all the column headers in the point file and remove the ones in removelist
     header = [field.name for field in arcpy.Describe(inPoint).fields]
