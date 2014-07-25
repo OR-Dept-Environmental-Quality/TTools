@@ -9,6 +9,7 @@
 # INPUTS
 # 0: Input TTools point feature class (inPoint)
 # 1: input the number of samples around the node (searchCells) 1. [0],  2. [9], 3. [25]
+# 2: input flag for smoothing if gradient is zero or negative (smooth_flag) 1. True, 2. False
 # 2: input elevation raster (EleRaster)
 # 3: input elevation raster z units (EleUnits) 1. "Feet", 2. "Meters" 3. "Other"
 
@@ -26,6 +27,7 @@
 from __future__ import division, print_function
 import sys, os, string, gc, shutil, time
 import arcpy
+import itertools
 from arcpy import env
 from math import sqrt, pow, ceil
 from collections import defaultdict
@@ -38,12 +40,14 @@ env.overwriteOutput = True
 # Parameter fields for python toolbox
 #inPoint = parameters[0].valueAsText
 #searchCells = parameters[1].valueAsText # Needs to be a int
-#EleRaster = parameters[2].valueAsText
-#EleUnits = parameters[3].valueAsText
+#smooth_flag = parameters[2].valueAsText # Needs to be a int
+#EleRaster = parameters[3].valueAsText
+#EleUnits = parameters[4].valueAsText
 
 # Start Fill in Data
 inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
-searchCells = 0
+searchCells = 9
+smooth_flag = "True"
 EleRaster = r"D:\Projects\TTools_9\Example_data.gdb\be_lidar_ft"
 EleUnits = 1
 # End Fill in Data
@@ -87,18 +91,17 @@ def ToMetersUnitConversion(inFeature):
         system.exit("Unrecognized spatial reference. Use projection with units of feet or meters.")
     return units_con
 
-def GetElevation(samplexy, EleRaster, LowElev):
+def GetElevation(samplexy, EleRaster, LowElev, eleZ_to_m):
     """"""
-    #pIDArray = pIdentify.Identify(pNewPoint)
-    #If Not pIDArray Is Nothing:
-        #Set pRIDObj = pIDArray.Element(0)
-        # Get the value of the RasterIdentifyObject and add it to the field
-        #If pProp.PixelType:
-            #If pRIDObj.Name <> "NoData":
-                #newElev = CDbl(pRIDObj.Name) / g_DEMConvertUnits
-        
-                #If newElev < lowElev:
-                    #lowElev = newElev
+    thevalue = arcpy.GetCellValue_management(EleRaster, samplexy)
+    if str(thevalue.getOutput(0)) == "NoData":
+	offRasterSamples = offRasterSamples + 1
+    else:
+	SampleElev= float(thevalue.getOutput(0)) *  eleZ_to_m
+		
+    #See if the sample elevation is the lowest for this stream node
+    if SampleElev < LowElev:
+	LowElev = SampleElev
     return(LowElev)
 
 def CalculateGradient(LowElev,LowElevUp):
@@ -110,11 +113,12 @@ def UpdatePointFile(pointDict, pointfile, AddFields):
     for f in AddFields:
 	arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")    
     
-    with arcpy.da.UpdateCursor(pointfile,["NODE_ID"] + AddFields) as cursor:
+    with arcpy.da.UpdateCursor(pointfile,["STREAM_ID","NODE_ID"] + AddFields) as cursor:
 	for row in cursor:
 	    for f in xrange(0,len(AddFields)):
-		node =row[0]
-		row[f+1] = pointDict[node][AddFields[f]]
+		streamID = row[0]
+		nodeID =row[1]
+		row[f+2] = pointDict[streamID][nodeID][AddFields[f]]
 		cursor.updateRow(row)
 
 #enable garbage collection
@@ -151,46 +155,76 @@ try:
 	
     # Get the elevation raster cell size
     CellSizeResult = arcpy.GetRasterProperties_management(EleRaster, "CELLSIZEX")
-    CellSize = float(CellSizeResult.getOutput(0))	      
+    CellSize = float(CellSizeResult.getOutput(0))
+    
+    # Make a list of the base x/y coordinate movments. These values will be multipled by the cell size.
+    if searchCells == 0: 
+	cellcoords = list(itertools.product([0],[0]))
 	
+    if searchCells == 9:
+	cellcoords = list(itertools.product([-1,0,1],[-1,0,1]))
+
+    if searchCells == 25:
+	cellcoords = list(itertools.product([-2,-1,0,1,2],[-2,-1,0,1,2]))
+        
     # read the data into a nested dictionary
     NODES = ReadPointFile(inPoint)
     n = 0
     for streamID in NODES:
+	SkipDownNodes = [1]
 	
 	for nodeID in NODES[streamID]:
 	    node_x = float(NODES[streamID][nodeID]["POINT_X"])
 	    node_y = float(NODES[streamID][nodeID]["POINT_Y"])
 	    LowElev = 99999
 	    
-	    for searchCell in range(searchCells):
-		# Calculate the cell X/Y based on searchCell number
-		
+	    for coord in cellcoords:
+		# Calculate the cell X/Y based on the base coordinate movement
+		cell_x = node_x + (coord[0] * CellSize)
+		cell_y = node_y + (coord[1] * CellSize)
 		
 		samplexy = str(cell_x) + " " + str(cell_y) # xy string requirement for arcpy.GetCellValue
 		
-		#GetElevation(samplexy, EleRaster, LowElev)
+		#GetElevation(samplexy, EleRaster, LowElev, eleZ_to_m)
 		# Sample the elevation value from the elevation raster
 		thevalue = arcpy.GetCellValue_management(EleRaster, samplexy)
 		if str(thevalue.getOutput(0)) == "NoData":
 		    offRasterSamples = offRasterSamples + 1
 		else:
-		    sampleZ= float(thevalue.getOutput(0)) *  eleZ_to
+		    SampleElev= float(thevalue.getOutput(0)) *  eleZ_to_m
 		
 		#See if the sample elevation is the lowest for this stream node
-		if SampleElev > LowElev:
+		if SampleElev < LowElev:
 		    LowElev = SampleElev
 	    
 	    # Save the elevation back into the dictionary
 	    NODES[streamID][nodeID]["ELEVATION"] = LowElev
 	    
-	    #CalculateGradient
-	    if NodeID > 0:
+	    # CalculateGradient
+	    if nodeID > 0:
+		# Calculate gradient between the current node and downstream node
 		Ele = LowElev
 		EleDown = NODES[streamID][nodeID - 1]["ELEVATION"]
-		If Ele <> 0:
-		    grad = (Ele - EleDown) / dx
-		
+		dx_meters = float(NODES[streamID][nodeID]["STREAM_KM"] - NODES[streamID][nodeID - 1]["STREAM_KM"]) * 1000
+		#GradientDown = (Ele - EleDown) / (dx_meters)
+		# Check if the gradient is <= 0, if yes keep going until
+		# it is positive again. Then recalculate the gradient over the longer distance		
+		if Ele <= EleDown and smooth_flag == "True":
+		    EleDownSkip = EleDown
+		    SkipDownNodes.append(max(SkipDownNodes) + 1)
+		    NODES[streamID][nodeID -1]["GRADIENT"] = GradientDown
+		else:
+		    EleDownSkip = NODES[streamID][nodeID - max(SkipDownNodes)]["ELEVATION"]
+		    dx_meters = float(NODES[streamID][nodeID]["STREAM_KM"] - NODES[streamID][nodeID - max(SkipDownNodes)]["STREAM_KM"]) * 1000
+		    GradientDown = (Ele - EleDownSkip) / dx_meters
+		    for Skip in SkipDownNodes:
+			NODES[streamID][nodeID - Skip]["GRADIENT"] = GradientDown
+		    SkipDownNodes = [1]
+    
+    # Write the Elevation and Gradient to the TTools point feature class
+    AddFields = ["ELEVATION", "GRADIENT"]
+    UpdatePointFile(NODES, inPoint, AddFields)	    
+
 # For arctool errors
 except arcpy.ExecuteError:
     msgs = arcpy.GetMessages(2)
