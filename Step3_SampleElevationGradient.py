@@ -188,8 +188,8 @@ try:
 	    if NodeID > 0:
 		Ele = LowElev
 		EleDown = NODES[streamID][nodeID - 1]["ELEVATION"]
-		If Ele <> 0 Then
-		    grad = (Ele - EleDown) / dx	
+		If Ele <> 0:
+		    grad = (Ele - EleDown) / dx
 		
 # For arctool errors
 except arcpy.ExecuteError:
