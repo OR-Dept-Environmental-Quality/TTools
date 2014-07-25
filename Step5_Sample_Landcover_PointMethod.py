@@ -112,9 +112,16 @@ def CreateLCPointFile(pointList, LCFields, pointfile, proj):
 
 def UpdatePointFile(pointDict, pointfile, AddFields): 
     """Updates the input point feature class with data from the nodes dictionary"""
-    # Add attribute fields # TODO add a check to se if the field already exists. if yes ask to overwrite.
+    
+    # Get a list of existing fields
+    ExistingFields = []
+    for f in arcpy.ListFields(pointfile):
+	ExistingFields.append(f.name)     
+    
+    # Check to see if the field exists and add it if not
     for f in AddFields:
-	arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")    
+	if (f in ExistingFields) == False:
+	    arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")   
     
     with arcpy.da.UpdateCursor(pointfile,["NODE_ID"] + AddFields) as cursor:
 	for row in cursor:
