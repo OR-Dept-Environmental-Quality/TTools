@@ -1,74 +1,76 @@
+# Import system modules
 from __future__ import division, print_function
+import sys, os, string, gc, shutil, time
+import arcpy
+import itertools
+from arcpy import env
+from math import sqrt, pow, ceil
 from collections import defaultdict
 
-length = [0.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 429.645497802]
-azimuths = [x * 360.0 / 8 for x in range(1,8+ 1)]
-zone = range(1,int(5))
-type = ['LC','ELE']
-type2 = type + ['SAMPLE_X','SAMPLE_Y']
-type3 = ["SAMPLE_X","SAMPLE_Y"] + type2
+# Check out the ArcGIS Spatial Analyst extension license
+arcpy.CheckOutExtension("Spatial")
 
-#Calculate the unique number of dictionary values
-N = len(length) * len(azimuths) * len(zone) * len(type)
+pointfile = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 
-# Build the Dictionary
-dictkeys = ["LENGTH","SAMPLE_X","SAMPLE_Y","VARIABLE","AZIMUTH","ZONE","VALUE"]
-DATA = defaultdict(list)
+env.overwriteOutput = True
+def NestedDictTree(): 
+    """Build a nested dictionary"""
+    return defaultdict(NestedDictTree)
 
-for d in dictkeys:
-	for i in range(0,N):
-		DATA[d].append(i)
-		
-def tree(): return defaultdict(tree)
+try:
 
-NODES = tree()
+    #"""Reads the input point file and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
+    pnt_dict = NestedDictTree()
+    Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y"]
+    AddFields = ["TEST","TOPO_S","TOPO_E"]
+    #AddFields = ["TOPO_W","TOPO_S","TOPO_E"]
+    OverwriteData = False
+    
+    # Get a list of existing fields
+    ExistingFields = []
+    for f in arcpy.ListFields(pointfile):
+	ExistingFields.append(f.name)     
+    
+    # Check to see if the 1st field exists if yes add it.
+    if OverwriteData == False and (AddFields[0] in ExistingFields) == True:
+	Incursorfields.append(AddFields[0])
+    else:
+	OverwriteData = True
+    
+    # Determine input point spatial units
+    proj = arcpy.Describe(pointfile).spatialReference
+    
+    with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
+	if OverwriteData == True:
+	    for row in Inrows:
+		pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
+		pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
+		pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4]
+	else:
+	    for row in Inrows:
+		# Is the data null or zero, if yes grab it.
+		if row[5] == None or row[5] == 0:
+		    pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
+		    pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
+		    pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4]		    
 
-i=0
-NODES = tree()
-for l in length:
-	for a in azimuths:
-		for z in zone:
-			for t in type2:
-				NODES[l][a][z][t] = i
-				i = i +1
-
-del(i,x,d,l,t,a,z)
-
-NODE_keys = NODES.keys()
-NODE_keys.sort()
-
-####################################################################################################### 
-# output shp
-# put the dictionary in a list form needed to build the output point feature class
-shapekeys = ["LENGTH","SAMPLE_X","SAMPLE_Y","VARIABLE","AZIMUTH","ZONE","VALUE","SAMPLE_X","SAMPLE_Y"]
-DATA_shp = [[DATA[k][row] for k in shapekeys] for row in range(0,N)]
-
-laz = [[l,a,z] for l in length for a in azimuths for z in zone]
-
-NODES_shp = [AA[row] + [NODES[la[row][0]][laz[row][1]][laz[row][2]][t] for t in type3] for row in range(0,len(laz))]
-
-
-####################################################################################################### 
-# output csv and point files
-
-# Get the stream km dictionary keys and sort them
-NODE_keys = NODES.keys()
-NODE_keys.sort()
-
-NODES_csv = [[NODES[l][a][z][t] for t in type for a in azimuths for z in zone] for l in length]
-
-# add in the stream km at the beginning of the list
-for l in range(0,len(NODE_keys)):
-	NODES_csv[l].insert(0,NODE_keys[l])	
-
-# Add the header row
-LC_Header = ["Stream_KM"]
-
-for t in range(0,len(type)):
-	for a in range(0,len(azimuths)):
-		for z in range(0,len(zone)):
-			LC_Header.append(type[t]+'_A'+str(a+1)+'_Z'+str(zone[z]))		
-
-NODES_csv.insert(0,LC_Header)
-	
-i = 0	
+# For arctool errors
+except arcpy.ExecuteError:
+    msgs = arcpy.GetMessages(2)
+    #arcpy.AddError(msgs)
+    print(msgs)
+    
+# For other errors
+except:
+    import traceback, sys
+    tb = sys.exc_info()[2]
+    tbinfo = traceback.format_tb(tb)[0]
+			
+    pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" + str(sys.exc_info()[1])
+    msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
+		    
+    #arcpy.AddError(pymsg)
+    #arcpy.AddError(msgs)
+		    
+    print(pymsg)
+    print(msgs)
