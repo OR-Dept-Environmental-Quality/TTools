@@ -61,7 +61,7 @@ def NestedDictTree():
     """Build a nested dictionary"""
     return defaultdict(NestedDictTree)
 
-def ReadPointFile(pointfile):
+def ReadPointFileOLD(pointfile):
     """Reads the input point file and returns the NODE_ID and X/Y coordinates as a nested dictionary"""
     pnt_dict = NestedDictTree()
     Incursorfields = ["NODE_ID", "SHAPE@X","SHAPE@Y"]
@@ -72,6 +72,39 @@ def ReadPointFile(pointfile):
 	    pnt_dict[row[0]]["POINT_X"] = row[1]
 	    pnt_dict[row[0]]["POINT_Y"] = row[2] 
     return(pnt_dict)
+
+def ReadPointFile(pointfile, OverwriteData, AddFields):
+    """Reads the input point file and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
+    pnt_dict = NestedDictTree()
+    Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y",]
+    
+    # Get a list of existing fields
+    ExistingFields = []
+    for f in arcpy.ListFields(pointfile):
+	ExistingFields.append(f.name)     
+	
+    # Check to see if the 1st field exists if yes add it.
+    if OverwriteData == False and (AddFields[0] in ExistingFields) == True:
+	Incursorfields.append(AddFields[0])
+    else:
+	OverwriteData = True
+	
+    # Determine input point spatial units
+    proj = arcpy.Describe(pointfile).spatialReference
+	
+    with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
+	if OverwriteData == True:
+	    for row in Inrows:
+		pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
+		pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
+		pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4]
+	else:
+	    for row in Inrows:
+		# if the data is null or zero (0 = default for shapefile), it is retreived and will be overwritten.
+		if row[5] == None or row[5] == 0:
+		    pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
+		    pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
+		    pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4] 
 
 def CreateTopoPointFile(pointList, pointfile, proj):
     """Creates the output topo point feature class using the data from the nodes list"""
