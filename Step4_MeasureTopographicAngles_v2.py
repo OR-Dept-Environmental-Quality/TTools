@@ -61,7 +61,7 @@ def NestedDictTree():
     """Build a nested dictionary"""
     return defaultdict(NestedDictTree)
 
-def ReadPointFile(pointfile):
+def ReadPointFileOLD(pointfile):
     """Reads the input point file and returns the NODE_ID and X/Y coordinates as a nested dictionary"""
     pnt_dict = NestedDictTree()
     Incursorfields = ["NODE_ID", "SHAPE@X","SHAPE@Y"]
@@ -73,11 +73,44 @@ def ReadPointFile(pointfile):
             pnt_dict[row[0]]["POINT_Y"] = row[2] 
     return(pnt_dict)
 
+def ReadPointFile(pointfile, OverwriteData, AddFields):
+    """Reads the input point file and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
+    pnt_dict = NestedDictTree()
+    Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y",]
+
+    # Get a list of existing fields
+    ExistingFields = []
+    for f in arcpy.ListFields(pointfile):
+        ExistingFields.append(f.name)     
+
+    # Check to see if the 1st field exists if yes add it.
+    if OverwriteData == False and (AddFields[0] in ExistingFields) == True:
+        Incursorfields.append(AddFields[0])
+    else:
+        OverwriteData = True
+
+    # Determine input point spatial units
+    proj = arcpy.Describe(pointfile).spatialReference
+
+    with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
+        if OverwriteData == True:
+            for row in Inrows:
+                pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
+                pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
+                pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4]
+        else:
+            for row in Inrows:
+                # if the data is null or zero (0 = default for shapefile), it is retreived and will be overwritten.
+                if row[5] == None or row[5] == 0:
+                    pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
+                    pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
+                    pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4] 
+
 def CreateTopoPointFile(pointList, pointfile, proj):
     """Creates the output topo point feature class using the data from the nodes list"""
     arcpy.AddMessage("Exporting Data")
     print("Exporting Data")
-    
+
     #Create an empty output with the same projection as the input polyline
     cursorfields = ["NODE_ID","AZIMUTH","TOPOANGLE","TOPO_ELE","NODE_ELE","ELE_CHANGE","DISTANCE_m","SEARCH_m","NA_SAMPLES","POINT_X","POINT_Y"]
     arcpy.CreateFeatureclass_management(os.path.dirname(pointfile),os.path.basename(pointfile), "POINT","","DISABLED","DISABLED",proj)
@@ -88,24 +121,24 @@ def CreateTopoPointFile(pointList, pointfile, proj):
             arcpy.AddField_management(pointfile, f, "TEXT", "", "", "", "", "NULLABLE", "NON_REQUIRED")
         else:
             arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-        
+
     with arcpy.da.InsertCursor(pointfile, cursorfields + ["SHAPE@X","SHAPE@Y"]) as cursor:
         for row in pointList:
             cursor.insertRow(row)
 
 def UpdatePointFile(pointDict, pointfile, AddFields): 
     """Updates the input point feature class with data from the nodes dictionary"""
-    
+
     # Get a list of existing fields
     ExistingFields = []
     for f in arcpy.ListFields(pointfile):
-	ExistingFields.append(f.name)     
-    
+        ExistingFields.append(f.name)     
+
     # Check to see if the field exists and add it if not
     for f in AddFields:
-	if (f in ExistingFields) == False:
-	    arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")     
-    
+        if (f in ExistingFields) == False:
+            arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")     
+
     with arcpy.da.UpdateCursor(pointfile,["NODE_ID"] + AddFields) as cursor:
         for row in cursor:
             for f in xrange(0,len(AddFields)):
@@ -116,9 +149,9 @@ def UpdatePointFile(pointDict, pointfile, AddFields):
 def UpdatePointFile2(pointDict, nodeID, pointfile, AddFields): 
     """Updates the input point feature class with data from the nodes dictionary"""
     # Add attribute fields # TODO add a check to se if the field already exists. if yes ask to overwrite.
-    
+
     whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(pointfile, "NODE_ID"), nodeID)
-    
+
     with arcpy.da.UpdateCursor(pointfile,["NODE_ID"] + AddFields, whereclause) as cursor:
         for row in cursor:   
             for f in xrange(0,len(AddFields)):
@@ -154,14 +187,14 @@ def CreateTopoPoints(inPoint,EleRaster, NODES, azimuths, MaxSearchDistance,eleZ_
         print("Processing Node %s of %s. %s minutes remaining" % (n+1, len(NODES), elapsedNodemin * (len(NODES) - n)))
         node_x = float(NODES[nodeID]["POINT_X"])
         node_y = float(NODES[nodeID]["POINT_Y"])
-    
+
         nodexy = str(node_x) + " " + str(node_y) # xy string requirement for arcpy.GetCellValue 
         thevalue = arcpy.GetCellValue_management(EleRaster, nodexy)
         if str(thevalue.getOutput(0)) == "NoData":
             sys.exit("There is no elevation to sample at sample node %s Please check your elevation raster and the spatial coordinates of your input data.") % (SreamNode_ID)
         else:       
             nodeZ = float(thevalue.getOutput(0)) *  eleZ_to_m
-        
+
         for a in xrange(0,len(azimuths)):
             SearchDistance = 0
             MaxShadeAngle = 0
@@ -173,7 +206,7 @@ def CreateTopoPoints(inPoint,EleRaster, NODES, azimuths, MaxSearchDistance,eleZ_
             FinalSearchDistance = 0
             MaxShadeAngle_X = node_x
             MaxShadeAngle_Y = node_y
-            
+
             while not SearchDistance > MaxSearchDistance:
                 # This is the skippy algorithm from Greg Pelletier
                 if i <= 10:
@@ -189,12 +222,12 @@ def CreateTopoPoints(inPoint,EleRaster, NODES, azimuths, MaxSearchDistance,eleZ_
                 if i > 60:
                     SearchDistance = SearchDistance + (CellSize * 50)
                 i = i + 1             
-                
+
                 # Calculate the x and y sample location.
                 sample_x = (SearchDistance * sin(radians(azimuths[a]))) + node_x
                 sample_y = (SearchDistance * cos(radians(azimuths[a]))) + node_y
                 samplexy = str(sample_x) + " " + str(sample_y) # xy string requirement for arcpy.GetCellValue
-                
+
                 # Sample the elevation value from the elevation raster
                 thevalue = arcpy.GetCellValue_management(EleRaster, samplexy)       
                 if str(thevalue.getOutput(0)) == "NoData":
@@ -202,7 +235,7 @@ def CreateTopoPoints(inPoint,EleRaster, NODES, azimuths, MaxSearchDistance,eleZ_
                 else:
                     sampleZ= float(thevalue.getOutput(0)) *  eleZ_to_m
                     ShadeAngle = degrees(atan((sampleZ - nodeZ) / SearchDistance * nodexy_to_m))
-                
+
                 if ShadeAngle > MaxShadeAngle:
                     MaxZChange = sampleZ - nodeZ
                     SampleZFinal = sampleZ
@@ -210,13 +243,13 @@ def CreateTopoPoints(inPoint,EleRaster, NODES, azimuths, MaxSearchDistance,eleZ_
                     FinalSearchDistance = SearchDistance * nodexy_to_m
                     MaxShadeAngle_X = sample_x
                     MaxShadeAngle_Y = sample_y
-                    
+
             TOPO.append([nodeID, azimuthdict[azimuths[a]], MaxShadeAngle, SampleZFinal, nodeZ, MaxZChange,FinalSearchDistance, MaxSearchDistance * nodexy_to_m, offRasterSamples, MaxShadeAngle_X, MaxShadeAngle_Y, MaxShadeAngle_X,MaxShadeAngle_Y])
             NODES[nodeID]["TOPO_"+ str(azimuthdict[azimuths[a]])]= MaxShadeAngle
-    
+
         # Write the topo angles to the TTools point feature class
         UpdatePointFile2(NODES, nodeID, inPoint, AddFields) 
-    
+
         endNodeTime = time.time()
         elapsedNodemin = ceil(((endNodeTime - startNodeTime) / 60)* 10)/10
         n = n + 1
@@ -224,15 +257,15 @@ def CreateTopoPoints(inPoint,EleRaster, NODES, azimuths, MaxSearchDistance,eleZ_
 
 #enable garbage collection
 gc.enable()
-  
+
 try:
     #keeping track of time
     startTime= time.time()    
-    
+
     # Determine input point spatial units
     proj = arcpy.Describe(inPoint).spatialReference
     proj_ele = arcpy.Describe(EleRaster).spatialReference
-    
+
     # Check to make sure the raster and input points are in the same projection.
     if proj.name != proj_ele.name:
         arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(inPoint,EleRaster))
@@ -242,7 +275,7 @@ try:
     #Elexy_to_m = ToMetersUnitConversion(EleRaster)
     #units_con=  nodexy_to_m / Elexy_to_m
     MaxSearchDistance = MaxSearchDistance_km * 1/nodexy_to_m * 1000
-    
+
     # Determine the elevation Z units conversion into meters
     if EleUnits == 1: # Feet
         eleZ_to_m = 0.3048
@@ -250,7 +283,7 @@ try:
         eleZ_to_m = 1
     if EleUnits == 3: # Other
         sys.exit("Please modify your raster elevtion units to feet or meters.")     
-    
+
     # Get the elevation raster cell size
     CellSizeResult = arcpy.GetRasterProperties_management(EleRaster, "CELLSIZEX")
     CellSize = float(CellSizeResult.getOutput(0))         
@@ -258,43 +291,43 @@ try:
         azimuths = [45,90,135,180,225,270,315]
     else:        
         azimuths = [270,180,90]
-    
+
     azimuthdict = {45:"NE",90:"E",135:"SE",180:"S",225:"SW",270:"W",315:"NW",365:"N"}
     # Add the Topo field to the input nodes point feature class
     AddFields = ["TOPO_"+ azimuthdict[a] for a in azimuths]
     for f in AddFields:
         arcpy.AddField_management(inPoint, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")    
-    
+
     # read the data into a nested dictionary
     NODES = ReadPointFile(inPoint)    
     TOPO = CreateTopoPoints(inPoint,EleRaster, NODES, azimuths, MaxSearchDistance, eleZ_to_m, AddFields)
     CreateTopoPointFile(TOPO, outpoint_final,proj)
-    
+
     gc.collect()
-    
+
     endTime = time.time()
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10   
     print("Process Complete in %s minutes" % (elapsedmin))
     arcpy.AddMessage("Process Complete in %s minutes" % (elapsedmin))
 
-    
+
 # For arctool errors
 except arcpy.ExecuteError:
     msgs = arcpy.GetMessages(2)
     #arcpy.AddError(msgs)
     print(msgs)
-    
+
 # For other errors
 except:
     import traceback, sys
     tb = sys.exc_info()[2]
     tbinfo = traceback.format_tb(tb)[0]
-    
+
     pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" + str(sys.exc_info()[1])
     msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
-    
+
     #arcpy.AddError(pymsg)
     #arcpy.AddError(msgs)
-    
+
     print(pymsg)
     print(msgs)
