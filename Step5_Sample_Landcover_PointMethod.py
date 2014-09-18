@@ -64,10 +64,10 @@ env.overwriteOutput = True
 
 # Start Fill in Data
 inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
-NumDirections = 8
-NumZones = 4 
+NumDirections = 8  #TransectNumber
+NumZones = 4  #TransectsSamples
 StreamSample = 'True' # include stream sample in number of zones? (True/False)
-TransDistance = 8
+TransDistance = 8  #TransectSampSpacing
 LCRaster = r"D:\Projects\TTools_9\Example_data.gdb\veght_lidar_ft" # This is either landcover height or codes
 CanopyDataType = "Codes"
 CanopyRaster = "" # OPTIONAL This is either canopy cover or a LAI raster
