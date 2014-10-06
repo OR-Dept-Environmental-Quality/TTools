@@ -10,7 +10,7 @@
 # INPUTS
 # 0: input stream centerline polyline (inLine)
 # 1: unique StreamID field (StreamIDfield)
-# 2: spacing between nodes (NodeDistance)
+# 2: spacing between nodes (node_dx)
 # 3: output point file name/path (outpoint_final)
 
 # OUTPUTS
@@ -46,19 +46,19 @@ env.overwriteOutput = True
 # Parameter fields for python toolbox
 #inLine = parameters[0].valueAsText
 #StreamIDfield = parameters[1].valueAsText
-#NodeDistance = parameters[2].valueAsText
+#node_dx = parameters[2].valueAsText
 #outpoint_final = parameters[3].valueAsText
 
 # Start Fill in Data
 inLine = r"D:\Projects\TTools_9\Example_data.gdb\McFee_flowline"
 SIDname = "GNIS_ID"
-NodeDistance = 50
+node_dx = 50
 outpoint_final = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 # End Fill in Data
 
 def CreateNodes(inLine):
     """Reads an input stream centerline file and returns the NODE ID, STREAM ID, and X/Y coordinates as a list"""
-    NODES = []
+    NodeList = []
     Incursorfields = ["SHAPE@",SIDname]
     NID = 0
     # Determine input point spatial units
@@ -67,18 +67,18 @@ def CreateNodes(inLine):
         print("Creating Nodes")	
         for row in Inrows:
             LineLength = row[0].getLength("PRESERVE_SHAPE")
-            numNodes = int(LineLength / NodeDistance)
+            numNodes = int(LineLength / node_dx)
             nodes = range(0,numNodes+1)
             arcpy.SetProgressor("step", "Creating Nodes", 0, numNodes+1, 1)
-            positions = [n * NodeDistance / LineLength for n in nodes] # list of Lengths in meters
+            positions = [n * node_dx / LineLength for n in nodes] # list of Lengths in meters
             for position in positions:
                 node = row[0].positionAlongLine(position,True).centroid
                 # list of "NODE_ID",STREAM_ID,"STREAM_KM","POINT_X","POINT_Y","SHAPE@X","SHAPE@Y"
-                NODES.append((NID, row[1], float(position * LineLength /1000), node.X, node.Y, node.X, node.Y ))
+                NodeList.append((NID, row[1], float(position * LineLength /1000), node.X, node.Y, node.X, node.Y ))
                 NID = NID + 1
             arcpy.SetProgressorPosition()
     arcpy.ResetProgressor()
-    return(NODES)
+    return(NodeList)
 
 def CreatePointFile(pointList,pointfile, SIDname, proj):
     """Create the output point feature class using the data from the nodes list"""
@@ -122,16 +122,16 @@ try:
     startTime= time.time()   
 
     # Create the stream nodes and return them as a list
-    NODES = CreateNodes(inLine)
+    NodeList = CreateNodes(inLine)
 
     #sort the list by stream ID and then stream km
-    NODES = sorted(NODES, key=itemgetter(1,2), reverse=True)
+    NodeList = sorted(NodeList, key=itemgetter(1,2), reverse=True)
 
     # Get the spatial projecton of the input stream lines
     proj = arcpy.Describe(inLine).SpatialReference
 
     # Create the output point feature class with the nodes list
-    CreatePointFile(NODES,outpoint_final, SIDname, proj)
+    CreatePointFile(NodeList,outpoint_final, SIDname, proj)
 
     gc.collect()
 
