@@ -54,7 +54,7 @@ class Step1_Create_Stream_Nodes(object):
 
     def getParameterInfo(self):
         """Define parameter definitions"""
-        
+
         inLine =arcpy.Parameter(
             name="inLine",
             displayName="Input Stream Centerlines/s",
@@ -62,43 +62,43 @@ class Step1_Create_Stream_Nodes(object):
             datatype="GPFeatureLayer",
             parameterType="Required")
         inLine.filter.list = ["LINE"])
-        
+
         SIDname =arcpy.Parameter(
             name="SIDname",
             displayName="Stream Identifier Field Name",
             direction="Input",
             datatype="Field",
             parameterType="Required")      
-        
-        NodeDistance =arcpy.Parameter(
-            name="NodeDistance",
+
+        node_dx =arcpy.Parameter(
+            name="node_dx",
             displayName="Desired distance between nodes (meters)",
             direction="Input",
             datatype="Double",
             parameterType="Required")
-        
+
         outpoint_final =arcpy.Parameter(
             name="outpoint_final",
             displayName="Output point features",
             direction="Output", 
             datatype="DEFeatureClass",
             parameterType="Required")
-        
-        parameters = [inLine, SIDname, NodeDistance, outpoint_final]
-        
+
+        parameters = [inLine, SIDname, node_dx, outpoint_final]
+
         return parameters
 
     def updateParameters(self, parameters):
         """Modify the values and properties of parameters before internal
         validation is performed.  This method is called whenever a parameter
         has been changed."""
-        
+
         if parameters[0].altered:
             parameters[1].value = arcpy.ValidateFieldName(parameters[1].value, parameters[0].value)        
-        
+
         if parameters[1].altered:
             parameters[2].value = arcpy.ValidateFieldName(parameters[2].value, parameters[1].value)        
-        
+
         return
 
     def updateMessages(self, parameters):
@@ -108,93 +108,93 @@ class Step1_Create_Stream_Nodes(object):
 
     def execute(self, parameters, messages):
         """The source code of the tool."""
-        
+
         inLine = parameters[0].valueAsText
         StreamIDfield = parameters[1].valueAsText
-        NodeDistance = parameters[2].valueAsText
+        node_dx = parameters[2].valueAsText
         outpoint_final = parameters[3].valueAsText        
-        
-	def CreateNodes(inLine):
-	    """Reads an input stream centerline file and returns the NODE ID, STREAM ID, and X/Y coordinates as a list"""
-	    NODES = []
-	    Incursorfields = ["SHAPE@",SIDname]
-	    NID = 0
-	    # Determine input point spatial units
-	    proj = arcpy.Describe(inLine).spatialReference
-	    with arcpy.da.SearchCursor(inLine,Incursorfields,"",proj) as Inrows:
-		print("Creating Nodes")	
-		for row in Inrows:
-		    LineLength = row[0].getLength("PRESERVE_SHAPE")
-		    numNodes = int(LineLength / NodeDistance)
-		    nodes = range(0,numNodes+1)
-		    arcpy.SetProgressor("step", "Creating Nodes", 0, numNodes+1, 1)
-		    positions = [n * NodeDistance / LineLength for n in nodes] # list of Lengths in meters
-		    for position in positions:
-			node = row[0].positionAlongLine(position,True).centroid
-			# list of "NODE_ID",STREAM_ID,"STREAM_KM","POINT_X","POINT_Y","SHAPE@X","SHAPE@Y"
-			NODES.append((NID, row[1], float(position * LineLength /1000), node.X, node.Y, node.X, node.Y ))
-			NID = NID + 1
-		    arcpy.SetProgressorPosition()
-	    arcpy.ResetProgressor()
-	    return(NODES)
-	
-	def CreatePointFile(pointList,pointfile, SIDname, proj):
-	    """Create the output point feature class using the data from the nodes list"""
-	    arcpy.AddMessage("Exporting Data")
-	    
-	    # Determine Stream ID field properties
-	    SIDtype = arcpy.ListFields(inLine,SIDname)[0].type
-	    SIDprecision = arcpy.ListFields(inLine,SIDname)[0].precision
-	    SIDscale = arcpy.ListFields(inLine,SIDname)[0].scale
-	    SIDlength = arcpy.ListFields(inLine,SIDname)[0].length    
-	    
-	    #Create an empty output with the same projection as the input polyline
-	    cursorfields = ["NODE_ID","STREAM_ID","STREAM_KM","LONGITUDE","LATITUDE","SHAPE@X","SHAPE@Y"]
-	    arcpy.CreateFeatureclass_management(os.path.dirname(pointfile),os.path.basename(pointfile), "POINT","","DISABLED","DISABLED",proj)
-	
-	    # Add attribute fields
-	    arcpy.AddField_management(pointfile, "NODE_ID", "LONG", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-	    arcpy.AddField_management(pointfile, "STREAM_ID", SIDtype, SIDprecision, SIDscale, SIDlength, "", "NULLABLE", "NON_REQUIRED")
-	    arcpy.AddField_management(pointfile, "STREAM_KM", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-	    arcpy.AddField_management(pointfile, "LONGITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-	    arcpy.AddField_management(pointfile, "LATITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-		    
-	    with arcpy.da.InsertCursor(pointfile, cursorfields) as cursor:
-		for row in pointList:
-		    cursor.insertRow(row)
-	    
-	    #Change X/Y from input spatial units to decimal degrees
-	    proj_dd = arcpy.SpatialReference(4269) #GCS_North_American_1983 
-	    with arcpy.da.UpdateCursor(pointfile,["SHAPE@X","SHAPE@Y","LONGITUDE","LATITUDE"],"",proj_dd) as cursor:
-		for row in cursor:
-		    row[2] = row[0] # LONGITUDE
-		    row[3] = row[1] # LATITUDE
-		    cursor.updateRow(row)
-	
-	#enable garbage collection
-	gc.enable()
-	
-	#keeping track of time
-	startTime= time.time()   
-		
-	# Create the stream nodes and return them as a list
-	NODES = CreateNodes(inLine)
-	    
-	#sort the list by stream ID and then stream km
-	NODES = sorted(NODES, key=itemgetter(1,2), reverse=True)
-		
-	# Get the spatial projecton of the input stream lines
-	proj = arcpy.Describe(inLine).SpatialReference
-		
-	# Create the output point feature class with the nodes list
-	CreatePointFile(NODES,outpoint_final, SIDname, proj)
-		
-	gc.collect()
-		
-	endTime = time.time()
-	elapsedmin= (endTime - startTime) / 60	
-	arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))        
-        
+
+        def CreateNodes(inLine):
+            """Reads an input stream centerline file and returns the NODE ID, STREAM ID, and X/Y coordinates as a list"""
+            NODES = []
+            Incursorfields = ["SHAPE@",SIDname]
+            NID = 0
+            # Determine input point spatial units
+            proj = arcpy.Describe(inLine).spatialReference
+            with arcpy.da.SearchCursor(inLine,Incursorfields,"",proj) as Inrows:
+                print("Creating Nodes")	
+                for row in Inrows:
+                    LineLength = row[0].getLength("PRESERVE_SHAPE")
+                    numNodes = int(LineLength / node_dx)
+                    nodes = range(0,numNodes+1)
+                    arcpy.SetProgressor("step", "Creating Nodes", 0, numNodes+1, 1)
+                    positions = [n * node_dx / LineLength for n in nodes] # list of Lengths in meters
+                    for position in positions:
+                        node = row[0].positionAlongLine(position,True).centroid
+                        # list of "NODE_ID",STREAM_ID,"STREAM_KM","POINT_X","POINT_Y","SHAPE@X","SHAPE@Y"
+                        NODES.append((NID, row[1], float(position * LineLength /1000), node.X, node.Y, node.X, node.Y ))
+                        NID = NID + 1
+                    arcpy.SetProgressorPosition()
+            arcpy.ResetProgressor()
+            return(NODES)
+
+        def CreatePointFile(pointList,pointfile, SIDname, proj):
+            """Create the output point feature class using the data from the nodes list"""
+            arcpy.AddMessage("Exporting Data")
+
+            # Determine Stream ID field properties
+            SIDtype = arcpy.ListFields(inLine,SIDname)[0].type
+            SIDprecision = arcpy.ListFields(inLine,SIDname)[0].precision
+            SIDscale = arcpy.ListFields(inLine,SIDname)[0].scale
+            SIDlength = arcpy.ListFields(inLine,SIDname)[0].length    
+
+            #Create an empty output with the same projection as the input polyline
+            cursorfields = ["NODE_ID","STREAM_ID","STREAM_KM","LONGITUDE","LATITUDE","SHAPE@X","SHAPE@Y"]
+            arcpy.CreateFeatureclass_management(os.path.dirname(pointfile),os.path.basename(pointfile), "POINT","","DISABLED","DISABLED",proj)
+
+            # Add attribute fields
+            arcpy.AddField_management(pointfile, "NODE_ID", "LONG", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+            arcpy.AddField_management(pointfile, "STREAM_ID", SIDtype, SIDprecision, SIDscale, SIDlength, "", "NULLABLE", "NON_REQUIRED")
+            arcpy.AddField_management(pointfile, "STREAM_KM", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+            arcpy.AddField_management(pointfile, "LONGITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+            arcpy.AddField_management(pointfile, "LATITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+
+            with arcpy.da.InsertCursor(pointfile, cursorfields) as cursor:
+                for row in pointList:
+                    cursor.insertRow(row)
+
+            #Change X/Y from input spatial units to decimal degrees
+            proj_dd = arcpy.SpatialReference(4269) #GCS_North_American_1983 
+            with arcpy.da.UpdateCursor(pointfile,["SHAPE@X","SHAPE@Y","LONGITUDE","LATITUDE"],"",proj_dd) as cursor:
+                for row in cursor:
+                    row[2] = row[0] # LONGITUDE
+                    row[3] = row[1] # LATITUDE
+                    cursor.updateRow(row)
+
+        #enable garbage collection
+        gc.enable()
+
+        #keeping track of time
+        startTime= time.time()   
+
+        # Create the stream nodes and return them as a list
+        NODES = CreateNodes(inLine)
+
+        #sort the list by stream ID and then stream km
+        NODES = sorted(NODES, key=itemgetter(1,2), reverse=True)
+
+        # Get the spatial projecton of the input stream lines
+        proj = arcpy.Describe(inLine).SpatialReference
+
+        # Create the output point feature class with the nodes list
+        CreatePointFile(NODES,outpoint_final, SIDname, proj)
+
+        gc.collect()
+
+        endTime = time.time()
+        elapsedmin= (endTime - startTime) / 60	
+        arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))        
+
         return
 
 class Step4_Measure_Topographic_Angles(object):
@@ -251,7 +251,7 @@ class Step5_Sample_Landcover_PointMethod(object):
     def execute(self, parameters, messages):
         """The source code of the tool."""
         return
-        
+
 class Output_To_csv(object):
     def __init__(self):
         """Output_To_csv will take the point feature created from using steps 1-5 and output a landcover data csv file formatted for heat source 9"""
@@ -262,38 +262,38 @@ class Output_To_csv(object):
 
     def getParameterInfo(self):
         """Define parameter definitions"""
-	
-	inPoint =arcpy.Parameter(
-	    name="inPoint",
-	    displayName="Input TTools point feature class",
-	    direction="Input",
-	    datatype="GPFeatureLayer",
-	    parameterType="Required")	
-        
+
+        inPoint =arcpy.Parameter(
+            name="inPoint",
+            displayName="Input TTools point feature class",
+            direction="Input",
+            datatype="GPFeatureLayer",
+            parameterType="Required")	
+
         multiplecsv = arcpy.Parameter(
-	    name="multiplecsv",
-	    displayName="Create seperate csv files for each STREAM_ID",
-	    direction="Input",
-	    datatype="GPBoolean",
-	    parameterType="Required")
-	
-	outcsv_dir = arcpy.Parameter(
-	    name="outcsv_dir",
-	    displayName="Path directory where output csv file will be saved",
-	    direction="Input",
-	    datatype="GPString",
-	    parameterType="Required")
-	
-	outcsv_file = arcpy.Parameter(
-	    name="outcsv_file",
-	    displayName="Name of the csv file",
-	    direction="Input",
-	    datatype="GPString",
-	    parameterType="Required")	
-        
-	parameters = [inPoint, multiplecsv, outcsv_dir, outcsv_file]
-		
-	return parameters
+            name="multiplecsv",
+            displayName="Create seperate csv files for each STREAM_ID",
+            direction="Input",
+            datatype="GPBoolean",
+            parameterType="Required")
+
+        outcsv_dir = arcpy.Parameter(
+            name="outcsv_dir",
+            displayName="Path directory where output csv file will be saved",
+            direction="Input",
+            datatype="GPString",
+            parameterType="Required")
+
+        outcsv_file = arcpy.Parameter(
+            name="outcsv_file",
+            displayName="Name of the csv file",
+            direction="Input",
+            datatype="GPString",
+            parameterType="Required")	
+
+        parameters = [inPoint, multiplecsv, outcsv_dir, outcsv_file]
+
+        return parameters
 
     def updateParameters(self, parameters):
         """Modify the values and properties of parameters before internal
@@ -308,95 +308,95 @@ class Output_To_csv(object):
 
     def execute(self, parameters, messages):
         """The source code of the tool."""
-	
-	inPoint = parameters[0].valueAsText
-	multiplecsv = parameters[1].valueAsText
-	outcsv_dir = parameters[2].valueAsText
-	outcsv_file = parameters[3].valueAsText	
-	
-	def read_pointfile(pointfile, readfields):
-	    """Reads an input point file and returns the NODE ID and X/Y coordinates as a nested dictionary"""
-	    pnt_dict = NestedDictTree()
-	    Incursorfields = ["STREAM_ID","NODE_ID"] + readfields
-	    # Determine input point spatial units
-	    proj = arcpy.Describe(inPoint).spatialReference
-	    with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
-		for row in Inrows:
-		    for f in xrange(0,len(readfields)):
-			pnt_dict[row[0]][row[1]][readfields[f]] = row[2+f]
-	    return(pnt_dict)
-	
-	def write_csv(csvlist, csvfile):
-	    """write the input list to csv"""
-	    with open(outcsv_final, "wb") as f:
-		writer = csv.writer(f)
-		writer.writerows(csv_out)    
-	
-	def NestedDictTree(): 
-	    """Build a nested dictionary"""
-	    return defaultdict(NestedDictTree)	
-	
-	try:
-	    #keeping track of time
-	    startTime= time.time()
-	    arcpy.AddMessage("Export to csv") 
-	
-	    removelist = [u"OBJECTID",u"Id",u"Shape",u"ELEVATION",u"GRADIENT",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
-		
-	    # Get all the column headers in the point file and remove the ones in removelist
-	    header = [field.name for field in arcpy.Describe(inPoint).fields]
-	    header_clean = [h for h in header if h not in removelist]
-		
-	    NODES = read_pointfile(inPoint, header_clean)
-	
-	    # make a wide format list by node ID from the nested dictionary
-	    if multiplecsv == "True":
-		for streamID in NODES:
-		    csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for nodeID in NODES[streamID]]
-		    outcsv_final = outcsv_dir + "\\" + outcsv_file.replace(".csv", "") + "_" + str(streamID) + ".csv"
-		    
-		    #sort the list by stream km
-		    csv_out = sorted(csv_out, key=itemgetter(1), reverse=True)
-		    
-		    # Add the header row
-		    csv_out.insert(0,header_clean)	    
-		    
-		    # write it
-		    write_csv(csv_out,outcsv_final)
-	
-	    else:
-		csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for streamID in NODES for nodeID in NODES[streamID]]
-		outcsv_final = outcsv_dir+ "\\" + outcsv_file
-		
-		#sort the list by stream ID and then stream km
-		csv_out = sorted(csv_out, key=itemgetter(1,2), reverse=True)	
-	
-		# Add the header row
-		csv_out.insert(0,header_clean)
-		
-		# write it
-		write_csv(csv_out,outcsv_final)
-	    
-	    gc.collect()
-		    
-	    endTime = time.time()
-	    elapsedmin= (endTime - startTime) / 60	
-	    arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))    
-		
-	# For arctool errors
-	except arcpy.ExecuteError:
-		msgs = arcpy.GetMessages(2)
-		arcpy.AddError(msgs)
-		
-	# For other errors
-	except:
-		import traceback, sys
-		tb = sys.exc_info()[2]
-		tbinfo = traceback.format_tb(tb)[0]
-		    
-		pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" + str(sys.exc_info()[1])
-		msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
-		
-		arcpy.AddError(pymsg)
-		arcpy.AddError(msgs)	
+
+        inPoint = parameters[0].valueAsText
+        multiplecsv = parameters[1].valueAsText
+        outcsv_dir = parameters[2].valueAsText
+        outcsv_file = parameters[3].valueAsText	
+
+        def read_pointfile(pointfile, readfields):
+            """Reads an input point file and returns the NODE ID and X/Y coordinates as a nested dictionary"""
+            pnt_dict = NestedDictTree()
+            Incursorfields = ["STREAM_ID","NODE_ID"] + readfields
+            # Determine input point spatial units
+            proj = arcpy.Describe(inPoint).spatialReference
+            with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
+                for row in Inrows:
+                    for f in xrange(0,len(readfields)):
+                        pnt_dict[row[0]][row[1]][readfields[f]] = row[2+f]
+            return(pnt_dict)
+
+        def write_csv(csvlist, csvfile):
+            """write the input list to csv"""
+            with open(outcsv_final, "wb") as f:
+                writer = csv.writer(f)
+                writer.writerows(csv_out)    
+
+        def NestedDictTree(): 
+            """Build a nested dictionary"""
+            return defaultdict(NestedDictTree)	
+
+        try:
+            #keeping track of time
+            startTime= time.time()
+            arcpy.AddMessage("Export to csv") 
+
+            removelist = [u"OBJECTID",u"Id",u"Shape",u"ELEVATION",u"GRADIENT",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
+
+            # Get all the column headers in the point file and remove the ones in removelist
+            header = [field.name for field in arcpy.Describe(inPoint).fields]
+            header_clean = [h for h in header if h not in removelist]
+
+            NODES = read_pointfile(inPoint, header_clean)
+
+            # make a wide format list by node ID from the nested dictionary
+            if multiplecsv == "True":
+                for streamID in NODES:
+                    csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for nodeID in NODES[streamID]]
+                    outcsv_final = outcsv_dir + "\\" + outcsv_file.replace(".csv", "") + "_" + str(streamID) + ".csv"
+
+                    #sort the list by stream km
+                    csv_out = sorted(csv_out, key=itemgetter(1), reverse=True)
+
+                    # Add the header row
+                    csv_out.insert(0,header_clean)	    
+
+                    # write it
+                    write_csv(csv_out,outcsv_final)
+
+            else:
+                csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for streamID in NODES for nodeID in NODES[streamID]]
+                outcsv_final = outcsv_dir+ "\\" + outcsv_file
+
+                #sort the list by stream ID and then stream km
+                csv_out = sorted(csv_out, key=itemgetter(1,2), reverse=True)	
+
+                # Add the header row
+                csv_out.insert(0,header_clean)
+
+                # write it
+                write_csv(csv_out,outcsv_final)
+
+            gc.collect()
+
+            endTime = time.time()
+            elapsedmin= (endTime - startTime) / 60	
+            arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))    
+
+        # For arctool errors
+        except arcpy.ExecuteError:
+            msgs = arcpy.GetMessages(2)
+            arcpy.AddError(msgs)
+
+        # For other errors
+        except:
+            import traceback, sys
+            tb = sys.exc_info()[2]
+            tbinfo = traceback.format_tb(tb)[0]
+
+            pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" + str(sys.exc_info()[1])
+            msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
+
+            arcpy.AddError(pymsg)
+            arcpy.AddError(msgs)	
         return

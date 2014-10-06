@@ -127,7 +127,7 @@ def GetElevation(samplexy, EleRaster, LowElev, eleZ_to_m):
     if str(thevalue.getOutput(0)) != "NoData":
         SampleElev= float(thevalue.getOutput(0)) *  eleZ_to_m
 
-    #See if the sample elevation is the lowest for this stream node
+    # See if the sample elevation is the lowest for this stream node
     if SampleElev < LowElev:
         LowElev = SampleElev
     return(LowElev)
