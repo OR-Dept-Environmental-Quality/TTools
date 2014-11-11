@@ -48,32 +48,32 @@ def read_pointfile(pointfile, readfields):
     # Determine input point spatial units
     proj = arcpy.Describe(inPoint).spatialReference
     with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
-	for row in Inrows:
-	    for f in xrange(0,len(readfields)):
-		pnt_dict[row[0]][row[1]][readfields[f]] = row[2+f]
+        for row in Inrows:
+            for f in xrange(0,len(readfields)):
+                pnt_dict[row[0]][row[1]][readfields[f]] = row[2+f]
     return(pnt_dict)
 
 def write_csv(csvlist, csvfile):
     """write the input list to csv"""
     with open(outcsv_final, "wb") as f:
-	writer = csv.writer(f)
-	writer.writerows(csv_out)    
+        writer = csv.writer(f)
+        writer.writerows(csv_out)    
 
 def NestedDictTree(): 
     """Build a nested dictionary"""
     return defaultdict(NestedDictTree)
-    
+
 def read_csv(csvfile):
     """Reads an input csv file and returns the header row as a list and the data as a nested dictionary"""
     csv_dict = NestedDictTree()
     with open(csvfile, "rb") as f:
-	reader = csv.reader(f)
-	header = reader.next()
-	if header[0] != "NODE_ID":
-	    sys.exit("csv file does not have NODE_ID as first column")
-	for row in reader:
-	    for key in xrange(0,len(header)):
-		csv_dict[row[0]][header[key]] = row[key]
+        reader = csv.reader(f)
+        header = reader.next()
+        if header[0] != "NODE_ID":
+            sys.exit("csv file does not have NODE_ID as first column")
+        for row in reader:
+            for key in xrange(0,len(header)):
+                csv_dict[row[0]][header[key]] = row[key]
     return(header,csv_dict)
 
 #enable garbage collection
@@ -85,74 +85,74 @@ try:
     arcpy.AddMessage("Export to csv") 
 
     removelist = [u"OBJECTID",u"Id",u"Shape",u"ELEVATION",u"GRADIENT",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
-	
+
     # Get all the column headers in the point file and remove the ones in removelist
     header = [field.name for field in arcpy.Describe(inPoint).fields]
     header_clean = [h for h in header if h not in removelist]
-	
+
     NODES = read_pointfile(inPoint, header_clean)
 
     ####################################################################################################### 
     # Output the csv file
-	
+
     # Get the stream km dictionary keys and sort them
     #NODE_keys = NODES.keys()
     #NODE_keys.sort()    
-    
+
     # make a wide format list by node ID from the nested dictionary
-    
+
     if multiplecsv == "True":
-	for streamID in NODES:
-	    csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for nodeID in NODES[streamID]]
-	    outcsv_final = outcsv_dir + "\\" + outcsv_file.replace(".csv", "") + "_" + str(streamID) + ".csv"
-	    
-	    #sort the list by stream km
-	    csv_out = sorted(csv_out, key=itemgetter(1), reverse=True)
-	    
-	    # Add the header row
-	    csv_out.insert(0,header_clean)	    
-	    
-	    # write it
-	    write_csv(csv_out,outcsv_final)
+        for streamID in NODES:
+            csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for nodeID in NODES[streamID]]
+            outcsv_final = outcsv_dir + "\\" + outcsv_file.replace(".csv", "") + "_" + str(streamID) + ".csv"
+
+            #sort the list by stream km
+            csv_out = sorted(csv_out, key=itemgetter(1), reverse=True)
+
+            # Add the header row
+            csv_out.insert(0,header_clean)	    
+
+            # write it
+            write_csv(csv_out,outcsv_final)
 
     else:
-	csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for streamID in NODES for nodeID in NODES[streamID]]
-	outcsv_final = outcsv_dir+ "\\" + outcsv_file
-	
-	
-	#sort the list by stream ID and then stream km
-	csv_out = sorted(csv_out, key=itemgetter(1,2), reverse=True)	
+        csv_out = [[NODES[streamID][nodeID][h] for h in header_clean] for streamID in NODES for nodeID in NODES[streamID]]
+        outcsv_final = outcsv_dir+ "\\" + outcsv_file
 
-	# Add the header row
-	csv_out.insert(0,header_clean)
-	
-	# write it
-	write_csv(csv_out,outcsv_final)
-    
+
+        #sort the list by stream ID and then stream km
+        csv_out = sorted(csv_out, key=itemgetter(1,2), reverse=True)	
+
+        # Add the header row
+        csv_out.insert(0,header_clean)
+
+        # write it
+        write_csv(csv_out,outcsv_final)
+
     gc.collect()
-	    
+
     endTime = time.time()
     elapsedmin= (endTime - startTime) / 60	
     print("Process Complete in %s minutes" % (elapsedmin))
     arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))    
-	
+
 # For arctool errors
 except arcpy.ExecuteError:
-	msgs = arcpy.GetMessages(2)
-	#arcpy.AddError(msgs)
-	print(msgs)
-	
+    msgs = arcpy.GetMessages(2)
+    #arcpy.AddError(msgs)
+    print(msgs)
+
 # For other errors
 except:
-	import traceback, sys
-	tb = sys.exc_info()[2]
-	tbinfo = traceback.format_tb(tb)[0]
-	    
-	pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" + str(sys.exc_info()[1])
-	msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
-	
-	#arcpy.AddError(pymsg)
-	#arcpy.AddError(msgs)
-	
-	print(pymsg)
-	print(msgs)	
+    import traceback, sys
+    tb = sys.exc_info()[2]
+    tbinfo = traceback.format_tb(tb)[0]
+
+    pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" + str(sys.exc_info()[1])
+    msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
+
+    #arcpy.AddError(pymsg)
+    #arcpy.AddError(msgs)
+
+    print(pymsg)
+    print(msgs)	

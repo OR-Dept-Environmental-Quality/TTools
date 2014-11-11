@@ -104,7 +104,8 @@ def ReadPointFile(pointfile, OverwriteData, AddFields):
                 if row[5] == None or row[5] == 0:
                     pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
                     pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
-                    pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4] 
+                    pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4]
+    return(pnt_dict)
 
 def CreateTopoPointFile(pointList, pointfile, proj):
     """Creates the output topo point feature class using the data from the nodes list"""
