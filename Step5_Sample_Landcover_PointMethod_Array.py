@@ -197,11 +197,11 @@ def SetupLCDataHeaders(transsample_count, trans_count, CanopyDataType, StreamSam
     
     return lcdataheaders, type, typer
 
-def CoordToArray(easting, northing, origin_a):
+def CoordToArray(easting, northing, bbox_upper_left):
     """converts x/y coordinates to col and row of the array"""
     xy = []
-    xy.append((easting - origin_a[0])/ origin_a[2])  # col
-    xy.append((northing - origin_a[1])/ origin_a[2])  # row
+    xy.append((easting - bbox_upper_left[0]) / bbox_upper_left[2])  # col, x
+    xy.append((bbox_upper_left[1] - northing) / bbox_upper_left[3])  # row, y
     return xy
 
 def CreateLCPointList(NodeDict, streamID, dir, zone, transsample_distance):
@@ -248,21 +248,23 @@ def SampleRaster(LCpointlist, raster, buffer, con):
     
     Xmin = min(tlist[0]) - buffer
     Ymin = min(tlist[1]) - buffer
+    Ymax = max(tlist[1]) + buffer            
     ncols = (max(tlist[0]) + buffer - Xmin) / cellsizeX
-    nrows = (max(tlist[1]) + buffer - Ymin) / cellsizeY
-    lower_left_corner = arcpy.Point(Xmin, Ymin)
-    origin_a = [Xmin, Ymin, cellsizeY]
-    nodata_to_value = -9999 / con
+    nrows = (Ymax - Ymin) / cellsizeY
+    bbox_lower_left = arcpy.Point(Xmin, Ymin) # must be in raster map units
+    bbox_upper_left = [Xmin, Ymax, cellsizeX, cellsizeY]
+    nodata_to_value = -9999 / con_z_to_m
     
+    # Construct the array. Note returned array is (row, col) so (y, x)
     print("Building Array")
-    arry = arcpy.RasterToNumPyArray(raster, lower_left_corner, ncols, nrows, nodata_to_value)
+    arry = arcpy.RasterToNumPyArray(raster, bbox_lower_left, ncols, nrows, nodata_to_value)
     
     # convert array values to meters if needed
     arry = arry * con
     
     print("Extracting raster values")
     for i in range(0,len(LCpointlist)):
-        xy = CoordToArray(LCpointlist[i][0], LCpointlist[i][1], origin_a)
+        xy = CoordToArray(LCpointlist[i][0], LCpointlist[i][1], bbox_upper_left)
         LCpointlist[i].append(arry[xy[1], xy[0]])
     return LCpointlist
 
@@ -310,9 +312,9 @@ try:
 
     # Set the converstion factor to get from the input elevation z units to meters
     if EleUnits == "Meters": #International meter
-        ele_con = 1 
+        con_z_to_m = 1 
     if EleUnits == "Feet": #International foot
-        ele_con = 0.3048
+        con_z_to_m = 0.3048
     if EleUnits == "Other": #Some other units
         sys.exit("Please modify your raster elevation z units so they are either in meters or feet")	
 
@@ -343,7 +345,7 @@ try:
         LCpointlist = LCpointlist + CreateLCPointList(NodeDict[streamID], streamID, dir, zone, transsample_distance)
         for raster in typer:
             if raster == EleRaster:
-                con = ele_con
+                con = con_z_to_m
             else:
                 con = 1
             LCpointlist = SampleRaster(LCpointlist, raster, buffer, con)

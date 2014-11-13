@@ -20,7 +20,7 @@
 # point feature class (new) - point for each x/y location of the maximum elevation.
 
 # Future Updates
-#
+# eliminate arcpy and use gdal for reading/writing feature class data
 
 # This version is for manual starts from within python.
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
@@ -52,8 +52,8 @@ env.overwriteOutput = True
 
 # Start Fill in Data
 NodesFC = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
-Directions = 1
-MaxSearchDistance_km = 1
+Directions = 2
+MaxSearchDistance_km = 9
 skippy = False
 EleRaster = r"D:\Projects\TTools_9\Example_data.gdb\be_lidar_ft"
 EleUnits = "Feet"
@@ -186,11 +186,11 @@ def BuildSearchArray(MinSearchDistance, MaxSearchDistance, cellsize, skippy):
         Distarry = np.arange(MinSearchDistance, MaxSearchDistance, cellsize)
     return Distarry
 
-def CoordToArray(easting, northing, origin_a):
+def CoordToArray(easting, northing, bbox_upper_left):
     """converts x/y coordinates to col and row of the array"""
     xy = []
-    xy.append((easting - origin_a[0])/ origin_a[2])  # col
-    xy.append((northing - origin_a[1])/ origin_a[2])  # row
+    xy.append((easting - bbox_upper_left[0]) / bbox_upper_left[2])  # col, x
+    xy.append((bbox_upper_left[1] - northing) / bbox_upper_left[3])  # row, y
     return xy
 
 def GetShadeAngles(NodeDict, streamID, EleRaster, azimuths, azimuthdisdict, buffer, con_z_to_m):
@@ -216,20 +216,21 @@ def GetShadeAngles(NodeDict, streamID, EleRaster, azimuths, azimuthdisdict, buff
                 # Add the all the coordinates to the list
                 CoordList.append([topoX, topoY])    
             
-            # calculate lower left corner and nrows/cols for the bounding box
-            # first transpose the list so x and y coordinates are in the same list
+            # calculate lower left corner coordinate and nrows/cols for the bounding box
+            # first transpose the list so x and y coordinates are in the same vector
             tlist = map(lambda *i: list(i), *CoordList)
                 
             Xmin = min(tlist[0]) - buffer
             Ymin = min(tlist[1]) - buffer
+            Ymax = max(tlist[1]) + buffer            
             ncols = (max(tlist[0]) + buffer - Xmin) / cellsizeX
-            nrows = (max(tlist[1]) + buffer - Ymin) / cellsizeY
-            lower_left_corner = arcpy.Point(Xmin, Ymin)
-            origin_a = [Xmin, Ymin, cellsizeY]
+            nrows = (Ymax - Ymin) / cellsizeY
+            bbox_lower_left = arcpy.Point(Xmin, Ymin) # must be in raster map units
+            bbox_upper_left = [Xmin, Ymax, cellsizeX, cellsizeY]
             nodata_to_value = -9999 / con_z_to_m
             
-            #print("Building Array")
-            Zarry = arcpy.RasterToNumPyArray(EleRaster, lower_left_corner, ncols, nrows, nodata_to_value)
+            # Construct the array. Note returned array is (row, col) so (y, x)
+            Zarry = arcpy.RasterToNumPyArray(EleRaster, bbox_lower_left, ncols, nrows, nodata_to_value)
             
             # convert array values to meters if needed
             Zarry = Zarry * con_z_to_m             
@@ -238,15 +239,19 @@ def GetShadeAngles(NodeDict, streamID, EleRaster, azimuths, azimuthdisdict, buff
             
             #print("Extracting raster values")
             for i in range(0,len(CoordList)):
-                xy = CoordToArray(CoordList[i][0], CoordList[i][1], origin_a)
+                xy = CoordToArray(CoordList[i][0], CoordList[i][1], bbox_upper_left)
                 TopoZList.append(Zarry[xy[1], xy[0]])
                 #TopoList[i].append(Zarry[xy[1], xy[0]])
             
             TopoZarry = np.array(TopoZList)
             Disarry = azimuthdisdict[a] * con_to_m
             Shadearry = np.degrees(np.arctan((TopoZarry - TopoZarry[0]) / Disarry))
+            # Take out the off raster samples
+            naindex = np.where(TopoZarry < -9998)
+            for x in naindex[0]: Shadearry[x] = -9999            
+            # Find the max shade angle
             ShadeAngle = Shadearry.max()
-            # index of the array at the maximum shade angle 
+            # array index at the max shade angle 
             arryindex = np.where(Shadearry==ShadeAngle)[0][0]
             ShadeZ = TopoZarry[arryindex]
             ZChange = ShadeZ - TopoZarry[0]
@@ -255,6 +260,7 @@ def GetShadeAngles(NodeDict, streamID, EleRaster, azimuths, azimuthdisdict, buff
             ShadeAngle_X = (ShadeDistance * con_from_m * sin(radians(a))) + origin_x #CoordList[0][0]
             ShadeAngle_Y = (ShadeDistance * con_from_m * cos(radians(a))) + origin_y #CoordList[0][1]
             offRasterSamples = (TopoZarry > -9998).sum()
+
     
             TopoList.append([ShadeAngle_X, ShadeAngle_Y, ShadeAngle_X, ShadeAngle_Y, streamID, nodeID, a, ShadeAngle, ShadeZ, TopoZarry[0], ZChange, ShadeDistance, SearchDistance, offRasterSamples])
         n = n + 1
