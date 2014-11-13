@@ -19,7 +19,7 @@
 # 9. save to nodes feature class
 
 # INPUTS
-# 0: Input TTools point feature class (PointFile)
+# 0: Input TTools point feature class (NodesFC)
 # 1: input number of transects per node (trans_count)
 # 2: input number of samples per transect (transsample_count)
 # 3: include stream sample in transect count (True/False)
@@ -36,7 +36,7 @@
 # 14: input flag if existing data can be over written (OverwriteData) 1. True, 2. False
 
 # OUTPUTS
-# point feature class (edit PointFile) - added fields with Landcover and elevation data for each azimuth direction at each node
+# point feature class (edit NodesFC) - added fields with Landcover and elevation data for each azimuth direction at each node
 # point feature class (new) - point at each x/y sample and the sample raster values
 
 # Future Updates
@@ -69,7 +69,7 @@ from arcpy.management import *
 env.overwriteOutput = True
 
 # Parameter fields for python toolbox
-#PointFile = parameters[0].valueAsText
+#NodesFC = parameters[0].valueAsText
 #trans_count = parameters[1].valueAsText # LONG
 #transsample_count = parameters[2].valueAsText # LONG
 #StreamSample = parameters[3].valueAsText True/False
@@ -81,10 +81,11 @@ env.overwriteOutput = True
 #OHRaster = = parameters[9].valueAsText
 #EleRaster = parameters[10].valueAsText
 #EleUnits = parameters[11].valueAsText
-#outpoint_final = aparameters[12].valueAsText
+#outpoint_final = parameters[12].valueAsText
+#OverwriteData = parameters[13].valueAsText True/False
 
 # Start Fill in Data
-PointFile = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
+NodesFC = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 trans_count = 8 
 transsample_count = 4 # does not include a sample at the stream node
 StreamSample = True # include a sample at the stream node (emergent sample)? (True/False)
@@ -105,26 +106,27 @@ def NestedDictTree():
     """Build a nested dictionary"""
     return defaultdict(NestedDictTree)
 
-def ReadPointFile(pointfile, OverwriteData, AddFields):
-    """Reads the input point file and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
+def ReadNodesFC(NodesFC, OverwriteData, AddFields):
+    """Reads the input point feature class and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
     pnt_dict = NestedDictTree()
     Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y",]
 
     # Get a list of existing fields
     ExistingFields = []
-    for f in arcpy.ListFields(pointfile):
+    for f in arcpy.ListFields(NodesFC):
         ExistingFields.append(f.name)
 
-    # Check to see if the last field exists if yes add it.
+    # Check to see if the last field exists if yes add it. 
+    # Grabs last field becuase often the first field, emergent, is zero
     if OverwriteData == False and (AddFields[len(AddFields)-1] in ExistingFields) == True:
         Incursorfields.append(AddFields[len(AddFields)-1])
     else:
         OverwriteData = True
 
     # Determine input point spatial units
-    proj = arcpy.Describe(pointfile).spatialReference
+    proj = arcpy.Describe(NodesFC).spatialReference
 
-    with arcpy.da.SearchCursor(pointfile, Incursorfields,"",proj) as Inrows:
+    with arcpy.da.SearchCursor(NodesFC, Incursorfields,"",proj) as Inrows:
         if OverwriteData == True:
             for row in Inrows:
                 pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
@@ -139,23 +141,23 @@ def ReadPointFile(pointfile, OverwriteData, AddFields):
                     pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4]
     
     if len(pnt_dict) == 0:
-        sys.exit("The fields we checked in input point feature class have existing data. There is nothing to overwrite. Process stopped")
-        
+        sys.exit("The fields checked in the input point feature class have existing data. There is nothing to process. Exiting")
+              
     return pnt_dict
 
-def CreateLCPointFC(pointList, LCFields, pointfile, proj):
+def CreateLCPointFC(pointList, LCFields, NodesFC, proj):
     """Creates the output landcover sample point feature class using the data from the point list"""
     print("Exporting data to land cover sample feature class")
 
-    arcpy.CreateFeatureclass_management(os.path.dirname(pointfile),os.path.basename(pointfile), "POINT","","DISABLED","DISABLED",proj)
+    arcpy.CreateFeatureclass_management(os.path.dirname(NodesFC),os.path.basename(NodesFC), "POINT","","DISABLED","DISABLED",proj)
 
     AddFields = ["POINT_X","POINT_Y"] + ["STREAM_ID","NODE_ID","AZIMUTH","TRANSNUM","SAMNUM"] + LCFields
 
     # Add attribute fields # TODO add dictionary of field types so they aren't all double
     for f in AddFields:
-        arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+        arcpy.AddField_management(NodesFC, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
 
-    with arcpy.da.InsertCursor(pointfile, ["SHAPE@X","SHAPE@Y"] + AddFields) as cursor:
+    with arcpy.da.InsertCursor(NodesFC, ["SHAPE@X","SHAPE@Y"] + AddFields) as cursor:
         for row in pointList:
             cursor.insertRow(row)
 
@@ -218,8 +220,8 @@ def CreateLCPointList(NodeDict, streamID, dir, zone, transsample_distance):
         for d in range(0,len(dir)):
             for z in zone:
                 # Calculate the x and y coordinate of the landcover sample location
-                _X_ = (z * transsample_distance * units_con * sin(radians(dir[d]))) + origin_x
-                _Y_ = (z * transsample_distance * units_con * cos(radians(dir[d]))) + origin_y
+                _X_ = (z * transsample_distance * con_from_m * sin(radians(dir[d]))) + origin_x
+                _Y_ = (z * transsample_distance * con_from_m * cos(radians(dir[d]))) + origin_y
 
                 # Add the all the data to the list
                 LCpointlist.append([_X_, _Y_, _X_, _Y_, streamID, nodeID, dir[d], d+1, z])
@@ -237,19 +239,19 @@ def RasterToArray(raster, lower_left_corner, nrows, ncols, nodata_to_value):
 
 def SampleRaster(LCpointlist, raster, buffer, con):
     
-    Ycellsize = arcpy.Describe(raster).meanCellHeight
-    Xcellsize = arcpy.Describe(raster).meanCellWidth
+    cellsizeX = arcpy.Describe(EleRaster).meanCellWidth
+    cellsizeY = arcpy.Describe(EleRaster).meanCellHeight    
     
     # calculate lower left corner and nrows/cols for the bounding box
     # first transpose the list so x and y coordinates are in the same list
-    tlist = map(lambda *a: list(a), *LCpointlist)
+    tlist = map(lambda *i: list(i), *LCpointlist)
     
     Xmin = min(tlist[0]) - buffer
     Ymin = min(tlist[1]) - buffer
-    ncols = (max(tlist[0]) + buffer - Xmin) / Xcellsize
-    nrows = (max(tlist[1]) + buffer - Ymin) / Ycellsize
+    ncols = (max(tlist[0]) + buffer - Xmin) / cellsizeX
+    nrows = (max(tlist[1]) + buffer - Ymin) / cellsizeY
     lower_left_corner = arcpy.Point(Xmin, Ymin)
-    origin_a = [Xmin, Ymin, Ycellsize]
+    origin_a = [Xmin, Ymin, cellsizeY]
     nodata_to_value = -9999 / con
     
     print("Building Array")
@@ -264,21 +266,21 @@ def SampleRaster(LCpointlist, raster, buffer, con):
         LCpointlist[i].append(arry[xy[1], xy[0]])
     return LCpointlist
 
-def UpdateNodesFC(pointDict, pointfile, AddFields): 
+def UpdateNodesFC(pointDict, NodesFC, AddFields): 
     """Updates the input point feature class with data from the nodes dictionary"""
     print("Updating input point feature class")
 
     # Get a list of existing fields
     ExistingFields = []
-    for f in arcpy.ListFields(pointfile):
+    for f in arcpy.ListFields(NodesFC):
         ExistingFields.append(f.name)     
 
     # Check to see if the field exists and add it if not
     for f in AddFields:
         if (f in ExistingFields) == False:
-            arcpy.AddField_management(pointfile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")   
+            arcpy.AddField_management(NodesFC, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")   
 
-    with arcpy.da.UpdateCursor(pointfile,["STREAM_ID","NODE_ID"] + AddFields) as cursor:
+    with arcpy.da.UpdateCursor(NodesFC,["STREAM_ID","NODE_ID"] + AddFields) as cursor:
         for row in cursor:
             for f in xrange(0,len(AddFields)):
                 streamID = row[0]
@@ -287,19 +289,13 @@ def UpdateNodesFC(pointDict, pointfile, AddFields):
                 cursor.updateRow(row)
 
 def FromMetersUnitConversion(inFeature):
-    """Get the conversion factor to get from meters to the input spatial units"""
-    unitCode = arcpy.Describe(inFeature).SpatialReference.linearUnitCode
-    if unitCode == 9001: #International meter
-        units_con = 1 
-    if unitCode == 9002: #International foot
-        units_con = 3.280839895013123359580052493
-    if unitCode == 9003: #US Survey foot
-        units_con = 3937/1200
-    if unitCode == 9005: #Clarke's foot
-        units_con = 3.280869330266635653352551371
-    if unitCode not in [9001,9002,9003,9005]:
-        system.exit("Unrecognized spatial reference. Use projection with units of feet or meters.")
-    return units_con
+    """Returns the conversion factor to get from meters to the spatial units of the input feature class"""
+    try:
+        con_from_m = 1 / arcpy.Describe(inFeature).SpatialReference.metersPerUnit
+    except:
+        arcpy.AddError("{0} has a coordinate system that is not projected or not recognized. Use a projected coordinate system preferably in linear units of feet or meters.".format(inFeature))
+        sys.exit("Coordinate system is not projected or not recognized. Use a projected coordinate system, preferably in linear units of feet or meters.")   
+    return con_from_m
 
 #enable garbage collection
 gc.enable()
@@ -309,8 +305,8 @@ try:
     startTime= time.time()
     
     # Determine input spatial units and set conversion factor to get from meters to the input spatial units
-    proj = arcpy.Describe(PointFile).SpatialReference
-    units_con = FromMetersUnitConversion(PointFile)
+    proj = arcpy.Describe(NodesFC).SpatialReference
+    con_from_m = FromMetersUnitConversion(NodesFC)
 
     # Set the converstion factor to get from the input elevation z units to meters
     if EleUnits == "Meters": #International meter
@@ -336,10 +332,10 @@ try:
         #zone = range(1,int(transsample_count+1))    
     
     AddFields, type, typer = SetupLCDataHeaders(transsample_count, trans_count, CanopyDataType, StreamSample, heatsource8)
-    NodeDict = ReadPointFile(PointFile, OverwriteData, AddFields)
+    NodeDict = ReadNodesFC(NodesFC, OverwriteData, AddFields)
     
-    # calculate the buffer distance to add to the raster bounding box
-    buffer = (transsample_count + 1) * transsample_distance * units_con    
+    # calculate the buffer distance to add to the raster bounding box when extracting to an array
+    buffer = (transsample_count + 1) * transsample_distance * con_from_m    
     LCpointlist = []
     n = 1 
     for streamID in NodeDict:
@@ -370,7 +366,7 @@ try:
     #AddFields = AddFields + ["NUM_DIR","NUM_ZONES","SAMPLE_DIS"]
 
     # Write the landcover data to the TTools point feature class
-    UpdateNodesFC(NodeDict, PointFile, AddFields)
+    UpdateNodesFC(NodeDict, NodesFC, AddFields)
 
     endTime = time.time()
     elapsedmin= (endTime - startTime) / 60	
