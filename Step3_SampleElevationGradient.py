@@ -106,18 +106,11 @@ def ReadPointFile(PointFile, OverwriteData, AddFields):
 
 def ToMetersUnitConversion(inFeature):
     """Returns the conversion factor to get from the input spatial units to meters"""
-    unitCode = arcpy.Describe(inFeature).SpatialReference.linearUnitCode
-    if unitCode == 9001: #International meter
-        units_con = 1 
-    if unitCode == 9002: #International foot
-        units_con = 0.3048
-    if unitCode == 9003: #US Survey foot
-        units_con = 1200/3937
-    if unitCode == 9005: #Clarke's foot
-        units_con =  0.3047972654 
-    if unitCode not in [9001,9002,9003,9005]:
-        arcpy.AddError("{0} has an unrecognized spatial reference. Use projection with units of feet or meters.".format(inFeature))
-        system.exit("Unrecognized spatial reference. Use projection with units of feet or meters.")
+    try:
+        units_con = arcpy.Describe(inFeature).SpatialReference.metersPerUnit
+    except:
+        arcpy.AddError("{0} has a coordinate system that is not projected or not recognized. Use a projected coordinate system preferably in linear units of feet or meters.".format(inFeature))
+        sys.exit("Coordinate system is not projected or not recognized. Use a projected coordinate system, preferably in linear units of feet or meters.")   
     return units_con
 
 def GetElevation(samplexy, EleRaster, LowElev, eleZ_to_m):
