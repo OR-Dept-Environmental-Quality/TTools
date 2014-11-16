@@ -54,12 +54,13 @@ import string
 import gc
 import shutil
 import time
-import arcpy
-from arcpy import env
-from math import radians, sin, cos
+from datetime import timedelta
+from math import radians, sin, cos, ceil
 from collections import defaultdict
 from operator import itemgetter
 import numpy
+import arcpy
+from arcpy import env
 
 # Check out the ArcGIS Spatial Analyst extension license
 arcpy.CheckOutExtension("Spatial")
@@ -228,19 +229,13 @@ def CreateLCPointList(NodeDict, streamID, dir, zone, transsample_distance):
                     
     return LCpointlist
 
-def RasterToArray(raster, lower_left_corner, nrows, ncols, nodata_to_value):
-    """Converts a raster to a numpy array, returns the geotransform data and number of rows and cols"""
-
-    arry = arcpy.RasterToNumPyArray(raster, lower_left_corner, ncols, nrows, nodata_to_value)
-    arry_origin = []
-    arry_origin.append(arcpy.Describe(raster).extent.XMin)
-    arry_origin.append(arcpy.Describe(raster).extent.YMin)
-    return arry
-
-def SampleRaster(LCpointlist, raster, buffer, con):
+def SampleRaster(LCpointlist, raster, con):
     
-    cellsizeX = arcpy.Describe(EleRaster).meanCellWidth
-    cellsizeY = arcpy.Describe(EleRaster).meanCellHeight    
+    cellsizeX = arcpy.Describe(raster).meanCellWidth
+    cellsizeY = arcpy.Describe(raster).meanCellHeight    
+    
+    # calculate the buffer distance (in raster spatial units) to add to the raster bounding box when extracting to an array
+    buffer = cellsizeX * 2    
     
     # calculate lower left corner and nrows/cols for the bounding box
     # first transpose the list so x and y coordinates are in the same list
@@ -256,7 +251,6 @@ def SampleRaster(LCpointlist, raster, buffer, con):
     nodata_to_value = -9999 / con_z_to_m
     
     # Construct the array. Note returned array is (row, col) so (y, x)
-    print("Building Array")
     arry = arcpy.RasterToNumPyArray(raster, bbox_lower_left, ncols, nrows, nodata_to_value)
     
     # convert array values to meters if needed
@@ -303,6 +297,8 @@ def FromMetersUnitConversion(inFeature):
 gc.enable()
 
 try:
+    print("Step 5: Sample Landcover - Star Pattern, Point Method")
+    
     #keeping track of time
     startTime= time.time()
     
@@ -335,9 +331,7 @@ try:
     
     AddFields, type, typer = SetupLCDataHeaders(transsample_count, trans_count, CanopyDataType, StreamSample, heatsource8)
     NodeDict = ReadNodesFC(NodesFC, OverwriteData, AddFields)
-    
-    # calculate the buffer distance to add to the raster bounding box when extracting to an array
-    buffer = (transsample_count + 1) * transsample_distance * con_from_m    
+       
     LCpointlist = []
     n = 1 
     for streamID in NodeDict:
@@ -348,7 +342,7 @@ try:
                 con = con_z_to_m
             else:
                 con = 1
-            LCpointlist = SampleRaster(LCpointlist, raster, buffer, con)
+            LCpointlist = SampleRaster(LCpointlist, raster, con)
         n = n + 1       
     
     # Update the NodeDict
@@ -357,6 +351,7 @@ try:
             LCkey = type[t]+'_T'+str(row[7])+'_S'+str(row[8])
             NodeDict[row[4]][row[5]][LCkey] = row[9 + t]
 
+    endTime = time.time()
     arcpy.ResetProgressor()		
     gc.collect()
 
@@ -370,10 +365,10 @@ try:
     # Write the landcover data to the TTools point feature class
     UpdateNodesFC(NodeDict, NodesFC, AddFields)
 
-    endTime = time.time()
-    elapsedmin= (endTime - startTime) / 60	
-    print("Process Complete in %s minutes" % (elapsedmin))
-    arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))
+    elapsedmin= ceil((endTime - startTime) / 60)
+    mspersample = timedelta(seconds=(endTime - startTime) / len(LCpointlist)).microseconds
+    print("Process Complete in %s minutes. %s microseconds per sample" % (elapsedmin, mspersample))    
+    #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per sample" % (elapsedmin, mspersample))
 
 
 # For arctool errors
