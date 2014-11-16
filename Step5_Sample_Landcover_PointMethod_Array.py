@@ -151,7 +151,7 @@ def CreateLCPointFC(pointList, LCFields, NodesFC, proj):
 
     arcpy.CreateFeatureclass_management(os.path.dirname(NodesFC),os.path.basename(NodesFC), "POINT","","DISABLED","DISABLED",proj)
 
-    AddFields = ["POINT_X","POINT_Y"] + ["STREAM_ID","NODE_ID","AZIMUTH","TRANSNUM","SAMNUM"] + LCFields
+    AddFields = ["POINT_X","POINT_Y"] + ["STREAM_ID","NODE_ID","AZIMUTH","TRANSNUM","SAMPLENUM"] + LCFields
 
     # Add attribute fields # TODO add dictionary of field types so they aren't all double
     for f in AddFields:

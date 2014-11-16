@@ -7,7 +7,7 @@
 # to find the lowest elevation in a user defined search radius and calculate the gradient for each node in the downstream direction.
 
 # INPUTS
-# 0: Input TTools point feature class (PointFile)
+# 0: Input TTools point feature class (NodesFC)
 # 1: input the number of samples around the node (searchCells) 1. [0],  2. [9], 3. [25]
 # 2: input flag for smoothing if gradient is zero or negative (SmoothFlag) 1. True, 2. False
 # 2: input elevation raster (EleRaster)
@@ -15,7 +15,7 @@
 # 5: input flag if existing data can be over written (OverwriteData) 1. True, 2. False
 
 # OUTPUTS
-# point feature class (edit PointFile) - Added fields with ELEVATION and GRADIENT for node
+# point feature class (edit NodesFC) - Added fields with ELEVATION and GRADIENT for node
 
 # Future Updates
 
@@ -39,7 +39,7 @@ arcpy.CheckOutExtension("Spatial")
 env.overwriteOutput = True
 
 # Parameter fields for python toolbox
-#PointFile = parameters[0].valueAsText
+#NodesFC = parameters[0].valueAsText
 #searchCells = parameters[1].valueAsText # Needs to be a int
 #SmoothFlag = parameters[2].valueAsText # Needs to be a int
 #EleRaster = parameters[3].valueAsText
@@ -47,7 +47,7 @@ env.overwriteOutput = True
 #OverwriteData = parameters[5].valueAsText
 
 # Start Fill in Data
-PointFile = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
+NodesFC = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 searchCells = 9
 SmoothFlag = False
 EleRaster = r"D:\Projects\TTools_9\Example_data.gdb\be_lidar_ft"
@@ -65,14 +65,14 @@ def NestedDictTree():
     """Build a nested dictionary"""
     return defaultdict(NestedDictTree)
 
-def ReadPointFile(PointFile, OverwriteData, AddFields):
+def ReadNodesFC(NodesFC, OverwriteData, AddFields):
     """Reads the input point file, adds new fields, and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
     NodeDict = NestedDictTree()
     Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y",]
 
     # Get a list of existing fields
     ExistingFields = []
-    for f in arcpy.ListFields(PointFile):
+    for f in arcpy.ListFields(NodesFC):
         ExistingFields.append(f.name)    
 
     # Check to see if the 1st field exists if yes add it to the cursorfields to be retreived.
@@ -84,12 +84,12 @@ def ReadPointFile(PointFile, OverwriteData, AddFields):
     # Check to see if all the new fields exist and add them if not
     for f in AddFields:
         if (f in ExistingFields) == False:
-            arcpy.AddField_management(PointFile, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")    
+            arcpy.AddField_management(NodesFC, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")    
 
     # Determine input point spatial units
-    proj = arcpy.Describe(PointFile).spatialReference
+    proj = arcpy.Describe(NodesFC).spatialReference
 
-    with arcpy.da.SearchCursor(PointFile,Incursorfields,"",proj) as Inrows:
+    with arcpy.da.SearchCursor(NodesFC,Incursorfields,"",proj) as Inrows:
         if OverwriteData == True:
             for row in Inrows:
                 NodeDict[row[0]][row[1]]["STREAM_KM"] = row[2] 
@@ -107,18 +107,18 @@ def ReadPointFile(PointFile, OverwriteData, AddFields):
 def ToMetersUnitConversion(inFeature):
     """Returns the conversion factor to get from the input spatial units to meters"""
     try:
-        units_con = arcpy.Describe(inFeature).SpatialReference.metersPerUnit
+        con_to_m = arcpy.Describe(inFeature).SpatialReference.metersPerUnit
     except:
         arcpy.AddError("{0} has a coordinate system that is not projected or not recognized. Use a projected coordinate system preferably in linear units of feet or meters.".format(inFeature))
         sys.exit("Coordinate system is not projected or not recognized. Use a projected coordinate system, preferably in linear units of feet or meters.")   
-    return units_con
+    return con_to_m
 
-def GetElevation(samplexy, EleRaster, LowElev, eleZ_to_m):
+def GetElevation(samplexy, EleRaster, LowElev, con_z_to_m):
     """Retreives the elevation value from an elevation raster at given x and y coordinate"""
     thevalue = arcpy.GetCellValue_management(EleRaster, samplexy)
 
     if str(thevalue.getOutput(0)) != "NoData":
-        SampleElev= float(thevalue.getOutput(0)) *  eleZ_to_m
+        SampleElev= float(thevalue.getOutput(0)) *  con_z_to_m
 
     # See if the sample elevation is the lowest for this stream node
     if SampleElev < LowElev:
@@ -128,10 +128,10 @@ def GetElevation(samplexy, EleRaster, LowElev, eleZ_to_m):
 def CalculateGradient(LowElev,LowElevUp):
     return (grad)
 
-def UpdatePointFile(pointDict, pointfile, AddFields): 
+def UpdateNodesFC(pointDict, NodesFC, AddFields): 
     """Updates the input point feature class with all new data from the nodes dictionary"""
 
-    with arcpy.da.UpdateCursor(pointfile,["STREAM_ID","NODE_ID"] + AddFields) as cursor:
+    with arcpy.da.UpdateCursor(NodesFC,["STREAM_ID","NODE_ID"] + AddFields) as cursor:
         for row in cursor:
             for f in xrange(0,len(AddFields)):
                 streamID = row[0]
@@ -139,24 +139,24 @@ def UpdatePointFile(pointDict, pointfile, AddFields):
                 row[f+2] = pointDict[streamID][nodeID][AddFields[f]]
                 cursor.updateRow(row)
 
-def UpdatePointFile1(NodeDict,streamID, nodeID, PointFile, AddFields): 
+def UpdateNodesFC1(NodeDict,streamID, nodeID, NodesFC, AddFields): 
     """Updates a single node in the input point feature class with data from the nodes dictionary"""
 
     # Build a query to retreive just the node row
-    whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(PointFile, "NODE_ID"), nodeID)
+    whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(NodesFC, "NODE_ID"), nodeID)
 
-    with arcpy.da.UpdateCursor(PointFile,["NODE_ID"] + AddFields, whereclause) as cursor:
+    with arcpy.da.UpdateCursor(NodesFC,["NODE_ID"] + AddFields, whereclause) as cursor:
         for row in cursor:   
             for f in xrange(0,len(AddFields)):
                 row[f+1] = NodeDict[streamID][nodeID][AddFields[f]]
                 cursor.updateRow(row)
 
-def UpdatePointFile2(UpdateValue, nodeID, PointFile, UpdateField): 
+def UpdateNodesFC2(UpdateValue, nodeID, NodesFC, UpdateField): 
     """Updates the input point feature class with the new value"""
 
-    whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(PointFile, "NODE_ID"), nodeID)
+    whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(NodesFC, "NODE_ID"), nodeID)
 
-    with arcpy.da.UpdateCursor(PointFile,["NODE_ID"] + UpdateField, whereclause) as cursor:
+    with arcpy.da.UpdateCursor(NodesFC,["NODE_ID"] + UpdateField, whereclause) as cursor:
         for row in cursor:   
             row[1] = UpdateValue
             cursor.updateRow(row)
@@ -169,27 +169,27 @@ try:
     startTime= time.time()    
 
     # Determine input point spatial units
-    proj = arcpy.Describe(PointFile).spatialReference
+    proj = arcpy.Describe(NodesFC).spatialReference
     proj_ele = arcpy.Describe(EleRaster).spatialReference
 
     # Check to make sure the raster and input points are in the same projection.
     if proj.name != proj_ele.name:
-        arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(PointFile,EleRaster))
+        arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(NodesFC,EleRaster))
         sys.exit("Input points and elevation raster do not have the same projection. Please reproject your data.")
         # reproject the inpoints
-        #PointFile_rp = os.path.dirname(PointFile) + "\\rp_" + os.path.basename(PointFile)
-        #arcpy.Project_management(PointFile,PointFile_rp,proj_ele)
-        #PointFile = PointFile_rp	
+        #NodesFC_rp = os.path.dirname(NodesFC) + "\\rp_" + os.path.basename(NodesFC)
+        #arcpy.Project_management(NodesFC,NodesFC_rp,proj_ele)
+        #NodesFC = NodesFC_rp	
 
-    nodexy_to_m = ToMetersUnitConversion(PointFile)
+    nodexy_to_m = ToMetersUnitConversion(NodesFC)
     Elexy_to_m = ToMetersUnitConversion(EleRaster)
     units_con=  nodexy_to_m / Elexy_to_m
 
     # Determine the elevation Z units conversion into meters
     if EleUnits == 1: # Feet
-        eleZ_to_m = 0.3048
+        con_z_to_m = 0.3048
     if EleUnits == 2: # Meters
-        eleZ_to_m = 1
+        con_z_to_m = 1
     if EleUnits == 3: # Other
         sys.exit("Please modify your raster elevtion units to feet or meters.") 	
 
@@ -209,7 +209,7 @@ try:
 
     # read the data into a nested dictionary
     AddFields = ["ELEVATION","GRADIENT"]
-    NodeDict = ReadPointFile(PointFile, OverwriteData, AddFields)
+    NodeDict = ReadNodesFC(NodesFC, OverwriteData, AddFields)
     n = 0
     for streamID in NodeDict:
         SkipDownNodes = [1]
@@ -230,12 +230,12 @@ try:
                 samplexy = str(cell_x) + " " + str(cell_y) # xy string requirement for arcpy.GetCellValue
 
                 # Get the lowest elevation
-                LowElev = GetElevation(samplexy, EleRaster, LowElev, eleZ_to_m)
+                LowElev = GetElevation(samplexy, EleRaster, LowElev, con_z_to_m)
 
             # Save the elevation back into the dictionary and update the point file
             NodeDict[streamID][nodeID]["ELEVATION"] = LowElev
-            #UpdatePointFile1(NodeDict,streamID, nodeID, PointFile, AddFields)
-            UpdatePointFile2(LowElev, nodeID, PointFile, UpdateField)
+            #UpdateNodesFC1(NodeDict,streamID, nodeID, NodesFC, AddFields)
+            UpdateNodesFC2(LowElev, nodeID, NodesFC, UpdateField)
 
             # 2. CalculateGradient
             if nodeID > 0:
@@ -252,18 +252,18 @@ try:
                     #GradientDown = (Ele - EleDown) / (dx_meters)
                     SkipDownNodes.append(max(SkipDownNodes) + 1)
                     #NodeDict[streamID][nodeID -1]["GRADIENT"] = GradientDown
-                    #UpdatePointFile2(GradientDown, nodeID-1, PointFile, UpdateField)
+                    #UpdateNodesFC2(GradientDown, nodeID-1, NodesFC, UpdateField)
                 else:
                     EleDownSkip = NodeDict[streamID][nodeID - max(SkipDownNodes)]["ELEVATION"]
                     dx_meters = float(NodeDict[streamID][nodeID]["STREAM_KM"] - NodeDict[streamID][nodeID - max(SkipDownNodes)]["STREAM_KM"]) * 1000
                     GradientDown = (Ele - EleDownSkip) / dx_meters
                     for Skip in SkipDownNodes:
                         NodeDict[streamID][nodeID - Skip]["GRADIENT"] = GradientDown
-                        UpdatePointFile2(GradientDown, nodeID - Skip, PointFile, UpdateField)
+                        UpdateNodesFC2(GradientDown, nodeID - Skip, NodesFC, UpdateField)
                     SkipDownNodes = [1]
 
     # Write the Elevation and Gradient to the TTools point feature class
-    #UpdatePointFile(NodeDict, PointFile, AddFields)	    
+    #UpdateNodesFC(NodeDict, NodesFC, AddFields)	    
 
 # For arctool errors
 except arcpy.ExecuteError:
