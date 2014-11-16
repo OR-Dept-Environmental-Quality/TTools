@@ -26,7 +26,13 @@
 
 # Import system modules
 from __future__ import division, print_function
-import sys, os, string, gc, shutil, time
+import sys
+import os
+import string
+import gc
+import shutil
+import time
+from datetime import timedelta
 import arcpy
 import itertools
 from arcpy import env
@@ -51,7 +57,7 @@ NodesFC = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 searchCells = 9
 SmoothFlag = False
 EleRaster = r"D:\Projects\TTools_9\Example_data.gdb\be_lidar_ft"
-EleUnits = 1
+EleUnits = "Feet"
 OverwriteData = True
 # End Fill in Data
 
@@ -165,6 +171,8 @@ def UpdateNodesFC2(UpdateValue, nodeID, NodesFC, UpdateField):
 gc.enable()
 
 try:
+    print("Step 3: Sample Stream Elevations/ Gradient")
+    
     #keeping track of time
     startTime= time.time()    
 
@@ -185,13 +193,13 @@ try:
     Elexy_to_m = ToMetersUnitConversion(EleRaster)
     units_con=  nodexy_to_m / Elexy_to_m
 
-    # Determine the elevation Z units conversion into meters
-    if EleUnits == 1: # Feet
+    # Set the converstion factor to get from the input elevation z units to meters
+    if EleUnits == "Meters": #International meter
+        con_z_to_m = 1 
+    if EleUnits == "Feet": #International foot
         con_z_to_m = 0.3048
-    if EleUnits == 2: # Meters
-        con_z_to_m = 1
-    if EleUnits == 3: # Other
-        sys.exit("Please modify your raster elevtion units to feet or meters.") 	
+    if EleUnits == "Other": #Some other units
+        sys.exit("Please modify your raster elevation z units so they are either in meters or feet")	
 
     # Get the elevation raster cell size
     CellSizeResult = arcpy.GetRasterProperties_management(EleRaster, "CELLSIZEX")
@@ -210,7 +218,7 @@ try:
     # read the data into a nested dictionary
     AddFields = ["ELEVATION","GRADIENT"]
     NodeDict = ReadNodesFC(NodesFC, OverwriteData, AddFields)
-    n = 0
+    n = 1
     for streamID in NodeDict:
         SkipDownNodes = [1]
 
@@ -261,6 +269,12 @@ try:
                         NodeDict[streamID][nodeID - Skip]["GRADIENT"] = GradientDown
                         UpdateNodesFC2(GradientDown, nodeID - Skip, NodesFC, UpdateField)
                     SkipDownNodes = [1]
+        n = n + 1
+    
+    endTime = time.time()
+    elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
+    mspernode = timedelta(seconds=(endTime - startTime) / n).microseconds
+    print("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))    
 
     # Write the Elevation and Gradient to the TTools point feature class
     #UpdateNodesFC(NodeDict, NodesFC, AddFields)	    
