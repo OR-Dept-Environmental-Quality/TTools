@@ -7,7 +7,7 @@
 # for heat source 9.
 
 # INPUTS
-# 0: Input TTools point feature class (inPoint)
+# 0: Input TTools point feature class (NodesFC)
 # 1: create seperate csv files for each STREAM_ID (multiplecsv) True/False. if True will appends stream ID to csv name.
 # 2: path directory where output csv file will be saved (outcsv_dir)
 # 3: name of the csv file (outcsv_file)
@@ -29,25 +29,25 @@ from operator import itemgetter
 import csv
 
 # Parameter fields for python toolbox
-#inPoint = parameters[0].valueAsText
+#NodesFC = parameters[0].valueAsText
 #multiplecsv = parameters[1].valueAsText
 #outcsv_dir = parameters[2].valueAsText
 #outcsv_file = parameters[3].valueAsText
 
 # Start Fill in Data
-inPoint = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
+NodesFC = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 multiplecsv = "True"
 outcsv_dir = r"D:\Projects\TTools_9"
 outcsv_file = "out_nodes.csv"
 # End Fill in Data
 
-def read_pointfile(pointfile, readfields):
+def ReadNodesFC(NodesFC, readfields):
     """Reads an input point file and returns the NODE ID and X/Y coordinates as a nested dictionary"""
     pnt_dict = NestedDictTree()
     Incursorfields = ["STREAM_ID","NODE_ID"] + readfields
     # Determine input point spatial units
-    proj = arcpy.Describe(inPoint).spatialReference
-    with arcpy.da.SearchCursor(pointfile,Incursorfields,"",proj) as Inrows:
+    proj = arcpy.Describe(NodesFC).spatialReference
+    with arcpy.da.SearchCursor(NodesFC,Incursorfields,"",proj) as Inrows:
         for row in Inrows:
             for f in xrange(0,len(readfields)):
                 pnt_dict[row[0]][row[1]][readfields[f]] = row[2+f]
@@ -87,10 +87,10 @@ try:
     removelist = [u"OBJECTID",u"Id",u"Shape",u"ELEVATION",u"GRADIENT",u"NUM_DIR",u"NUM_ZONES",u"SAMPLE_DIS"]
 
     # Get all the column headers in the point file and remove the ones in removelist
-    header = [field.name for field in arcpy.Describe(inPoint).fields]
+    header = [field.name for field in arcpy.Describe(NodesFC).fields]
     header_clean = [h for h in header if h not in removelist]
 
-    NODES = read_pointfile(inPoint, header_clean)
+    NODES = read_pointfile(NodesFC, header_clean)
 
     ####################################################################################################### 
     # Output the csv file
