@@ -418,7 +418,6 @@ try:
     n = 1
     for streamID in NodeDict:
         print("Processing stream %s of %s" % (n, len(NodeDict)))
-        #TopoList = CreateTopoList(NodeDict[streamID], streamID, a, azimuthdisdict, con_from_m)
         TopoList = TopoList + GetShadeAngles2(NodeDict[streamID], streamID, EleRaster, azimuths, azimuthdisdict, con_z_to_m)
         n = n + 1       
     
@@ -437,7 +436,6 @@ try:
     mspernode = timedelta(seconds=(endTime - startTime) / len(TopoList) / len(azimuths)).microseconds
     print("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
     #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
-
 
 # For arctool errors
 except arcpy.ExecuteError:

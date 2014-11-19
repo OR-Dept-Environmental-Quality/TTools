@@ -33,13 +33,18 @@
 
 # Import system modules
 from __future__ import division, print_function
-import sys, os, string, gc, shutil, time
-import arcpy
-from arcpy import env
+import sys
+import os
+import string 
+import gc
+import shutil
+import time
+from datetime import timedelta
 from math import radians, sin, cos
 from collections import defaultdict
 from operator import itemgetter
-
+import arcpy
+from arcpy import env
 
 env.overwriteOutput = True
 
@@ -56,7 +61,7 @@ node_dx = 50
 outpoint_final = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
 # End Fill in Data
 
-def CreateNodes(inLine):
+def CreateNodeList(inLine):
     """Reads an input stream centerline file and returns the NODE ID, STREAM ID, and X/Y coordinates as a list"""
     NodeList = []
     Incursorfields = ["SHAPE@",SIDname]
@@ -80,7 +85,7 @@ def CreateNodes(inLine):
     arcpy.ResetProgressor()
     return(NodeList)
 
-def CreatePointFile(pointList,pointfile, SIDname, proj):
+def CreateNodesFC(NodeList, NodesFC, SIDname, proj):
     """Create the output point feature class using the data from the nodes list"""
     #arcpy.AddMessage("Exporting Data")
     print("Exporting Data")
@@ -93,22 +98,22 @@ def CreatePointFile(pointList,pointfile, SIDname, proj):
 
     #Create an empty output with the same projection as the input polyline
     cursorfields = ["NODE_ID","STREAM_ID","STREAM_KM","LONGITUDE","LATITUDE","SHAPE@X","SHAPE@Y"]
-    arcpy.CreateFeatureclass_management(os.path.dirname(pointfile),os.path.basename(pointfile), "POINT","","DISABLED","DISABLED",proj)
+    arcpy.CreateFeatureclass_management(os.path.dirname(NodesFC),os.path.basename(NodesFC), "POINT","","DISABLED","DISABLED",proj)
 
     # Add attribute fields
-    arcpy.AddField_management(pointfile, "NODE_ID", "LONG", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(pointfile, "STREAM_ID", SIDtype, SIDprecision, SIDscale, SIDlength, "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(pointfile, "STREAM_KM", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(pointfile, "LONGITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(pointfile, "LATITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+    arcpy.AddField_management(NodesFC, "NODE_ID", "LONG", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+    arcpy.AddField_management(NodesFC, "STREAM_ID", SIDtype, SIDprecision, SIDscale, SIDlength, "", "NULLABLE", "NON_REQUIRED")
+    arcpy.AddField_management(NodesFC, "STREAM_KM", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+    arcpy.AddField_management(NodesFC, "LONGITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+    arcpy.AddField_management(NodesFC, "LATITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
 
-    with arcpy.da.InsertCursor(pointfile, cursorfields) as cursor:
-        for row in pointList:
+    with arcpy.da.InsertCursor(NodesFC, cursorfields) as cursor:
+        for row in NodeList:
             cursor.insertRow(row)
 
     #Change X/Y from input spatial units to decimal degrees
     proj_dd = arcpy.SpatialReference(4269) #GCS_North_American_1983 
-    with arcpy.da.UpdateCursor(pointfile,["SHAPE@X","SHAPE@Y","LONGITUDE","LATITUDE"],"",proj_dd) as cursor:
+    with arcpy.da.UpdateCursor(NodesFC,["SHAPE@X","SHAPE@Y","LONGITUDE","LATITUDE"],"",proj_dd) as cursor:
         for row in cursor:
             row[2] = row[0] # LONGITUDE
             row[3] = row[1] # LATITUDE
@@ -122,7 +127,7 @@ try:
     startTime= time.time()   
 
     # Create the stream nodes and return them as a list
-    NodeList = CreateNodes(inLine)
+    NodeList = CreateNodeList(inLine)
 
     #sort the list by stream ID and then stream km
     NodeList = sorted(NodeList, key=itemgetter(1,2), reverse=True)
@@ -131,14 +136,15 @@ try:
     proj = arcpy.Describe(inLine).SpatialReference
 
     # Create the output point feature class with the nodes list
-    CreatePointFile(NodeList,outpoint_final, SIDname, proj)
+    CreateNodesFC(NodeList, outpoint_final, SIDname, proj)
 
     gc.collect()
 
     endTime = time.time()
-    elapsedmin= (endTime - startTime) / 60	
-    print("Process Complete in %s minutes" % (elapsedmin))
-    #arcpy.AddMessage("Process Complete at %s, %s minutes" % (endTime, elapsedmin))	
+    elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
+    mspernode = timedelta(seconds=(endTime - startTime) / len(NodeList)).microseconds
+    print("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
+    #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))	
 
 # For arctool errors
 except arcpy.ExecuteError:
