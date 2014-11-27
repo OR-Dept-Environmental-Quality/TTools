@@ -1,0 +1,213 @@
+'******************************
+'*****  VERSION 7.0  **********
+'******************************
+
+' Written by: Brian Kasper and Matt Boyd, Oregon Dept of Environmental Quality (September 2002)
+
+'''''''''''''''''''''''''''''''''''''''''''''''''
+' Set search radius and other vars...
+'''''''''''''''''''''''''''''''''''''''''''''''''
+shortDist = 1000000000
+v = av.GetActiveDoc
+tl = v.getThemes
+shortTRec = 0
+theCount = 0
+w = "Warning"
+
+av.finddialog("channel").close
+
+theview = av.getactivedoc
+
+themapunits = theview.getunits.asstring
+
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'Get 'From' theme and field - check for 'From' selection, and field
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+f = msgbox.list (tl, "Select the theme that contains" + NL + "the TTools Point features." ,"'Channel Center' Point theme")
+if (f = nil) then
+  exit
+end
+fromName = f.GetName
+fromShpFld = f.GetFTab.FindField("Shape")
+if (f.GetFTab.GetSelection.Count = 0) then
+    fromFeatures = f.GetFTab
+    fromTotal = f.GetFTab.GetNumRecords
+  else
+    fromFeatures = f.GetFTab.GetSelection
+    fromTotal = fromFeatures.Count
+end
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'get 'Right Bank' theme and field
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+rb = msgbox.list (tl, "Select 'Right Bank' theme", "'Right Bank' theme")
+if (rb = nil) then
+  exit
+end
+RBName = rb.GetName
+RBShpFld  = rb.GetFTab.FindField("Shape")
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'get 'Left Bank' theme and field
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+lb = msgbox.list (tl, "Select 'Left Bank' theme", "'Left Bank' theme")
+if (lb = nil) then
+  exit
+end
+LBName = lb.GetName
+LBShpFld  = lb.GetFTab.FindField("Shape")
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'get 'Right Bank' Theme's selection
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+if (rb.GetFTab.GetSelection.Count = 0) then
+  RBFeatures = rb.GetFTab
+  else
+  RBFeatures = rb.GetFTab.GetSelection
+end
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'get 'Left Bank' Theme's selection
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+if (lb.GetFTab.GetSelection.Count = 0) then
+  LBFeatures = lb.GetFTab
+  else
+  LBFeatures = lb.GetFTab.GetSelection
+end
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'Check point theme
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'get the theme table and current edit state
+theFTab = f.GetFTab
+theFields = theFTab.GetFields
+edit_state = theFTab.IsEditable
+'make sure table is editable and that fields can be added
+if (theFtab.CanEdit) then
+  theFTab.SetEditable(true)
+  if ((theFTab.CanAddFields).Not) then
+    MsgBox.Info("Can't add fields to the table."+NL+"Check write permission.")
+    exit
+  end
+else
+  MsgBox.Info("Can't modify the feature table."+NL+"Check write permission.")
+  exit
+end
+'Check if fields exist named: Channel, RightDist, LeftDist
+bf_exists = (theFtab.FindField("Channel") = NIL).Not
+rd_exists = (theFtab.FindField("RightDist") = NIL).Not
+ld_exists = (theFtab.FindField("LeftDist") = NIL).Not
+if ((bf_exists) or (rd_exists) or (ld_exists)) then 
+  if (MsgBox.YesNo("Overwrite Existing Data?","Options", false)) then
+    Blubber=0      'Overwrite existing data
+  else
+    Blubber=1      'Do not overwrite existing data
+  end  'if (MsgBox...)
+else
+  Msgbox.info("Run step (1)","Error")
+  av.purgeobjects
+end  'if
+
+''''''''''''''''''''''''''''''''''''''''''''''''''
+' Find the closest feature to the point...Right Bank
+''''''''''''''''''''''''''''''''''''''''''''''''''
+for each frec in fromfeatures
+  av.showmsg ("Sampling Channel Width...")
+  av.showstopbutton
+  more=av.SetStatus((theCount / fromTotal) * 100)
+  If (not more) then
+    av.showmsg("Channel Width Sampling Stopped...")
+    Msgbox.info("Channel Width Sampling Stopped.","Status:")
+    av.purgeobjects
+    av.ClearStatus
+    av.ClearMsg
+    theFtab.Flush
+    theFtab.Refresh 
+    theFTab.SetEditable(False)
+    exit
+  End
+  fPoint = f.GetFTab.ReturnValue(fromShpFld,frec)
+  theCount = theCount + 1
+  theFTab.SetEditable(true)
+  bfField = theFTab.FindField("Channel")
+  rdfield = theFTab.FindField("RightDist")
+  ldfield = theFTab.FindField("LeftDist")
+  CheckRec = theFtab.ReturnValue(bfField,frec)
+  If (Blubber=0) then
+      for each rec in RBFeatures
+        rbShape = rb.GetFTab.ReturnValue(RBShpFld,rec)
+        RBdist = fpoint.Distance(rbshape) 
+      end
+      for each LBrec in LBFeatures
+        lbShape = lb.GetFTab.ReturnValue(LBShpFld,LBrec)
+        LBdist = fpoint.Distance(lbshape)
+      end 
+      '''''''''''''''''''''''''''''''''''''''''''''''''''''
+      'Write to table: 'Bankfull' field
+      '''''''''''''''''''''''''''''''''''''''''''''''''''''
+      BFDist = ((LBDist + RBDist))
+      RBmDist = RBDist
+      LBmDist = LBDist
+      
+      if (themapunits="UNITS_LINEAR_FEET") then
+        BFDist=(BFDist*0.3048)
+        RBmDist=(RBmDist*0.3048)
+        LBmDist=(LBmDist*0.3048)
+      else
+        BFDist=BFDist
+        RBmDist=RBmDist
+        LBmDist=LBmDist
+      end
+      
+      theFTab.SetValueNumber(bfField,fRec,BFDist)
+      theFTab.SetValueNumber(rdField,fRec,RBmDist)
+      theFTab.SetValueNumber(ldField,fRec,LBmDist)
+  Else
+    If (CheckRec<=0) then
+      for each rec in RBFeatures
+        rbShape = rb.GetFTab.ReturnValue(RBShpFld,rec)
+        RBdist = fpoint.Distance(rbshape) 
+      end
+      for each LBrec in LBFeatures
+        lbShape = lb.GetFTab.ReturnValue(LBShpFld,LBrec)
+        LBdist = fpoint.Distance(lbshape)
+      end 
+      '''''''''''''''''''''''''''''''''''''''''''''''''''''
+      'Write to table: 'Bankfull' field
+      '''''''''''''''''''''''''''''''''''''''''''''''''''''
+      theFTab.SetEditable(true)
+      bfField = theFTab.FindField("Channel")
+      rdfield = theFTab.FindField("RightDist")
+      ldfield = theFTab.FindField("LeftDist")
+      BFDist = ((LBDist + RBDist))
+      RBmDist = RBDist
+      LBmDist = LBDist
+      
+      if (themapunits="UNITS_LINEAR_FEET") then
+        BFDist=(BFDist*0.3048)
+        RBmDist=(RBmDist*0.3048)
+        LBmDist=(LBmDist*0.3048)
+      else
+        BFDist=BFDist
+        RBmDist=RBmDist
+        LBmDist=LBmDist
+      end
+            
+        theFTab.SetValueNumber(bfField,fRec,BFDist)
+        theFTab.SetValueNumber(rdField,fRec,RBmDist)
+        theFTab.SetValueNumber(ldField,fRec,LBmDist)
+      
+      
+    End
+  End
+  shortDist = 1000000000
+end
+av.ClearStatus
+av.ClearMsg
+theFTab.SetEditable (false)
+msgbox.info("Done Measuring Channel Widths!  Units are recorded in METERS.","Status Report:")
+
+
+
+
+
+
+
+

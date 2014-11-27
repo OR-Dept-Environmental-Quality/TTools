@@ -1,0 +1,845 @@
+'*******************************************************
+'******************** VERSION 7.0 **********************
+'*******************************************************
+'-------------------------------------------------------
+' Author: Matt Boyd and Brian Kasper (Oregon DEQ),Updated September 2002
+
+av.finddialog("veg").close
+
+theView = av.GetActiveDoc
+theThemes={}
+
+if (MsgBox.YesNo("It is highly recommended that you save the project, completely exit ArcView, and re-open the project before beginning a grid sampling procedure (in order to clear ArcView memory).  Have you done this, and would you like to continue?","Warning!", true)) then
+  yogibear=3 'continue on
+else
+  exit   
+end  'if (MsgBox...)
+
+'-----------------
+'Choose a point theme
+'-----------------
+themeList = theView.GetThemes 
+rep = 0
+stupid = 0
+while (rep = 0)
+  theTheme = MsgBox.List(themeList,"Select your TTools point theme","Point Theme")
+  if (theTheme = NIL) then
+    exit
+  end 
+  if (theTheme.Is(Ftheme).Not) then
+    stupid = stupid+1
+    if (stupid = 4) then
+      msgBox.Info("Select a valid theme")
+    end
+    msgBox.Error("Not a valid theme","Error")
+  else
+    rep = 1
+    theFtab = theTheme.GetFtab
+  end
+end
+rep = 0
+stupid = 0
+
+theThemes={}
+if (theFtab.CanEdit) then
+  theFTab.SetEditable(true)
+  if ((theFTab.CanAddFields).Not) then
+    MsgBox.Info("Can't add fields to the table."+NL+"Check write permission.","Can't add grid values")
+    exit
+  end
+else
+  MsgBox.Info("Can't modify the feature table."+NL+
+  "Check write permission.","Can't add grid values")
+  exit
+end
+
+'-----------------
+'Choose veg grid theme
+'-----------------
+for each ttheme in theView.GetThemes
+  if (ttheme.Is(Gtheme)) then
+    theThemes.Add(ttheme)
+  end
+end
+theVtheme = MsgBox.List(theThemes,"Select grid vegetation data to sample","Sample Vegetation")
+if (theVtheme = Nil) then
+  exit
+end
+theVegGrid = theVtheme.Clone.GetGrid.Clone
+thePrj = Prj.MakeNull
+GridSize=theVegGrid.GetCellSize
+
+'-----------------
+'Choose DEM grid theme
+'-----------------
+theEtheme = MsgBox.List(theThemes,"Select DEM to sample","Sample Elevation")
+if (theEtheme = Nil) then
+  exit
+end
+theDEMGrid = theEtheme.Clone.GetGrid.Clone
+thePrj = Prj.MakeNull
+GridSize=theDEMGrid.GetCellSize
+
+options = {"Feet","Meters"}
+DEMunits = MsgBox.choiceAsString( options, "What are your DEM elevation units?", "IMPORTANT:")
+if (DEMunits = nil) then
+msgbox.info("You must make a selection.","")
+exit
+end
+
+'-----------------
+'Choose Sample Length
+'-----------------
+
+SampleDist = MsgBox.Input ("Input Sampling Distance Interval in METERS.", "Distance", "15").asNumber
+
+mapunits = theview.getunits
+
+if (mapunits = #UNITS_LINEAR_FEET) then
+  SampleDist = SampleDist*3.2808
+else
+  SampleDist = SampleDist
+end
+  
+  theFields = thefTab.GetFields
+  numFld0 = theFtab.findfield("Rip0")  
+  numFld1 = theFtab.findfield("NERip1")  
+  numfld2 = theftab.findfield("NERip2")
+  numfld3 = theftab.findfield("NERip3")
+  numFld4 = theFtab.findfield("NERip4")  
+  numFld5 = theFtab.findfield("ERip1")  
+  numfld6 = theftab.findfield("ERip2")
+  numfld7 = theftab.findfield("ERip3")
+  numFld8 = theFtab.findfield("ERip4")  
+  numFld9 = theFtab.findfield("SERip1")  
+  numfld10 = theftab.findfield("SERip2")
+  numfld11 = theftab.findfield("SERip3")
+  numFld12 = theFtab.findfield("SERip4")  
+  numFld13 = theFtab.findfield("SRip1")  
+  numfld14 = theftab.findfield("SRip2")
+  numfld15 = theftab.findfield("SRip3")
+  numFld16 = theFtab.findfield("SRip4")  
+  numFld17 = theFtab.findfield("SWRip1")  
+  numfld18 = theftab.findfield("SWRip2")
+  numfld19 = theftab.findfield("SWRip3")
+  numFld20 = theFtab.findfield("SWRip4")  
+  numFld21 = theFtab.findfield("WRip1")  
+  numfld22 = theftab.findfield("WRip2")
+  numfld23 = theftab.findfield("WRip3")
+  numFld24 = theFtab.findfield("WRip4")  
+  numFld25 = theFtab.findfield("NWRip1")  
+  numfld26 = theftab.findfield("NWRip2")
+  numfld27 = theftab.findfield("NWRip3")
+  numFld28 = theFtab.findfield("NWRip4")
+  numfld00 = theftab.findfield("dem0")  
+  numFld29 = theFtab.findfield("NEDEM1")  
+  numfld30 = theftab.findfield("NEDEM2")
+  numfld31 = theftab.findfield("NEDEM3")
+  numFld32 = theFtab.findfield("NEDEM4")  
+  numFld33 = theFtab.findfield("EDEM1")  
+  numfld34 = theftab.findfield("EDEM2")
+  numfld35 = theftab.findfield("EDEM3")
+  numFld36 = theFtab.findfield("EDEM4")  
+  numFld37 = theFtab.findfield("SEDEM1")  
+  numfld38 = theftab.findfield("SEDEM2")
+  numfld39 = theftab.findfield("SEDEM3")
+  numFld40 = theFtab.findfield("SEDEM4")  
+  numFld41 = theFtab.findfield("SDEM1")  
+  numfld42 = theftab.findfield("SDEM2")
+  numfld43 = theftab.findfield("SDEM3")
+  numFld44 = theFtab.findfield("SDEM4")  
+  numFld45 = theFtab.findfield("SWDEM1")  
+  numfld46 = theftab.findfield("SWDEM2")
+  numfld47 = theftab.findfield("SWDEM3")
+  numFld48 = theFtab.findfield("SWDEM4")  
+  numFld49 = theFtab.findfield("WDEM1")  
+  numfld50 = theftab.findfield("WDEM2")
+  numfld51 = theftab.findfield("WDEM3")
+  numFld52 = theFtab.findfield("WDEM4")  
+  numFld53 = theFtab.findfield("NWDEM1")  
+  numfld54 = theftab.findfield("NWDEM2")
+  numfld55 = theftab.findfield("NWDEM3")
+  numFld56 = theFtab.findfield("NWDEM4")  
+
+
+'OVERWRITE EXISTING DATA?'''''''''''''''''''''''''''''''''''''''''''''''''''''''''   
+
+if (MsgBox.YesNo("Overwrite Existing Data?","Vegetation fields already exist", false)) then
+  for each rec in theftab
+    theftab.setvalue(numfld0,rec,0)
+    theftab.setvalue(numfld1,rec,0)
+    theftab.setvalue(numfld2,rec,0)    
+    theftab.setvalue(numfld3,rec,0)
+    theftab.setvalue(numfld4,rec,0)    
+    theftab.setvalue(numfld5,rec,0)
+    theftab.setvalue(numfld6,rec,0)    
+    theftab.setvalue(numfld7,rec,0)
+    theftab.setvalue(numfld8,rec,0)    
+    theftab.setvalue(numfld9,rec,0)
+    theftab.setvalue(numfld10,rec,0)
+    theftab.setvalue(numfld11,rec,0)    
+    theftab.setvalue(numfld12,rec,0)
+    theftab.setvalue(numfld13,rec,0)    
+    theftab.setvalue(numfld14,rec,0)
+    theftab.setvalue(numfld15,rec,0)    
+    theftab.setvalue(numfld16,rec,0)
+    theftab.setvalue(numfld17,rec,0)    
+    theftab.setvalue(numfld18,rec,0)
+    theftab.setvalue(numfld19,rec,0)
+    theftab.setvalue(numfld20,rec,0)    
+    theftab.setvalue(numfld21,rec,0)
+    theftab.setvalue(numfld22,rec,0)    
+    theftab.setvalue(numfld23,rec,0)
+    theftab.setvalue(numfld24,rec,0)    
+    theftab.setvalue(numfld25,rec,0)
+    theftab.setvalue(numfld26,rec,0)    
+    theftab.setvalue(numfld27,rec,0)
+    theftab.setvalue(numfld28,rec,0)
+    theftab.setvalue(numfld00,rec,0)
+    theftab.setvalue(numfld29,rec,0)    
+    theftab.setvalue(numfld30,rec,0)
+    theftab.setvalue(numfld31,rec,0)    
+    theftab.setvalue(numfld32,rec,0)
+    theftab.setvalue(numfld33,rec,0)    
+    theftab.setvalue(numfld34,rec,0)
+    theftab.setvalue(numfld35,rec,0)    
+    theftab.setvalue(numfld36,rec,0)
+    theftab.setvalue(numfld37,rec,0)
+    theftab.setvalue(numfld38,rec,0)    
+    theftab.setvalue(numfld39,rec,0)
+    theftab.setvalue(numfld40,rec,0)    
+    theftab.setvalue(numfld41,rec,0)
+    theftab.setvalue(numfld42,rec,0)    
+    theftab.setvalue(numfld43,rec,0)
+    theftab.setvalue(numfld44,rec,0)    
+    theftab.setvalue(numfld45,rec,0)
+    theftab.setvalue(numfld46,rec,0)
+    theftab.setvalue(numfld47,rec,0)    
+    theftab.setvalue(numfld48,rec,0)
+    theftab.setvalue(numfld49,rec,0)    
+    theftab.setvalue(numfld50,rec,0)
+    theftab.setvalue(numfld51,rec,0)    
+    theftab.setvalue(numfld52,rec,0)
+    theftab.setvalue(numfld53,rec,0)    
+    theftab.setvalue(numfld54,rec,0)
+    theftab.setvalue(numfld55,rec,0)    
+    theftab.setvalue(numfld56,rec,0)
+  end
+else
+  clinton=123
+end
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''' 
+theftab=thetheme.getftab
+theshapefield=theftab.findfield("shape")
+theshapename=theftab.returnvalue(theshapefield,0).getclass.getclassname
+
+'-------------------------------------------------------------------------------------------
+theProgressDialog = av.FindDialog ("ProgressMeter")
+thePDBeginTime = theProgressDialog.FindByName("lblBeginTime")
+thePDCurrentTime = theProgressDialog.FindByName("lblCurrentTime")
+thePDRecordNumber = theProgressDialog.FindByName("lblRecordNumber")
+thePDIndex = theProgressDialog.FindByName("lblIndex")
+thePDTimeLeft = theProgressDialog.FindByName("lblTimeLeft")
+thePDPercentDone = theProgressDialog.FindByName("lblPercentDone")
+thePDProgressBar = theProgressDialog.FindByName("icnProgressLine")
+
+' - BEGIN TIME ------------------------------------------------------------------------------
+' Just set the date format.
+Date.SetDefFormat ("MMMM d, h:m:s AMPM")
+' Find the exact time this request is executed. I put this line in right before my script
+' starts calculating things.
+BeginTime = Date.Now
+' Put the BeginTime value in to the dialog box.
+thePDBeginTime.SetLabel("Began Job:"++BeginTime.AsString)
+
+
+'------------------
+' Check fields
+'------------------
+NERip1 = (theFTab.FindField("NERip1") = NIL).Not
+'......................................................
+TotRec = 0
+LastValue=1000000
+For each Rec in theFtab
+  TotRec = TotRec+1
+End
+blubber=1
+
+'------------------
+' Sample Vegetation
+'------------------
+theProgressDialog.Open
+'=====================
+thepolycount=totrec
+
+
+' - CURRENT TIME ----------------------------------------------------------------------------
+' Finds the current time and formats it, then writes current time to the label.
+thePDCurrentTime.SetLabel(date.now.setFormat("h:m:s AMPM").AsString)
+
+'- RECORD NUMBER --------------------------------------------------------------------------- 
+thePDRecordNumber.SetLabel ("Working on "+theshapename+" # 1 of [some number]")
+'- INDEX -----------------------------------------------------------------------------------
+thePDIndex.SetLabel ("Sampling Riparian Land Cover...")
+'- TIME LEFT ------------------------------------------------------------------------------- 
+'thePDTimeLeft.SetLabel ("Estimated time remaining: ---:---:---")
+'- PERCENT DONE ----------------------------------------------------------------------------
+thePDPercentDone.SetLabel ("00.0%")
+
+'====================
+
+
+myview=av.getactivedoc
+viewunits=myview.getunits
+
+CrashTest=0
+XField=theFTab.FindField("Xcoord")
+YField=theFTab.FindField("Ycoord")
+'====================
+For each Rec in theFtab
+
+'---------------------Progress bar stuff------------------------------------------
+
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDRecordNumber" -------------------------------------
+       theStepNumber = rec + 1
+       theRecordCount = theFTab.GetNumRecords-1
+       thePDRecordNumber.SetLabel ("Working on TTools Node # "+(rec).AsString++"of"++theRecordCount.AsString)
+
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDPercentDone" and the Graphic Bar Size -------------
+       thePercentDone = (rec/theRecordCount)*100
+       thePercentDone.SetFormat ("dd.d")      
+       thePDPercentDone.SetLabel (""+thePercentDone.AsString+"%")
+ 
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDIndex" --------------------------------------------
+       'thePDIndex.SetLabel ("Sampling Riparian Land Cover...")
+         
+       ' -- CALCULATE AND ASSIGN VALUES TO CURRENT TIME ("thePDCurrentTime") -------------------       
+       thePDCurrentTime.SetLabel(date.now.setFormat("h:m:s AMPM").AsString)
+
+       theProgressDialog.Activate
+
+'----------------------------------------------------------------------------------------------------
+
+
+  EmergtmpPoint=Point.MakeNull
+  NEtmpPoint=Point.MakeNull
+  EtmpPoint=Point.MakeNull
+  SEtmpPoint=Point.MakeNull
+  StmpPoint=Point.MakeNull
+  SWtmpPoint=Point.MakeNull
+  WtmpPoint=Point.MakeNull
+  NWtmpPoint=Point.MakeNull
+  av.Showmsg("Sampling Riparian Land Cover...")
+  av.ShowStopButton
+  more=av.SetStatus(100*Rec/TotRec)
+  If (not more) then
+  'av.finddialog("veg").close
+    av.showmsg("Riparian Land Cover Sampling Stopped.")
+    Msgbox.info("Riparian Land Cover Sampling Stopped.","Status:")
+    av.ClearStatus
+    av.ClearMsg
+    theFtab.Flush
+    theFtab.Refresh 
+    theFTab.SetEditable(False)
+  exit
+ end 
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''' 
+   numfld00 = theftab.findfield("dem0")
+   elevfield=theftab.findfield("elevation")
+   Elev0=theFtab.ReturnValueNumber(elevfield,Rec)
+   theftab.setvalue(numfld00,rec,elev0)
+ 
+ If (Blubber=1) then
+    Blab=theFTab.FindField("NWRip4")
+    RecCheck=theFTab.ReturnValueNumber(blab,Rec)   
+    If (RecCheck<=0) then    'Do not overwrite Data
+      CrashTest=CrashTest+1
+      
+      EmergField=theFTab.findfield("Rip0")
+      
+      For Each i in 1..4 by 1    
+        If (i=1) then
+          NEField=theFTab.FindField("NERip1")
+          EField=theFTab.FindField("ERip1")
+          SEField=theFTab.FindField("SERip1")
+          SField=theFTab.FindField("SRip1")
+          SWField=theFTab.FindField("SWRip1")
+          WField=theFTab.FindField("WRip1")
+          NWField=theFTab.FindField("NWRip1")
+
+          NEDEMField=theFTab.FindField("NEDEM1")
+          EDEMField=theFTab.FindField("Edem1")
+          SEDEMField=theFTab.FindField("SEDEM1")
+          SDEMField=theFTab.FindField("SDEM1")
+          SWDEMField=theFTab.FindField("SWDEM1")
+          WDEMField=theFTab.FindField("WDEM1")
+          NWDEMField=theFTab.FindField("NWDEM1")
+
+        Elseif (i=2) then
+          NEField=theFTab.FindField("NERip2")
+          EField=theFTab.FindField("ERip2")
+          SEField=theFTab.FindField("SERip2")
+          SField=theFTab.FindField("SRip2")
+          SWField=theFTab.FindField("SWRip2")
+          WField=theFTab.FindField("WRip2")
+          NWField=theFTab.FindField("NWRip2")
+
+          NEDEMField=theFTab.FindField("NEDEM2")
+          EDEMField=theFTab.FindField("Edem2")
+          SEDEMField=theFTab.FindField("SEDEM2")
+          SDEMField=theFTab.FindField("SDEM2")
+          SWDEMField=theFTab.FindField("SWDEM2")
+          WDEMField=theFTab.FindField("WDEM2")
+          NWDEMField=theFTab.FindField("NWDEM2")
+
+        Elseif (i=3) then
+          NEField=theFTab.FindField("NERip3")
+          EField=theFTab.FindField("ERip3")
+          SEField=theFTab.FindField("SERip3")
+          SField=theFTab.FindField("SRip3")
+          SWField=theFTab.FindField("SWRip3")
+          WField=theFTab.FindField("WRip3")
+          NWField=theFTab.FindField("NWRip3")
+
+          NEDEMField=theFTab.FindField("NEDEM3")
+          EDEMField=theFTab.FindField("Edem3")
+          SEDEMField=theFTab.FindField("SEDEM3")
+          SDEMField=theFTab.FindField("SDEM3")
+          SWDEMField=theFTab.FindField("SWDEM3")
+          WDEMField=theFTab.FindField("WDEM3")
+          NWDEMField=theFTab.FindField("NWDEM3")
+
+        Elseif (i=4) then
+          NEField=theFTab.FindField("NERip4")
+          EField=theFTab.FindField("ERip4")
+          SEField=theFTab.FindField("SERip4")
+          SField=theFTab.FindField("SRip4")
+          SWField=theFTab.FindField("SWRip4")
+          WField=theFTab.FindField("WRip4")
+          NWField=theFTab.FindField("NWRip4")
+
+          NEDEMField=theFTab.FindField("NEDEM4")
+          EDEMField=theFTab.FindField("Edem4")
+          SEDEMField=theFTab.FindField("SEDEM4")
+          SDEMField=theFTab.FindField("SDEM4")
+          SWDEMField=theFTab.FindField("SWDEM4")
+          WDEMField=theFTab.FindField("WDEM4")
+          NWDEMField=theFTab.FindField("NWDEM4")
+        End  'If
+  
+        X=theFtab.ReturnValueNumber(XField,Rec)
+        Y=theFtab.ReturnValueNumber(YField,Rec)        
+        
+        NE=theFTab.ReturnValueNumber(NEField,Rec)
+        E=theFTab.ReturnValueNumber(EField,Rec)
+        SE=theFTab.ReturnValueNumber(SEField,Rec)
+        S=theFTab.ReturnValueNumber(SField,Rec)
+        SW=theFTab.ReturnValueNumber(SWField,Rec)
+        W=theFTab.ReturnValueNumber(WField,Rec)
+        NW=theFTab.ReturnValueNumber(NWField,Rec)
+                            
+        NEXStep=i*SampleDist*(45*3.14/180).sin
+        NEYStep=i*SampleDist*(45*3.14/180).cos
+        EXStep=i*SampleDist*(90*3.14/180).sin
+        EYStep=i*SampleDist*(90*3.14/180).cos
+        SEXStep=i*SampleDist*(135*3.14/180).sin
+        SEYStep=i*SampleDist*(135*3.14/180).cos
+        SXStep=i*SampleDist*(180*3.14/180).sin
+        SYStep=i*SampleDist*(180*3.14/180).cos
+        SWXStep=i*SampleDist*(225*3.14/180).sin
+        SWYStep=i*SampleDist*(225*3.14/180).cos
+        WXStep=i*SampleDist*(270*3.14/180).sin
+        WYStep=i*SampleDist*(270*3.14/180).cos
+        NWXStep=i*SampleDist*(315*3.14/180).sin
+        NWYStep=i*SampleDist*(315*3.14/180).cos
+
+        NEXnew=X+NEXStep
+        NEYnew=Y+(NEYStep)
+        EXnew=X+(EXStep)
+        EYnew=Y+(EYStep)
+        SEXnew=X+(SEXStep)
+        SEYnew=Y+(SEYStep)
+        SXnew=X+(SXStep)
+        SYnew=Y+(SYStep)
+        SWXnew=X+(SWXStep)
+        SWYnew=Y+(SWYStep)
+        WXnew=X+(WXStep)
+        WYnew=Y+(WYStep)
+        NWXnew=X+(NWXStep)
+        NWYnew=Y+(NWYStep)
+
+        EmergtmpPoint.setx(X)
+        EmergtmpPoint.sety(Y)
+        NEtmpPoint.setx(NEXnew)
+        NEtmpPoint.sety(NEYnew)
+        EtmpPoint.setx(EXnew)
+        EtmpPoint.sety(EYnew)
+        SEtmpPoint.setx(SEXnew)
+        SEtmpPoint.sety(SEYnew)
+        StmpPoint.setx(SXnew)
+        StmpPoint.sety(SYnew)
+        SWtmpPoint.setx(SWXnew)
+        SWtmpPoint.sety(SWYnew)
+        WtmpPoint.setx(WXnew)
+        WtmpPoint.sety(WYnew)
+        NWtmpPoint.setx(NWXnew)
+        NWtmpPoint.sety(NWYnew)
+        
+      if (viewunits = #UNITS_LINEAR_FEET) then
+        if (demunits = "feet") then
+          theDEMNE = theDEMGrid.CellValue(NEtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(NEDEMField,Rec,(theDEMNE*0.3048))
+          theDEME = theDEMGrid.CellValue(EtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(EDEMField,Rec,(theDEME*0.3048))
+          theDEMSE = theDEMGrid.CellValue(SEtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SEDEMField,Rec,(theDEMSE*0.3048))
+          theDEMS = theDEMGrid.CellValue(StmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SDEMField,Rec,(theDEMS*0.3048))
+          theDEMSW = theDEMGrid.CellValue(SWtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SWDEMField,Rec,(theDEMSW*0.3048))
+          theDEMW = theDEMGrid.CellValue(WtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(WDEMField,Rec,(theDEMW*0.3048))
+          theDEMNW = theDEMGrid.CellValue(NWtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(NWDEMField,Rec,(theDEMNW*0.3048))
+        else
+          theDEMNE = theDEMGrid.CellValue(NEtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(NEDEMField,Rec,theDEMNE)
+          theDEME = theDEMGrid.CellValue(EtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(EDEMField,Rec,theDEME)
+          theDEMSE = theDEMGrid.CellValue(SEtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SEDEMField,Rec,theDEMSE)
+          theDEMS = theDEMGrid.CellValue(StmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SDEMField,Rec,theDEMS)
+          theDEMSW = theDEMGrid.CellValue(SWtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SWDEMField,Rec,theDEMSW)
+          theDEMW = theDEMGrid.CellValue(WtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(WDEMField,Rec,theDEMW)
+          theDEMNW = theDEMGrid.CellValue(NWtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(NWDEMField,Rec,theDEMNW)
+        end 'if  
+      else
+        if (demunits = "meters") then
+          theDEMNE = theDEMGrid.CellValue(NEtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(NEDEMField,Rec,theDEMNE)
+          theDEME = theDEMGrid.CellValue(EtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(EDEMField,Rec,theDEME)
+          theDEMSE = theDEMGrid.CellValue(SEtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SEDEMField,Rec,theDEMSE)
+          theDEMS = theDEMGrid.CellValue(StmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SDEMField,Rec,theDEMS)
+          theDEMSW = theDEMGrid.CellValue(SWtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SWDEMField,Rec,theDEMSW)
+          theDEMW = theDEMGrid.CellValue(WtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(WDEMField,Rec,theDEMW)
+          theDEMNW = theDEMGrid.CellValue(NWtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(NWDEMField,Rec,theDEMNW)
+        else
+          theDEMNE = theDEMGrid.CellValue(NEtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(NEDEMField,Rec,(theDEMNE*0.3048))
+          theDEME = theDEMGrid.CellValue(EtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(EDEMField,Rec,(theDEME*0.3048))
+          theDEMSE = theDEMGrid.CellValue(SEtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SEDEMField,Rec,(theDEMSE*0.3048))
+          theDEMS = theDEMGrid.CellValue(StmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SDEMField,Rec,(theDEMS*0.3048))
+          theDEMSW = theDEMGrid.CellValue(SWtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(SWDEMField,Rec,(theDEMSW*0.3048))
+          theDEMW = theDEMGrid.CellValue(WtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(WDEMField,Rec,(theDEMW*0.3048))
+          theDEMNW = theDEMGrid.CellValue(NWtmpPoint,Prj.MakeNull)
+          theFtab.SetValue(NWDEMField,Rec,(theDEMNW*0.3048))
+        end 'if
+      end 'if  
+        
+        theVeg0 = theVegGrid.CellValue(EmergtmpPoint,Prj.MakeNull)
+        If (theVeg0>=0) then  
+          theFtab.SetValue(EmergField,Rec,theVeg0)
+        else
+          msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) sampled beyond the grid boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) expand the coverage area of your grid, or 3) decrease your sampling distance interval.","ALERT!")
+          exit
+        End  'If 
+           
+        theVegNE = theVegGrid.CellValue(NEtmpPoint,Prj.MakeNull)          
+        If (theVegNE>=0) then
+          theFtab.SetValue(NEField,Rec,theVegNE)
+        else
+          msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) sampled beyond the grid boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) expand the coverage area of your grid, or 3) decrease your sampling distance interval.","ALERT!")
+          exit
+        End  'If  
+        
+        theVegE = theVegGrid.CellValue(EtmpPoint,Prj.MakeNull)
+        If (theVegE>=0) then
+          theFtab.SetValue(EField,Rec,theVegE)
+        else
+          msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) sampled beyond the grid boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) expand the coverage area of your grid, or 3) decrease your sampling distance interval.","ALERT!")
+          exit
+        End  'If  
+        
+        theVegSE = theVegGrid.CellValue(SEtmpPoint,Prj.MakeNull)
+        If (theVegSE>=0) then
+          theFtab.SetValue(SEField,Rec,theVegSE)
+        else
+          msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) sampled beyond the grid boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) expand the coverage area of your grid, or 3) decrease your sampling distance interval.","ALERT!")
+          exit
+        End  'If  
+        
+        theVegS = theVegGrid.CellValue(StmpPoint,Prj.MakeNull)
+        If (theVegS>=0) then
+          theFtab.SetValue(SField,Rec,theVegS)
+        else
+          msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) sampled beyond the grid boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) expand the coverage area of your grid, or 3) decrease your sampling distance interval.","ALERT!")
+          exit
+        End  'If
+        
+        theVegSW = theVegGrid.CellValue(SWtmpPoint,Prj.MakeNull)
+        If (theVegSW>=0) then
+          theFtab.SetValue(SWField,Rec,theVegSW)
+        else
+          msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) sampled beyond the grid boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) expand the coverage area of your grid, or 3) decrease your sampling distance interval.","ALERT!")
+          exit
+        End  'If  
+        
+        theVegW = theVegGrid.CellValue(WtmpPoint,Prj.MakeNull)
+        If (theVegW>=0) then
+          theFtab.SetValue(WField,Rec,theVegW)
+        else
+          msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) sampled beyond the grid boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) expand the coverage area of your grid, or 3) decrease your sampling distance interval.","ALERT!")
+          exit
+        End  'If  
+
+        theVegNW = theVegGrid.CellValue(NWtmpPoint,Prj.MakeNull)
+        If (theVegNW>=0) then
+          theFtab.SetValue(NWField,Rec,theVegNW)
+        else
+          msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) sampled beyond the grid boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) expand the coverage area of your grid, or 3) decrease your sampling distance interval.","ALERT!")
+          exit
+        End  'If  
+
+      End  'For
+      
+
+    End
+    
+  else                       'Overwrite data
+    elvis=666
+  end
+
+''''''''''''''''''''''''''''''''''''''
+'Check elevations beneath land cover sample points and if less than stream elevation, make equal to stream elevation
+''''''''''''''''''''''''''''''''''''''
+
+elevation = theftab.findfield("elevation")
+
+
+'+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+theview=av.getactivedoc
+theproject=av.getproject
+
+    if (CrashTest=540) then
+    msgbox.info("Spatial Analyst has reached its sampling capacity.  TTools is now going to save your project and quit ArcView.  You must re-open your project, and continue sampling riparian land cover.","Attention!")
+    av.getproject.save
+    av.quit
+    exit
+    end
+
+'+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+End  'For
+
+For each rec in theftab
+
+  if ((theftab.returnvaluenumber(numfld29,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld29,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+  
+  if ((theftab.returnvaluenumber(numfld30,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld30,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld31,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld31,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld32,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld32,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld33,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld33,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld34,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld34,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld35,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld35,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld36,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld36,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld37,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld37,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld38,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld38,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld39,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld39,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld40,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld40,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld41,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld41,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld42,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld42,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld43,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld43,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld44,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld44,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld45,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld45,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld46,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld46,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld47,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld47,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld48,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld48,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld49,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld49,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld50,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld50,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld51,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld51,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld52,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld52,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld53,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld53,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld54,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld54,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld55,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld55,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  if ((theftab.returnvaluenumber(numfld56,rec))<(theftab.returnvaluenumber(numfld00,rec))) then
+    theftab.setvalue(numfld56,rec,(theftab.returnvaluenumber(numfld00,rec)))
+  else
+    leavealone = 1
+  end 
+
+  
+end  
+
+
+'------------------
+'Reset arcview
+'------------------
+  theFtab.Flush
+  theFtab.Refresh 
+  theFTab.SetEditable(False)
+  av.purgeobjects
+  av.ClearStatus
+  av.ClearMsg
+  Msgbox.info("Riparian land cover sampling is complete!","Status:")
+  thePDPercentDone.SetLabel ("100%")
+
+
+
+
+
+
+
+
+
+
+

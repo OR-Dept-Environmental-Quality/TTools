@@ -1,0 +1,661 @@
+'******************************************************
+'********************VERSION 7.0***********************
+'******************************************************
+
+' Brian Kasper and Matt Boyd, Oregon DEQ, September 2002' 
+'-------------------------------------------------------
+
+av.finddialog("elevation").close
+
+theView = av.GetActiveDoc
+mustgrid = theview.getactivethemes
+
+theThemes={}
+
+if (MsgBox.YesNo("It is highly recommended that you save the project, completely exit ArcView, and re-open the project before beginning a grid sampling procedure (in order to clear ArcView memory).  Have you done this, and would you like to continue?","Warning!", true)) then
+  yogibear=3 'continue on
+else
+  exit   
+end  'if (MsgBox...)
+
+'-----------------
+'Choose a theme
+'-----------------
+
+themeList = theView.GetThemes 
+rep = 0
+stupid = 0
+while (rep = 0)
+  theTheme = MsgBox.list(themeList,"Select your TTools point theme.","Sample Elevation")
+  if (theTheme = NIL) then
+    exit
+  end 
+  if (theTheme.Is(Ftheme).Not) then
+    stupid = stupid+1
+    if (stupid = 4) then
+      msgBox.Info("Select a valid theme")
+    end
+    msgBox.Error("Not a valid theme","Error")
+  else
+    rep = 1
+    theFtab = theTheme.GetFtab
+  end
+end
+rep = 0
+stupid = 0
+
+theThemes={}
+if (theFtab.CanEdit) then
+  theFTab.SetEditable(true)
+  if ((theFTab.CanAddFields).Not) then
+    MsgBox.Info("Can't add fields to the table."+NL+"Check write permission.","Can't add grid values")
+    exit
+  end
+else
+  MsgBox.Info("Can't modify the feature table."+NL+
+  "Check write permission.","Can't add grid values")
+  exit
+end
+
+
+theftab=thetheme.getftab
+theshapefield=theftab.findfield("shape")
+theshapename=theftab.returnvalue(theshapefield,0).getclass.getclassname
+
+'-------------------------------------------------------------------------------------------
+theProgressDialog = av.FindDialog ("ProgressMeter")
+thePDBeginTime = theProgressDialog.FindByName("lblBeginTime")
+thePDCurrentTime = theProgressDialog.FindByName("lblCurrentTime")
+thePDRecordNumber = theProgressDialog.FindByName("lblRecordNumber")
+thePDIndex = theProgressDialog.FindByName("lblIndex")
+thePDTimeLeft = theProgressDialog.FindByName("lblTimeLeft")
+thePDPercentDone = theProgressDialog.FindByName("lblPercentDone")
+thePDProgressBar = theProgressDialog.FindByName("icnProgressLine")
+
+' - BEGIN TIME ------------------------------------------------------------------------------
+' Just set the date format.
+Date.SetDefFormat ("MMMM d, h:m:s AMPM")
+' Find the exact time this request is executed. I put this line in right before my script
+' starts calculating things.
+BeginTime = Date.Now
+' Put the BeginTime value in to the dialog box.
+thePDBeginTime.SetLabel("Began Job:"++BeginTime.AsString)
+
+'-----------------
+'Choose grid theme
+'-----------------
+for each ttheme in theView.GetThemes
+  if (ttheme.Is(Gtheme)) then
+    theThemes.Add(ttheme)
+  end
+end
+theGtheme = MsgBox.list(theThemes,"Select the DEM grid.","Sample Elevation")
+if (theGtheme = Nil) then
+  msgbox.info("You have no DEM grid in this view.","Alert!")
+  exit
+end
+theGrid = theGtheme.Clone.GetGrid.Clone
+thePrj = Prj.MakeNull
+GridSize=theGrid.GetCellSize
+
+'''''''''''''''''
+'choose dem units
+''''''''''''''''''
+
+options = {"Feet","Meters"}
+DEMunits = MsgBox.choiceAsString( options, "What are your DEM elevation units?", "IMPORTANT:")
+if (DEMunits = nil) then
+msgbox.info("You must make a selection.","")
+exit
+end
+
+'OVERWRITE EXISTING DATA?'''''''''''''''''''''''''''''''''''''''''''''''''''''''''   
+
+if (MsgBox.YesNo("Overwrite Existing Data?","Elevation and gradient fields already exist", false)) then
+  theFields = thefTab.GetFields  
+  numFld1 = theFtab.findfield("Elevation")  
+  numfld2 = theftab.findfield("Gradient")
+  for each rec in theftab
+    theftab.setvalue(numfld1,rec,0)
+    theftab.setvalue(numfld2,rec,0)    
+  end
+else
+  clinton=123
+end
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''  
+
+'------------------
+' Check fields
+'------------------
+
+Elev = (theFTab.FindField("Elevation") = NIL).Not
+Grad = (theFtab.FindField("Gradient") = NIL).Not
+'......................................................
+Blubber=1
+
+
+'------------------
+' Sample Elevation
+'------------------
+
+theProgressDialog.Open
+
+myview=av.getactivedoc
+viewunits=myview.getunits
+
+TotRec = 0
+LastValue=10000000
+For each Rec in theFtab
+  TotRec = TotRec+1
+End
+
+thepolycount=totrec
+
+theFieldX=theFTab.FindField("Xcoord")
+theFieldY=theFTab.FindField("Ycoord")
+theFieldE=theFTab.FindField("Elevation")
+
+'=====================
+
+' - CURRENT TIME ----------------------------------------------------------------------------
+' Finds the current time and formats it, then writes current time to the label.
+thePDCurrentTime.SetLabel(date.now.setFormat("h:m:s AMPM").AsString)
+
+'- RECORD NUMBER --------------------------------------------------------------------------- 
+thePDRecordNumber.SetLabel ("Working on "+theshapename+" # 1 of [some number]")
+'- INDEX -----------------------------------------------------------------------------------
+thePDIndex.SetLabel ("Measuring Elevation and Gradient...")
+'- TIME LEFT ------------------------------------------------------------------------------- 
+'thePDTimeLeft.SetLabel ("Estimated time remaining: ---:---:---")
+'- PERCENT DONE ----------------------------------------------------------------------------
+thePDPercentDone.SetLabel ("00.0%")
+
+'====================
+
+if (viewunits = #UNITS_LINEAR_FEET) then 
+
+CrashTest=0
+   
+zrec = 0
+
+thestepnumber = 0
+
+For each Rec in theFtab
+
+  av.Showmsg("Measuring Elevation and Gradient...")
+  av.ShowStopButton
+   more=av.SetStatus(100*rec/totrec)
+   If (not more) then
+    av.showmsg("Elevation and Gradient Sampling Stopped...")
+    Msgbox.info("Elevation and Gradient Sampling Stopped.","Status:")
+    av.ClearStatus
+    av.ClearMsg
+    theFtab.Flush
+    theFtab.Refresh 
+    theFTab.SetEditable(False)
+    exit
+  End
+
+'---------------------Progress bar stuff------------------------------------------
+
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDRecordNumber" -------------------------------------
+       theStepNumber = rec + 1
+       theRecordCount = theFTab.GetNumRecords-1
+       thePDRecordNumber.SetLabel ("Working on TTools Node # "+(rec).AsString++"of"++theRecordCount.AsString)
+
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDPercentDone" and the Graphic Bar Size -------------
+       thePercentDone = (rec/theRecordCount)*100
+       thePercentDone.SetFormat ("dd.d")      
+       thePDPercentDone.SetLabel (""+thePercentDone.AsString+"%")
+ 
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDIndex" --------------------------------------------
+       'thePDIndex.SetLabel ("Measuring Elevations and Gradients...")
+         
+       ' -- CALCULATE AND ASSIGN VALUES TO CURRENT TIME ("thePDCurrentTime") -------------------       
+       thePDCurrentTime.SetLabel(date.now.setFormat("h:m:s AMPM").AsString)
+
+       theProgressDialog.Activate
+
+'----------------------------------------------------------------------------------------------------
+
+  tmpPoint=Point.MakeNull
+  
+  X=theFTab.ReturnValueNumber(theFieldX,Rec)
+  Y=theFTab.ReturnValueNumber(theFieldY,Rec)
+  E=theFTab.ReturnValueNumber(theFieldE,Rec)
+  If (Blubber=1) then    'Do not overwrite existing data 
+    If (E<=0) then
+      CrashTest=CrashTest+1
+      For Each i in 1..25 by 1
+        if (i=1) then
+          Xnew=X
+          Ynew=Y
+        end
+        if (i=2) then
+          Xnew=X
+          Ynew=Y+GridSize
+        end
+        if (i=3) then
+          Xnew=X-GridSize
+          Ynew=Y+GridSize
+        end
+        if (i=4) then
+          Xnew=X-GridSize
+          Ynew=Y
+        end
+        if (i=5) then
+          Xnew=X-GridSize
+          Ynew=Y-GridSize
+        end
+        if (i=6) then
+          Xnew=X
+          Ynew=Y-GridSize
+        end
+        if (i=7) then 
+          Xnew=X+GridSize
+          Ynew=Y-GridSize
+        end
+        if (i=8) then
+          Xnew=X+GridSize
+          Ynew=Y
+        end
+        if (i=9) then 
+          Xnew=X+GridSize
+          Ynew=Y+GridSize
+        end
+        if (i=10) then
+          Xnew=X+GridSize
+          Ynew=Y+(Gridsize*2)
+        end
+        if (i=11) then
+          Xnew=X
+          Ynew=Y+(Gridsize*2)
+        end
+        if (i=12) then
+          Xnew=X-Gridsize
+          Ynew=Y+(Gridsize*2)
+        end
+        if (i=13) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y+(GridSize*2)
+        end
+        if (i=14) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y+GridSize
+        end
+        if (i=15) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y
+        end
+        if (i=16) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y-GridSize
+        end
+        if (i=17) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=18) then
+          Xnew=X-GridSize
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=19) then
+          Xnew=X
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=20) then
+          Xnew=X+GridSize
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=21) then
+          Xnew=X+(GridSize*2)
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=22) then
+          Xnew=X+(GridSize*2)
+          Ynew=Y-(GridSize)
+        end
+        if (i=23) then
+          Xnew=X+(Gridsize*2)
+          Ynew=Y
+        end
+        if (i=24) then
+          Xnew=X+(GridSize*2)
+          Ynew=Y+GridSize
+        end
+        if (i>24) then
+          Xnew=X+(GridSize*2)
+          Ynew=Y+(GridSize*2)
+        end     
+        
+        tmpPoint.setx(Xnew)
+        tmpPoint.sety(Ynew)
+        theValue = theGrid.CellValue(tmpPoint,Prj.MakeNull)
+        if (rec=1) then
+          LastValue = theValue
+        end
+        if (LastValue>theValue) then
+          LastValue = theValue            
+        end  'if 
+         
+      End  'For each i in 1..25 by 1
+           
+      if (theValue>=0) then
+      
+      if (DEMunits = "Feet") then
+      theFtab.SetValue(theFieldE,Rec,(LastValue*0.3048))
+      elseif (DEMunits = "Meters") then
+      theFtab.SetValue(theFieldE,Rec,LastValue)
+      end 'if (DEMunits =
+
+      else
+      msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) run beyond the DEM boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) extend the coverage area of your DEM.","ALERT!")
+      exit
+      end 'if (thevalue =
+
+    End 'if (E<0)  
+   
+  Else              'Overwrite existing data 
+    elvis=666
+
+  End 'if (blubber=1
+   
+   
+'+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+theview=av.getactivedoc
+theproject=av.getproject
+
+    if (CrashTest=1300) then
+    msgbox.info("Spatial Analyst has reached its sampling capacity.  TTools is now going to save your project and quit ArcView.  You must re-open your project, and continue sampling elevation.","Attention!")
+    av.finddialog("progressmeter").close
+    theproject.save
+    av.quit
+    exit
+    end
+
+'+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+End  'For each rec in the ftab
+
+elseif (viewunits = #UNITS_LINEAR_METERS) then  
+
+CrashTest=0
+
+For each Rec in theFtab
+
+  av.Showmsg("Measuring Elevation and Gradient...")
+  av.ShowStopButton
+   more=av.SetStatus(100*rec/totrec)
+   If (not more) then
+    av.showmsg("Elevation and Gradient Sampling Stopped...")
+    Msgbox.info("Elevation and Gradient Sampling Stopped.","Status:")
+    av.ClearStatus
+    av.ClearMsg
+    theFtab.Flush
+    theFtab.Refresh 
+    theFTab.SetEditable(False)
+    exit
+  End
+
+'---------------------Progress bar stuff------------------------------------------
+
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDRecordNumber" -------------------------------------
+       theStepNumber = rec + 1
+       theRecordCount = theFTab.GetNumRecords-1
+       thePDRecordNumber.SetLabel ("Working on TTools Node # "+(rec).AsString++"of"++theRecordCount.AsString)
+
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDPercentDone" and the Graphic Bar Size -------------
+       thePercentDone = (rec/theRecordCount)*100
+       thePercentDone.SetFormat ("dd.d")      
+       thePDPercentDone.SetLabel (""+thePercentDone.AsString+"%")
+ 
+       ' -- CALCULATE AND ASSIGN VALUES TO "thePDIndex" --------------------------------------------
+       thePDIndex.SetLabel ("Measuring Elevations and Gradients...")
+       
+       ' -- CALCULATE AND ASSIGN VALUES TO CURRENT TIME ("thePDCurrentTime") -------------------       
+       thePDCurrentTime.SetLabel(date.now.setFormat("h:m:s AMPM").AsString)
+
+       theProgressDialog.Activate
+
+'----------------------------------------------------------------------------------------------------
+
+
+  tmpPoint=Point.MakeNull
+  
+  X=theFTab.ReturnValueNumber(theFieldX,Rec)
+  Y=theFTab.ReturnValueNumber(theFieldY,Rec)
+  E=theFTab.ReturnValueNumber(theFieldE,Rec)
+  If (Blubber=1) then    'Do not overwrite existing data 
+    If (E<=0) then
+      CrashTest=CrashTest+1
+      For Each i in 1..25 by 1
+        if (i=1) then
+          Xnew=X
+          Ynew=Y
+        end
+        if (i=2) then
+          Xnew=X
+          Ynew=Y+GridSize
+        end
+        if (i=3) then
+          Xnew=X-GridSize
+          Ynew=Y+GridSize
+        end
+        if (i=4) then
+          Xnew=X-GridSize
+          Ynew=Y
+        end
+        if (i=5) then
+          Xnew=X-GridSize
+          Ynew=Y-GridSize
+        end
+        if (i=6) then
+          Xnew=X
+          Ynew=Y-GridSize
+        end
+        if (i=7) then 
+          Xnew=X+GridSize
+          Ynew=Y-GridSize
+        end
+        if (i=8) then
+          Xnew=X+GridSize
+          Ynew=Y
+        end
+        if (i=9) then 
+          Xnew=X+GridSize
+          Ynew=Y+GridSize
+        end
+        if (i=10) then
+          Xnew=X+GridSize
+          Ynew=Y+(Gridsize*2)
+        end
+        if (i=11) then
+          Xnew=X
+          Ynew=Y+(Gridsize*2)
+        end
+        if (i=12) then
+          Xnew=X-Gridsize
+          Ynew=Y+(Gridsize*2)
+        end
+        if (i=13) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y+(GridSize*2)
+        end
+        if (i=14) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y+GridSize
+        end
+        if (i=15) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y
+        end
+        if (i=16) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y-GridSize
+        end
+        if (i=17) then
+          Xnew=X-(GridSize*2)
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=18) then
+          Xnew=X-GridSize
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=19) then
+          Xnew=X
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=20) then
+          Xnew=X+GridSize
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=21) then
+          Xnew=X+(GridSize*2)
+          Ynew=Y-(GridSize*2)
+        end
+        if (i=22) then
+          Xnew=X+(GridSize*2)
+          Ynew=Y-(GridSize)
+        end
+        if (i=23) then
+          Xnew=X+(Gridsize*2)
+          Ynew=Y
+        end
+        if (i=24) then
+          Xnew=X+(GridSize*2)
+          Ynew=Y+GridSize
+        end
+        if (i>24) then
+          Xnew=X+(GridSize*2)
+          Ynew=Y+(GridSize*2)
+        end     
+        
+        tmpPoint.setx(Xnew)
+        tmpPoint.sety(Ynew)
+        theValue = theGrid.CellValue(tmpPoint,Prj.MakeNull)
+        if (rec=1) then
+          LastValue = theValue
+        end
+        if (LastValue>theValue) then
+          LastValue = theValue            
+        end  'if 
+         
+      End  'For each i in 1..25 by 1
+      
+      
+      if (TheValue>=0) then
+      
+      if (DEMunits = "Feet") then
+      theFtab.SetValue(theFieldE,Rec,(LastValue*0.3048))
+      elseif (DEMunits = "Meters") then
+      theFtab.SetValue(theFieldE,Rec,LastValue)
+      end 'if (DEMunits =
+
+      else
+      msgbox.info("TTools has 1) encountered a NO DATA grid cell, or 2) run beyond the DEM boundary.  You must 1) perform a fill to remove NO DATA grid cells, or 2) extend the coverage area of your DEM.","ALERT!")
+      exit
+      end 'if (theValue = 
+    End 'if (E<=0)
+    
+  Else          'Overwrite existing data 
+      elvis=666
+  end 'if blubber
+
+
+'+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+theview=av.getactivedoc
+theproject=av.getproject
+
+    if (CrashTest=1300) then
+    msgbox.info("Spatial Analyst has reached its sampling capacity.  TTools is now going to save your project and quit ArcView.  You must re-open your project, and continue sampling elevation.","Attention!")
+    av.finddialog("progressmeter").close
+    theproject.save
+    av.quit
+    exit
+    end
+
+'++++++++++++++++++
+
+End 'For Each Rec in the fTab
+
+'*************************************************************************************************************************
+
+else
+msgbox.info("Your map units must be either Feet or Meters.","Alert!")
+exit
+
+End 'If (viewunits=
+
+'----------------
+'Gradient Calculations
+'----------------
+
+theFieldLength=theFTab.FindField("Length")
+theFieldElev=theFTab.FindField("Elevation")
+theFieldGrad=theFtab.FindField("Gradient")
+Counter=0
+LElev=0
+BLength=0
+  
+  For Each GRec in theFTab
+  Counter=Counter+1
+  Elevation=theFTab.ReturnValueNumber(theFieldElev,GRec)
+  FakeL=theFTab.ReturnValueNumber(theFieldLength,GRec)
+  If (GRec=1) then
+    LElev=Elevation
+  Else
+    Length=FakeL-BLength
+    If (LElev<>Elevation) then
+      dElev=(LElev-Elevation)
+      Grad=(dElev/Length)
+      LElev=Elevation
+      theFtab.SetValue(theFieldGrad,GRec,Grad)
+      For Each Geez in 1..Counter by 1
+        BackRec=GRec+1-Geez
+        theFtab.SetValue(theFieldGrad,BackRec,Grad)
+      End  'For
+      BLength=FakeL
+      Counter=0
+      Length=0
+    End 'if
+  End 'if   
+    
+end 'if
+
+sprec=0
+for each sprec in theftab
+  if (sprec=0) then
+    uno = theftab.returnvaluenumber(theFieldgrad,(sprec+1))
+    theftab.setvalue(thefieldgrad,sprec,uno)
+    else
+    elvis=1
+  end 'if
+end 'for
+
+'******************************************************************
+
+'if (viewunits = #UNITS_LINEAR_FEET) then
+'  for each rec in theftab
+'    elevationft = theftab.returnvaluenumber(theFieldE,rec)
+'    theftab.setvalue(thefieldE,rec,(elevationft*0.3048))
+'  end
+'else
+'monster=31
+'end
+   
+'------------------
+'Reset arcview
+'------------------
+  theFtab.Flush
+  theFtab.Refresh 
+  theFTab.SetEditable(False)
+  av.purgeobjects
+  av.ClearMsg
+  Msgbox.info("Elevations Retrieved and Gradients Calculated!  Elevation Units are in METERS.","Status:")
+  thePDPercentDone.SetLabel ("100%")
+
+
+

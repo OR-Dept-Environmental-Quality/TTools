@@ -1,0 +1,362 @@
+'*******************************************************
+'********************VERSION 7.0************************
+'*******************************************************
+
+' Description: 
+' (1) Segments Polyline into equally spaced point data
+' (2) Adds X and Y coordinates of features to Attribute Table
+' (3) Creates cum. distance field
+' (4) Calculates segment aspect
+
+'Brian Kasper and Matt Boyd, Oregon DEQ (September 2002)
+
+'''''''''''''''''''''''''''''''''''''''''''''''''
+
+av.finddialog("segment").close
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+theview = av.getactivedoc
+
+themapunits = theview.getunits
+
+thetheme = theview.getactivethemes.get(0)
+
+oldt = av.getactivedoc.getactivethemes.get(0) 
+    shapetype = oldt.GetFtab.FindField("Shape").GetType
+    if (shapetype <> #FIELD_SHAPELINE) then
+      msgbox.info("You must have your stream polyline theme selected.","Alert!")
+      exit
+    end
+oldv = oldt.getftab
+oldsf = oldv.findfield("shape")
+
+if (themapunits = #UNITS_LINEAR_UNKNOWN) then
+  msgbox.error("You need to set the Map Units before proceeding.","OOPS!")
+  Exit
+End
+
+msgbox.info("In the next window, you must choose the projection properties that you are currently in.  TTools works with any projection that has meters or feet as its map units.  Data will be recorded in metric (SI) units.","Important!")
+
+Inputprj = Projectiondialog.show(theView, theview.getunits)
+
+thefilename = FileDialog.Put("NewFile.shp".asfilename,"*.shp","Enter the new output filename.")
+newftab = FTab.MakeNew (thefilename, point)
+newftab.SetEditable (True)
+
+reverse = msgbox.YesNo ( "Reverse Line Segments", "Reverse?", false ) 
+length = MsgBox.Input ("Input Spacing Distance (METERS)", "Distance", "50").asNumber
+
+if(themapunits=#UNITS_LINEAR_FEET) then
+  length=length*3.28084
+else
+  length=length
+end
+
+for each rec in oldv
+
+pl = oldv.returnvalue(oldsf, rec)
+
+if (reverse) then
+ pl = pl.flip
+end
+
+newlist = pl.returnconnected.aslist
+
+for each pointlist in newlist
+
+pointlist = newlist.get(0)
+
+fp = pointlist.get(0)
+
+''''''''''''''''''''''''''''''''''''''
+'CREATE NEW FIELDS
+''''''''''''''''''''''''''''''''''''''
+
+av.ShowMsg("Segmenting Polyline...")
+av.ShowStopButton
+shapefield = newftab.Findfield("Shape")
+id = field.make("ID",#Field_FLOAT, 8,0)
+x = field.make("Xcoord",#FIELD_DECIMAL, 16, 8)
+y = field.make("Ycoord",#FIELD_DECIMAL, 16, 8)
+l = field.make("Length",#FIELD_FLOAT, 16, 2)
+rk = field.make("StreamKM",#FIELD_FLOAT, 16, 2)
+a = field.make("Aspect",#FIELD_FLOAT, 16, 1)
+e = Field.Make ("Elevation",#FIELD_DECIMAL,16,1)
+g = Field.Make ("Gradient",#FIELD_DECIMAL,16,6)
+TE = Field.Make ("TopoEast",#FIELD_DECIMAL,16,1)
+XE = Field.Make ("XEast",#FIELD_DECIMAL,16,4)
+YE = Field.Make ("YEast",#FIELD_DECIMAL,16,4)
+TS = Field.Make ("TopoSouth",#FIELD_DECIMAL,16,1)
+XS = Field.Make ("XSouth",#FIELD_DECIMAL,16,4)
+YS = Field.Make ("YSouth",#FIELD_DECIMAL,16,4)
+TW = Field.Make ("TopoWest",#FIELD_DECIMAL,16,1)
+XW = Field.Make ("XWest",#FIELD_DECIMAL,16,4)
+YW = Field.Make ("YWest",#FIELD_DECIMAL,16,4)
+CW = Field.Make ("Channel",#FIELD_DECIMAL,16,1)
+LW = Field.Make ("RightDist",#FIELD_DECIMAL,16,1)
+RW = Field.Make ("LeftDist",#FIELD_DECIMAL,16,1)
+T = Field.Make ("Temp",#FIELD_DECIMAL,16,1)
+Rip0 = Field.Make ("Rip0",#FIELD_DECIMAL,16,0)
+NE1 = Field.Make ("NERip1",#FIELD_DECIMAL,16,0)
+E1 = Field.Make ("ERip1",#FIELD_DECIMAL,16,0)
+SE1 = Field.Make ("SERip1",#FIELD_DECIMAL,16,0)
+S1 = Field.Make ("SRip1",#FIELD_DECIMAL,16,0)
+SW1 = Field.Make ("SWRip1",#FIELD_DECIMAL,16,0)
+W1 = Field.Make ("WRip1",#FIELD_DECIMAL,16,0)
+NW1 = Field.Make ("NWRip1",#FIELD_DECIMAL,16,0)
+NE2 = Field.Make ("NERip2",#FIELD_DECIMAL,16,0)
+E2 = Field.Make ("ERip2",#FIELD_DECIMAL,16,0)
+SE2 = Field.Make ("SERip2",#FIELD_DECIMAL,16,0)
+S2 = Field.Make ("SRip2",#FIELD_DECIMAL,16,0)
+SW2 = Field.Make ("SWRip2",#FIELD_DECIMAL,16,0)
+W2 = Field.Make ("WRip2",#FIELD_DECIMAL,16,0)
+NW2 = Field.Make ("NWRip2",#FIELD_DECIMAL,16,0)
+NE3 = Field.Make ("NERip3",#FIELD_DECIMAL,16,0)
+E3 = Field.Make ("ERip3",#FIELD_DECIMAL,16,0)
+SE3 = Field.Make ("SERip3",#FIELD_DECIMAL,16,0)
+S3 = Field.Make ("SRip3",#FIELD_DECIMAL,16,0)
+SW3 = Field.Make ("SWRip3",#FIELD_DECIMAL,16,0)
+W3 = Field.Make ("WRip3",#FIELD_DECIMAL,16,0)
+NW3 = Field.Make ("NWRip3",#FIELD_DECIMAL,16,0)
+NE4 = Field.Make ("NERip4",#FIELD_DECIMAL,16,0)
+E4 = Field.Make ("ERip4",#FIELD_DECIMAL,16,0)
+SE4 = Field.Make ("SERip4",#FIELD_DECIMAL,16,0)
+S4 = Field.Make ("SRip4",#FIELD_DECIMAL,16,0)
+SW4 = Field.Make ("SWRip4",#FIELD_DECIMAL,16,0)
+W4 = Field.Make ("WRip4",#FIELD_DECIMAL,16,0)
+NW4 = Field.Make ("NWRip4",#FIELD_DECIMAL,16,0)
+dem0 = Field.Make ("dem0",#FIELD_DECIMAL,16,1)
+dNE1 = Field.Make ("NEdem1",#FIELD_DECIMAL,16,1)
+dE1 = Field.Make ("Edem1",#FIELD_DECIMAL,16,1)
+dSE1 = Field.Make ("SEdem1",#FIELD_DECIMAL,16,1)
+dS1 = Field.Make ("Sdem1",#FIELD_DECIMAL,16,1)
+dSW1 = Field.Make ("SWdem1",#FIELD_DECIMAL,16,1)
+dW1 = Field.Make ("Wdem1",#FIELD_DECIMAL,16,1)
+dNW1 = Field.Make ("NWdem1",#FIELD_DECIMAL,16,1)
+dNE2 = Field.Make ("NEdem2",#FIELD_DECIMAL,16,1)
+dE2 = Field.Make ("Edem2",#FIELD_DECIMAL,16,1)
+dSE2 = Field.Make ("SEdem2",#FIELD_DECIMAL,16,1)
+dS2 = Field.Make ("Sdem2",#FIELD_DECIMAL,16,1)
+dSW2 = Field.Make ("SWdem2",#FIELD_DECIMAL,16,1)
+dW2 = Field.Make ("Wdem2",#FIELD_DECIMAL,16,1)
+dNW2 = Field.Make ("NWdem2",#FIELD_DECIMAL,16,1)
+dNE3 = Field.Make ("NEdem3",#FIELD_DECIMAL,16,1)
+dE3 = Field.Make ("Edem3",#FIELD_DECIMAL,16,1)
+dSE3 = Field.Make ("SEdem3",#FIELD_DECIMAL,16,1)
+dS3 = Field.Make ("Sdem3",#FIELD_DECIMAL,16,1)
+dSW3 = Field.Make ("SWdem3",#FIELD_DECIMAL,16,1)
+dW3 = Field.Make ("Wdem3",#FIELD_DECIMAL,16,1)
+dNW3 = Field.Make ("NWdem3",#FIELD_DECIMAL,16,1)
+dNE4 = Field.Make ("NEdem4",#FIELD_DECIMAL,16,1)
+dE4 = Field.Make ("Edem4",#FIELD_DECIMAL,16,1)
+dSE4 = Field.Make ("SEdem4",#FIELD_DECIMAL,16,1)
+dS4 = Field.Make ("Sdem4",#FIELD_DECIMAL,16,1)
+dSW4 = Field.Make ("SWdem4",#FIELD_DECIMAL,16,1)
+dW4 = Field.Make ("Wdem4",#FIELD_DECIMAL,16,1)
+dNW4 = Field.Make ("NWdem4",#FIELD_DECIMAL,16,1)
+latitude = Field.Make ("Lat", #FIELD_DECIMAL,16,8)
+longitude = Field.Make ("Long", #FIELD_DECIMAL,16,8)
+
+
+newftab.addfields({id,l,rk,longitude,latitude,e,CW,a,TW,TS,TE,Rip0,NE1,NE2,NE3,NE4,E1,E2,E3,E4,SE1,SE2,SE3,SE4,S1,S2,S3,S4,SW1,SW2,SW3,SW4,W1,W2,W3,W4,NW1,NW2,NW3,NW4,dNE1,dNE2,dNE3,dNE4,dE1,dE2,dE3,dE4,dSE1,dSE2,dSE3,dSE4,dS1,dS2,dS3,dS4,dSW1,dSW2,dSW3,dSW4,dW1,dW2,dW3,dW4,dNW1,dNW2,dNW3,dNW4,dem0,T,g,XE,YE,XS,YS,XW,YW,LW,RW,x,y})
+num = newftab.addrecord
+newftab.setvalue(x, num, fp.getx)
+newftab.setvalue(y, num, fp.gety)
+newftab.setvalue(shapefield, num, fp)
+
+nlength = length
+
+for each pnt in (1..(pointlist.count - 1))
+  
+  lp = fp
+  fp = pointlist.get(pnt)
+  deltax = (fp.getx - lp.getx)
+  deltay = (fp.gety - lp.gety)
+  distance = ((deltax*deltax) + (deltay*deltay)).sqrt
+      
+   if (distance > nlength) then 
+     newx = (nlength * (deltax/distance)) + lp.getx
+     newy = nlength * (deltay/distance) + lp.gety
+     newpoint = point.make(newx,newy)
+     num = newftab.addrecord
+     newftab.setvalue(x, num, newx)
+     newftab.setvalue(y, num, newy)
+     newftab.setvalue(shapefield, num, newpoint)
+     remainder = distance - nlength
+       while (remainder > length)
+        nlength = length
+          lp = newpoint        
+            deltax = (fp.getx - lp.getx)
+            deltay = (fp.gety - lp.gety)
+            distance = ((deltax*deltax) + (deltay*deltay)).sqrt
+               newx = (nlength * (deltax/distance)) + lp.getx
+               newy = nlength * (deltay/distance) + lp.gety
+               newpoint = point.make(newx,newy)
+               num = newftab.addrecord
+               newftab.setvalue(x, num, newx)
+               newftab.setvalue(y, num, newy)
+               newftab.setvalue(shapefield, num, newpoint)
+               remainder = distance - nlength
+        end
+      nlength = length - (distance-nlength)
+     else
+     nlength = nlength - distance
+    end   
+end 
+
+end
+end
+
+''''''''''''''''''''''''''''''''''''''
+'Record ID in FTab
+''''''''''''''''''''''''''''''''''''''
+  TotRec=0
+  For Each Rec in newFTab
+    TotRec=TotRec+1
+  End
+  av.ShowMsg("Writing ID...")
+  av.ShowStopButton
+  for each rec in newftab
+    newftab.setvalue(id,rec,rec)
+    
+    if (themapunits = #UNITS_LINEAR_FEET) then
+      CumLength=Length*0.3048*rec
+      newftab.setvalue(L,rec,CumLength)
+    else 'themapunits = meters
+      CumLength=Length*rec
+      newftab.setvalue(L,rec,CumLength)
+    end  
+    
+    av.SetStatus(100*Rec/(TotRec-1))
+  end
+'--------------------------------
+'Convert Length field to meters if necessary
+'--------------------------------
+totrec=0
+for each rec in newftab
+  totrec=totrec+1
+end
+av.showmsg("Writing cumulative length...")
+av.showstopbutton
+if (themapunits="UNITS_LINEAR_FEET") then
+  for each rec in newftab
+    cumkm=length*rec*0.3048
+    newftab.setvalue(l,rec,cumkm)
+    av.setstatus(100*rec/(totrec-1))
+  end
+else
+  pixie = 123
+end
+
+'--------------------------------
+'Record Stream Kilometer in FTab
+'--------------------------------
+streamkmfld = newFtab.FindField("StreamKM")
+
+  TotRec=0
+  For Each Rec in newFTab
+    TotRec=TotRec+1
+  End
+  av.ShowMsg("Writing Stream KM...")
+  av.ShowStopButton
+  for each rec in newftab
+    if (themapunits=#UNITS_LINEAR_FEET) then
+      KM = ((totrec-rec)*Length-Length)*(0.3048/1000)
+      newftab.setvalue(Streamkmfld,rec,KM)
+    else 'themapunits=meters
+      KM = ((totrec-rec)*Length-Length)/(1000)
+      newftab.setvalue(Streamkmfld,rec,KM)
+    end  
+    av.SetStatus(100*Rec/(TotRec-1))
+    
+  end
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'    Obtain the decimal degrees lat/long and fill in the columns
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+theXfield = newFtab.FindField("Xcoord")
+
+theYfield = newFtab.FindField("Ycoord")
+
+thelatfield = newftab.findfield("lat")
+
+thelongfield = newftab.findfield("long")
+
+TotRec = 0
+LastValue=10000000
+For each Rec in newFtab
+  TotRec = TotRec+1
+End
+
+For each rec in newFtab
+  
+  valx = newftab.returnvaluenumber(thexfield,rec)
+  valy = newftab.returnvaluenumber(theyfield,rec)
+  
+  thepoint = point.make (valx, valy)
+  
+  newpointdd = thepoint.returnunprojected(inputprj)
+  thexoutputnumber = newpointdd.getx
+  thexoutputnumber = thexoutputnumber.setformat("dd.dddddddd")
+  theyoutputnumber = newpointdd.gety
+  theyoutputnumber = theyoutputnumber.setformat("dd.dddddddd")
+
+  newFtab.setvalue(thelatfield, rec, theyoutputnumber)
+  newFtab.setvalue(thelongfield, rec, thexoutputnumber)
+  
+end
+
+''''''''''''''''''''''''''''''''''''''
+'Calculate Stream Segment Aspect
+''''''''''''''''''''''''''''''''''''''
+  av.ShowMsg("Calculating Aspects...")
+  av.ShowStopButton
+  theFTab=newFTab
+  For Each Rec in theFTab
+    Duh=Rec+1
+    more = av.SetStatus(100*Rec/(TotRec-1))
+      if (not more) then
+        av.showmsg("Segentation Stopped...")
+        Msgbox.info("Segmentation Stopped.","Status:")
+        av.purgeobjects
+        av.ClearStatus
+        av.ClearMsg
+        theFtab.Flush
+        theFtab.Refresh 
+        theFTab.SetEditable(False)
+    exit
+      end
+    If (duh=TotRec) then
+      LastOne=newftab.returnvaluenumber(A,(rec-1))
+      newFTab.SetValueNumber(A,Rec,Lastone) 
+      av.ClearMsg
+      theFtab.SetEditable(false) 
+      msgbox.info("Done Segmenting Stream and Calculating Aspect!  Data are recorded in metric (SI) units.","Status Report:")
+      newft = FTheme.Make (newftab)
+      av.getactivedoc.addtheme(newft)
+      newftab.SetEditable(false)
+      exit
+    end
+    X1=theFTab.ReturnValueNumber(X,rec)
+    X2=theFTab.ReturnValueNumber(X,duh)
+    Y1=theFTab.ReturnValueNumber(Y,rec)    
+    Y2=theFTab.ReturnValueNumber(Y,duh)
+    dX=(X1-X2)
+    dY=(Y1-Y2)
+    Radians=((dY/dX).abs).atan
+        If ((dX<0) and (dY<0)) then
+          Aspect=90-(Radians*180/3.14)
+        Elseif ((dX<0) and (dY>0)) then
+          Aspect=90+(Radians*180/3.14)
+        Elseif ((dX>0) and (dY>0)) then
+          Aspect=270-(Radians*180/3.14)
+        Elseif ((dX>0) and (dY<0)) then
+          Aspect=270+(Radians*180/3.14)
+        end 'if
+        newFTab.SetValueNumber(A,Rec,Aspect)
+
+  end 'for      
+
+
+
