@@ -167,6 +167,15 @@ def UpdateNodesFC2(UpdateValue, nodeID, NodesFC, UpdateField):
             row[1] = UpdateValue
             cursor.updateRow(row)
 
+def CreateNodeList(NodeDict, streamID):
+    NodeList = []
+    for nodeID in NodeDict:
+        origin_x = NodeDict[nodeID]["POINT_X"]
+        origin_y = NodeDict[nodeID]["POINT_Y"]
+        stream_km = NodeDict[nodeID]["STREAM_KM"]
+        NodeList.append([origin_x, origin_y, streamID, nodeID, stream_km, 0, 0])
+    return(NodeList)
+
 #enable garbage collection
 gc.enable()
 
@@ -218,10 +227,15 @@ try:
     # read the data into a nested dictionary
     AddFields = ["ELEVATION","GRADIENT"]
     NodeDict = ReadNodesFC(NodesFC, OverwriteData, AddFields)
-    
+    NodeList = []
     
     n = 1
     for streamID in NodeDict:
+        print("Processing stream %s of %s" % (n, len(NodeDict)))
+        NodeList = CreateNodeList(NodeDict, streamID)
+        NodeList = SampleRaster(NodeList, raster, con_z_to_m)
+        
+        ###########################################################################################################
         SkipDownNodes = [1]
         CoordList = []
 
