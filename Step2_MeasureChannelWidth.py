@@ -103,12 +103,15 @@ def ToMetersUnitConversion(inFeature):
     return con_to_m
 
 def ReadPolylineGeometry(polylineFC, proj):
+    """Reads an input polyline into a polyline geometry object"""
     poly_list = []
+    # Get the x and y of each vertex in the polyline and save it as a list.
     for row in arcpy.da.SearchCursor(polylineFC, ["SHAPE@"]):
         for part in row[0]:
             for pnt in part:
                 poly_list.append(arcpy.Point(pnt.X, pnt.Y))
     poly_array = arcpy.Array(poly_list)
+    # put it into a geometry object.
     poly_geom = arcpy.Polyline(poly_array, proj)
     return(poly_geom)
         
