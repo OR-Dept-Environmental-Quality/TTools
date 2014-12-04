@@ -41,6 +41,8 @@ from arcpy import env
 from math import degrees, radians, sin, cos, atan, hypot, ceil
 from collections import defaultdict
 import numpy as np
+from osgeo import ogr
+from osgeo import gdal
 
 # Check out the ArcGIS Spatial Analyst extension license
 arcpy.CheckOutExtension("Spatial")
@@ -57,14 +59,24 @@ env.overwriteOutput = True
 #OverwriteData = parameters[6].valueAsText True/False
 
 # Start Fill in Data
-NodesFC = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
-Directions = 2
-MaxSearchDistance_km = 2
+#NodesFC = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
+#Directions = 2
+#MaxSearchDistance_km = 2
+#skippy = False
+#EleRaster = r"D:\Projects\TTools_9\Example_data.gdb\be_lidar_ft"
+#EleUnits = "Feet"
+#outpoint_final = r"D:\Projects\TTools_9\Example_data.gdb\topo_samples"
+#OverwriteData = True
+
+NodesFC = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+Directions = 1
+MaxSearchDistance_km = .05
 skippy = False
-EleRaster = r"D:\Projects\TTools_9\Example_data.gdb\be_lidar_ft"
-EleUnits = "Feet"
-outpoint_final = r"D:\Projects\TTools_9\Example_data.gdb\topo_samples"
+EleRaster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+EleUnits = "Meters"
+outpoint_final = r"D:\Projects\TTools_9\JohnsonCreek.gdb\topo_samples"
 OverwriteData = True
+
 # End Fill in Data
 
 def NestedDictTree(): 
@@ -74,7 +86,7 @@ def NestedDictTree():
 def ReadNodesFC(NodesFC, OverwriteData, AddFields):
     """Reads the input point feature class and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
     pnt_dict = NestedDictTree()
-    Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y",]
+    Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y"]
 
     # Get a list of existing fields
     ExistingFields = []
@@ -108,20 +120,29 @@ def ReadNodesFC(NodesFC, OverwriteData, AddFields):
             
     return(pnt_dict)
 
-def CreateTopoFC(pointList, NodesFC, proj):
+def CreateTopoFC(pointList, TopoFC, NodesFC, proj):
     """Creates the output topo point feature class using the data from the nodes list"""
     #arcpy.AddMessage("Exporting Data")
     print("Exporting Data")
     
     #Create an empty output with the same projection as the input polyline
     cursorfields = ["POINT_X","POINT_Y","STREAM_ID","NODE_ID","AZIMUTH","TOPOANGLE","TOPO_ELE","NODE_ELE","ELE_CHANGE","TOPODIS","SEARCHDIS","NA_SAMPLES"]
-    arcpy.CreateFeatureclass_management(os.path.dirname(NodesFC),os.path.basename(NodesFC), "POINT","","DISABLED","DISABLED",proj)
+    arcpy.CreateFeatureclass_management(os.path.dirname(TopoFC),os.path.basename(TopoFC), "POINT","","DISABLED","DISABLED",proj)
+    
+    # Determine Stream ID field properties
+    SIDtype = arcpy.ListFields(NodesFC,"STREAM_ID")[0].type
+    SIDprecision = arcpy.ListFields(NodesFC,"STREAM_ID")[0].precision
+    SIDscale = arcpy.ListFields(NodesFC,"STREAM_ID")[0].scale
+    SIDlength = arcpy.ListFields(NodesFC,"STREAM_ID")[0].length    
 
     # Add attribute fields # TODO add dictionary of field types so they aren't all double
     for f in cursorfields:
-        arcpy.AddField_management(NodesFC, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
+        if f == "STREAM_ID":
+            arcpy.AddField_management(TopoFC, f, SIDtype, SIDprecision, SIDscale, SIDlength, "", "NULLABLE", "NON_REQUIRED")
+        else:
+            arcpy.AddField_management(TopoFC, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
 
-    with arcpy.da.InsertCursor(NodesFC, ["SHAPE@X","SHAPE@Y"] + cursorfields) as cursor:
+    with arcpy.da.InsertCursor(TopoFC, ["SHAPE@X","SHAPE@Y"] + cursorfields) as cursor:
         for row in pointList:
             cursor.insertRow(row)
             
@@ -197,7 +218,84 @@ def CoordToArray(easting, northing, bbox_upper_left):
     xy = []
     xy.append((easting - bbox_upper_left[0]) / bbox_upper_left[2])  # col, x
     xy.append((bbox_upper_left[1] - northing) / bbox_upper_left[3])  # row, y
+    
+    #xy.append((easting - gt[0])/ gt[1])  # col
+    #xy.append((northing - gt[3]) / gt[5])  # row    
+    
     return xy
+
+def CreateCoordList(origin_x, origin_y, azimuth, azimuthdisdict, con_from_m):
+    
+    CoordList = []
+    for searchdistance in azimuthdisdict[a]:
+        # Calculate the x and y coordinate of the landcover sample location in the spatial units of the inputFC                
+        topoX = (searchdistance * con_from_m * sin(radians(a))) + origin_x
+        topoY = (searchdistance * con_from_m * cos(radians(a))) + origin_y
+
+        # Add the all the coordinates to the list
+        CoordList.append([topoX, topoY])
+    return CoordList
+
+def GetTopoAngles(CoordList, EleRaster, a, azimuthdisdict, con_z_to_m):
+    """This gets the maximum topographic angle for a set of sample coordinates in an azimuth direction.
+    The data is output as a list. This version is slower but will not crash as the arrays are small"""
+    
+    cellsizeX = arcpy.Describe(EleRaster).meanCellWidth
+    cellsizeY = arcpy.Describe(EleRaster).meanCellHeight
+    
+    # calculate the buffer distance (in EleRaster spatial units) to add to the raster bounding box when extracting to an array
+    buffer = cellsizeX * 0    
+    
+    # calculate lower left corner coordinate and nrows/cols for the bounding box
+    # first transpose the list so x and y coordinates are in the same vector
+    tlist = map(lambda *i: list(i), *CoordList)
+        
+    Xmin = min(tlist[0]) - buffer
+    Ymin = min(tlist[1]) - buffer
+    Ymax = max(tlist[1]) + buffer            
+    ncols = (max(tlist[0]) + buffer - Xmin) / cellsizeX + 1
+    nrows = (Ymax - Ymin) / cellsizeY + 1
+    bbox_lower_left = arcpy.Point(Xmin, Ymin) # must be in raster map units
+    bbox_upper_left = [Xmin, Ymax, cellsizeX, cellsizeY]
+    nodata_to_value = -9999 / con_z_to_m
+    
+    # Construct the array. Note returned array is (row, col) so (y, x)
+    Zarry = arcpy.RasterToNumPyArray(EleRaster, bbox_lower_left, ncols, nrows, nodata_to_value)
+    
+    # convert array values to meters if needed
+    Zarry = Zarry * con_z_to_m             
+    
+    TopoZList = []
+    
+    #print("Extracting raster values")
+    for i in range(0,len(CoordList)):
+        xy = CoordToArray(CoordList[i][0], CoordList[i][1], bbox_upper_left)
+        TopoZList.append(Zarry[xy[1], xy[0]])
+        #TopoList[i].append(Zarry[xy[1], xy[0]])
+    
+    TopoZarry = np.array(TopoZList)
+    Disarry = azimuthdisdict[a] * con_to_m
+    Shadearry = np.degrees(np.arctan((TopoZarry - TopoZarry[0]) / Disarry))
+    # Take out the off raster samples
+    naindex = np.where(TopoZarry < -9998)
+    for x in naindex[0]: Shadearry[x] = -9999            
+    # Find the max shade angle
+    ShadeAngle = Shadearry.max()
+    # array index at the max shade angle 
+    arryindex = np.where(Shadearry==ShadeAngle)[0][0]
+    ShadeZ = TopoZarry[arryindex]
+    ZChange = ShadeZ - TopoZarry[0]
+    ShadeDistance = azimuthdisdict[a][arryindex]
+    SearchDistance = azimuthdisdict[a].max()
+    ShadeAngle_X = (ShadeDistance * con_from_m * sin(radians(a))) + CoordList[0][0]
+    ShadeAngle_Y = (ShadeDistance * con_from_m * cos(radians(a))) + CoordList[0][1]
+    offRasterSamples = (TopoZarry > -9998).sum()
+    
+    TopoDataList = [ShadeAngle_X, ShadeAngle_Y, ShadeAngle_X, ShadeAngle_Y, 
+                    streamID, nodeID, a, ShadeAngle, ShadeZ, TopoZarry[0], 
+                    ZChange, ShadeDistance, SearchDistance, offRasterSamples]
+    return TopoDataList
+
 
 def GetShadeAngles1(NodeDict, streamID, EleRaster, azimuths, azimuthdisdict, con_z_to_m):
     """This gets the maximum shade angle for each stream and outputs the data as a list. 
@@ -212,7 +310,11 @@ def GetShadeAngles1(NodeDict, streamID, EleRaster, azimuths, azimuthdisdict, con
     buffer = cellsizeX * 2    
     
     n = 1
-    for nodeID in NodeDict:
+    
+    Nodes = NodeDict.keys()
+    Nodes.sort()
+    
+    for nodeID in Nodes:    
         #print("Processing node %s of %s" % (n, len(NodeDict)))
         origin_x = NodeDict[nodeID]["POINT_X"]
         origin_y = NodeDict[nodeID]["POINT_Y"]
@@ -291,7 +393,10 @@ def GetShadeAngles2(NodeDict, streamID, EleRaster, azimuths, azimuthdisdict, con
     # calculate the buffer distance (in EleRaster spatial units) to add to the raster bounding box when extracting to an array
     buffer = cellsizeX * 2    
     
-    for nodeID in NodeDict:
+    Nodes = NodeDict.keys()
+    Nodes.sort()
+    
+    for nodeID in Nodes:
         origin_x = NodeDict[nodeID]["POINT_X"]
         origin_y = NodeDict[nodeID]["POINT_Y"]      
         for a in azimuths:
@@ -417,8 +522,20 @@ try:
     TopoList = []
     n = 1
     for streamID in NodeDict:
-        print("Processing stream %s of %s" % (n, len(NodeDict)))
-        TopoList = TopoList + GetShadeAngles2(NodeDict[streamID], streamID, EleRaster, azimuths, azimuthdisdict, con_z_to_m)
+        
+        Nodes = NodeDict[streamID].keys()
+        Nodes.sort()
+        i = 1
+        p = 0
+        for nodeID in Nodes:
+            print("Processing stream {0} of {1}. {2:.0%} complete".format(n, len(NodeDict), i / len(Nodes)))
+            origin_x = NodeDict[streamID][nodeID]["POINT_X"]
+            origin_y = NodeDict[streamID][nodeID]["POINT_Y"]
+            for a in azimuths:
+                CoordList = CreateCoordList(origin_x, origin_y, a, azimuthdisdict, con_from_m)
+                TopoDataList = GetTopoAngles(CoordList, EleRaster, a, azimuthdisdict, con_z_to_m)
+                TopoList.append(TopoDataList) 
+            i = i + 1
         n = n + 1       
     
     # Update the NodeDict
@@ -426,9 +543,9 @@ try:
         for key in AddFields:
             NodeDict[row[4]][row[5]][key] = row[7]    
     
-    CreateTopoFC(TopoList, outpoint_final, proj)
     UpdateNodesFC(NodeDict, NodesFC, AddFields)
-
+    CreateTopoFC(TopoList, outpoint_final, NodesFC, proj)
+    
     gc.collect()
 
     endTime = time.time()
