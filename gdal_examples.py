@@ -69,7 +69,7 @@ def RasterToArray(raster):
     gt = data.GetGeoTransform()
     proj = data.GetProjection
     rows = data.RasterYSize
-    cols = data.RasterYSize
+    cols = data.RasterXSize
     return arry, gt, proj, rows, cols
 
 def ReadRasterDirectly(raster, xy):

@@ -59,7 +59,7 @@ def NestedDictTree():
 def ReadNodesFC(NodesFC, OverwriteData, AddFields):
     """Reads the input point feature class and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
     pnt_dict = NestedDictTree()
-    Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y",]
+    Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y"]
 
     # Get a list of existing fields
     ExistingFields = []
