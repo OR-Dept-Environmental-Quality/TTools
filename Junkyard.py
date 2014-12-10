@@ -99,3 +99,65 @@ def GetTopoAngles2(NodeDict, streamID, EleRaster, azimuths, azimuthdisdict, con_
             TopoList.append([ShadeAngle_X, ShadeAngle_Y, ShadeAngle_X, ShadeAngle_Y, streamID, nodeID, a, ShadeAngle, ShadeZ, TopoZarry[0], ZChange, ShadeDistance, SearchDistance, offRasterSamples])
 
     return TopoList
+
+def Downloadcomtypes():
+    import urllib
+    
+    print("Downloading comtypes")
+    url = "https://pypi.python.org/packages/source/c/comtypes/comtypes-1.1.1.zip"
+    file_name = url.split('/')[-1]
+    out_filepath = "C:/" + file_name
+    urllib.urlretrieve (url, r"C:\comtypes-1.1.1.zip")
+
+def GetLibPath():
+    """Return location of ArcGIS type libraries as string.
+    Based on work from Matt Wilkie and others
+    https://bitbucket.org/maphew/canvec/src/eaf2678de06f/Canvec/Scripts/parco.py"""
+    import _winreg
+
+    # this looks for a file which should always be present in the ESRI  com library folder
+    # first in the regkey (and directory) expected for v9x, then for v10
+    # this method of testing is ugly, reeks of code smell, but works
+    # after 2 hours of trying to make it happen elegantly I give up, for now. (mhw)
+
+    keyESRI = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\ESRI\\ArcGIS")
+    esriComDir = _winreg.QueryValueEx(keyESRI,"InstallDir") [0] + "com\\"
+
+    if not os.path.isfile(esriComDir+'\\esriSystemUI.olb'):
+        keyESRI = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\ESRI\\Desktop10.1")
+        esriComDir = _winreg.QueryValueEx(keyESRI,"InstallDir") [0] + "com\\"
+    
+    if not os.path.isfile(esriComDir+'\\esriSystemUI.olb'):
+            keyESRI = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\ESRI\\Desktop10.2")
+            esriComDir = _winreg.QueryValueEx(keyESRI,"InstallDir") [0] + "com\\"    
+
+    return esriComDir
+    
+def GetModule(sModuleName):
+    """Import ArcGIS module"""
+    from comtypes.client import GetModule
+    sLibPath = GetLibPath()
+    GetModule(sLibPath + sModuleName)
+
+def GetStandaloneModules():
+    """Import commonly used ArcGIS libraries for standalone scripts"""
+    GetModule("esriSystem.olb")
+    GetModule("esriGeometry.olb")
+    GetModule("esriCarto.olb")
+    GetModule("esriDisplay.olb")
+    GetModule("esriGeoDatabase.olb")
+    GetModule("esriDataSourcesGDB.olb")
+    GetModule("esriDataSourcesFile.olb")
+    GetModule("esriOutput.olb")
+
+def DistanceBetweenPoints(Xa,Ya,Xb,Yb):
+    """Determines the distance between two points using the pythagorean theorem and returns distance between them in map units"""
+    from math import sqrt, pow
+    dist = math.sqrt(math.pow((Xa - Xb),2) + math.pow((Ya - Yb),2))
+    return dist
+
+def CalcAspect(dx, dy):
+    
+    RadAngle = atan2(dY,dX)
+    aspect = (RadAngle * 180) / pi
+    aspect2 = degrees(atan2(dY,dX))
