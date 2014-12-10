@@ -2,30 +2,26 @@
 # Import system modules
 from __future__ import division, print_function
 import sys
-import os
-import string
 import gc
-import shutil
 import time
 from datetime import timedelta
 import arcpy
-import itertools
 from arcpy import env
 from math import ceil
 from collections import defaultdict
 #######################################################################################
 # TTools
-# Step 2: Measure Channel Widths / Aspects - v 0.1
+# Step 2: Measure Channel Widths - v 0.9
 # Ryan Michie
 
 # INPUTS
-# 0: Input TTools point feature class (NodesFC)
-# 1: input Right Bank feature class(rb)
-# 2: input Left Bank feature class(lb)
-# 3: input flag if existing data can be over written (OverwriteData) 1. True, 2. False
+# 0: Input TTools point feature class (nodes_fc)
+# 1: input Right Bank feature class(rb_fc)
+# 2: input Left Bank feature class(lb_fc)
+# 3: input flag if existing data can be over written (overwrite_data) 1. True, 2. False
 
 # OUTPUTS
-# point feature class (edit NodesFC) - Added fields with ASPECT and CHANWIDTH for each node
+# point feature class (edit nodes_fc) - Added fields with ASPECT and CHANWIDTH for each node
 
 # Future Updates
 
@@ -37,63 +33,68 @@ from collections import defaultdict
 #Check out the ArcGIS Spatial Analyst extension license
 #arcpy.CheckOutExtension("Spatial")
 
-env.overwriteOutput = True
 
 # Parameter fields for python toolbox
-#NodesFC = parameters[0].valueAsText
-#rb = parameters[1].valueAsText
-#lb = parameters[2].valueAsText
-#OverwriteData = parameters[3].valueAsText
+#nodes_fc = parameters[0].valueAsText
+#rb_fc = parameters[1].valueAsText
+#lb_fc = parameters[2].valueAsText
+#overwrite_data = parameters[3].valueAsText
 
 # Start Fill in Data
-NodesFC = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
-rb = r"D:\Projects\TTools_9\Example_data.gdb\McFee_RB"
-lb = r"D:\Projects\TTools_9\Example_data.gdb\McFee_LB"
-OverwriteData = True
+#nodes_fc = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
+#rb_fc = r"D:\Projects\TTools_9\Example_data.gdb\McFee_RB"
+#lb_fc = r"D:\Projects\TTools_9\Example_data.gdb\McFee_LB"
+#overwrite_data = True
+
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+rb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams_two"
+lb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams_two"
+overwrite_data = True
+
 # End Fill in Data
 
-def NestedDictTree(): 
+def nested_dict(): 
     """Build a nested dictionary"""
-    return defaultdict(NestedDictTree)
+    return defaultdict(nested_dict)
 
-def ReadNodesFC(NodesFC, OverwriteData, AddFields):
+def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     """Reads the input point feature class and returns the STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
-    pnt_dict = NestedDictTree()
-    Incursorfields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y"]
+    nodeDict = nested_dict()
+    incursorFields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y"]
 
     # Get a list of existing fields
-    ExistingFields = []
-    for f in arcpy.ListFields(NodesFC):
-        ExistingFields.append(f.name)     
+    existingFields = []
+    for f in arcpy.ListFields(nodes_fc):
+        existingFields.append(f.name)     
 
     # Check to see if the 1st field exists if yes add it.
-    if OverwriteData == False and (AddFields[0] in ExistingFields) == True:
-        Incursorfields.append(AddFields[0])
+    if overwrite_data is False and (addFields[0] in existingFields) is True:
+        incursorFields.append(addFields[0])
     else:
-        OverwriteData = True
+        overwrite_data = True
 
     # Determine input point spatial units
-    proj = arcpy.Describe(NodesFC).spatialReference
+    proj_nodes = arcpy.Describe(nodes_fc).spatialReference
 
-    with arcpy.da.SearchCursor(NodesFC,Incursorfields,"",proj) as Inrows:
-        if OverwriteData == True:
+    with arcpy.da.SearchCursor(nodes_fc,incursorFields,"",proj_nodes) as Inrows:
+        if overwrite_data is True:
             for row in Inrows:
-                pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
-                pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
-                pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4]
+                nodeDict[row[0]][row[1]]["STREAM_KM"] = row[2] 
+                nodeDict[row[0]][row[1]]["POINT_X"] = row[3]
+                nodeDict[row[0]][row[1]]["POINT_Y"] = row[4]
         else:
             for row in Inrows:
                 # if the data is null or zero (0 = default for shapefile), it is retreived and will be overwritten.
-                if row[5] == None or row[5] == 0:
-                    pnt_dict[row[0]][row[1]]["STREAM_KM"] = row[2] 
-                    pnt_dict[row[0]][row[1]]["POINT_X"] = row[3]
-                    pnt_dict[row[0]][row[1]]["POINT_Y"] = row[4]
-    if len(pnt_dict) == 0:
+                if row[5] is None or row[5] == 0 or row[5] < -9998:
+                    nodeDict[row[0]][row[1]]["STREAM_KM"] = row[2] 
+                    nodeDict[row[0]][row[1]]["POINT_X"] = row[3]
+                    nodeDict[row[0]][row[1]]["POINT_Y"] = row[4]
+    if len(nodeDict) == 0:
         sys.exit("The fields checked in the input point feature class have existing data. There is nothing to process. Exiting")
             
-    return(pnt_dict)
+    return(nodeDict)
 
-def ToMetersUnitConversion(inFeature):
+def to_meters_con(inFeature):
     """Returns the conversion factor to get from the input spatial units to meters"""
     try:
         con_to_m = arcpy.Describe(inFeature).SpatialReference.metersPerUnit
@@ -102,64 +103,46 @@ def ToMetersUnitConversion(inFeature):
         sys.exit("Coordinate system is not projected or not recognized. Use a projected coordinate system, preferably in linear units of feet or meters.")   
     return con_to_m
 
-def ReadPolylineGeometry(polylineFC, proj):
-    """Reads an input polyline into a polyline geometry object"""
+def read_polyline_geometry(polyline_fc, proj_polyline):
+    """Reads an input polyline into an arcpy polyline geometry object"""
     poly_list = []
     # Get the x and y of each vertex in the polyline and save it as a list.
-    for row in arcpy.da.SearchCursor(polylineFC, ["SHAPE@"]):
+    for row in arcpy.da.SearchCursor(polyline_fc, ["SHAPE@"]):
         for part in row[0]:
             for pnt in part:
                 poly_list.append(arcpy.Point(pnt.X, pnt.Y))
     poly_array = arcpy.Array(poly_list)
     # put it into a geometry object.
-    poly_geom = arcpy.Polyline(poly_array, proj)
+    poly_geom = arcpy.Polyline(poly_array, proj_polyline)
     return(poly_geom)
         
-def CalcChannelWidthAdvancedLic(nodexy, rb, lb):
-    rb_near_result = arcpy.analysis.GenerateNearTable(
-        nodexy, rb, r'in_memory\neartable', '', 'LOCATION','NO_ANGLE', 'CLOSEST')
-    
-    with arcpy.da.SearchCursor(rb_near_result, ['NEAR_DIST']) as rows:
-            row = rows.next()
-            rb_distance = row[0]    
-    
-    lb_near_result = arcpy.analysis.GenerateNearTable(
-        nodexy, lb, r'in_memory\neartable', '', 'LOCATION','NO_ANGLE', 'CLOSEST')
-    
-    with arcpy.da.SearchCursor(lb_near_result, ['NEAR_DIST']) as rows:
-                row = rows.next()
-                lb_distance = row[0]    
-    return(rb_distance + lb_distance)
-    
-
-def CalcChannelWidth(node_geom, rb_geom, lb_geom):
+def calc_channel_width(node_geom, rb_geom, lb_geom):
     
     rb_distance = node_geom.distanceTo(rb_geom)
     lb_distance = node_geom.distanceTo(lb_geom)
-    # http://gis.stackexchange.com/questions/75605/converting-a-distance-to-a-map-distance
     
-    return(rb_distance + lb_distance)
+    return(lb_distance, rb_distance)
 
-def UpdateNodesFC(pointDict, NodesFC, AddFields): 
+def update_nodes_fc(nodeDict, nodes_fc, addFields): 
     """Updates the input point feature class with data from the nodes dictionary"""
     print("Updating input point feature class")
 
     # Get a list of existing fields
-    ExistingFields = []
-    for f in arcpy.ListFields(NodesFC):
-        ExistingFields.append(f.name)     
+    existingFields = []
+    for f in arcpy.ListFields(nodes_fc):
+        existingFields.append(f.name)     
 
     # Check to see if the field exists and add it if not
-    for f in AddFields:
-        if (f in ExistingFields) == False:
-            arcpy.AddField_management(NodesFC, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")   
+    for f in addFields:
+        if (f in existingFields) is False:
+            arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")   
 
-    with arcpy.da.UpdateCursor(NodesFC,["STREAM_ID","NODE_ID"] + AddFields) as cursor:
+    with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID"] + addFields) as cursor:
         for row in cursor:
-            for f in xrange(0,len(AddFields)):
+            for f in xrange(0,len(addFields)):
                 streamID = row[0]
                 nodeID =row[1]
-                row[f+2] = pointDict[streamID][nodeID][AddFields[f]]
+                row[f+2] = nodeDict[streamID][nodeID][addFields[f]]
                 cursor.updateRow(row)
     
 
@@ -170,48 +153,56 @@ try:
     print("Step 2: Measure Channel Width") 
     
     #keeping track of time
-    startTime= time.time()    
+    startTime= time.time()
+    
+    if overwrite_data is True: 
+        env.overwriteOutput = True
+    else:
+        env.overwriteOutput = False    
 
     # Determine input spatial units
-    proj = arcpy.Describe(NodesFC).spatialReference
-    proj_rb = arcpy.Describe(rb).spatialReference
-    proj_lb = arcpy.Describe(lb).spatialReference
+    proj_nodes = arcpy.Describe(nodes_fc).spatialReference
+    proj_rb = arcpy.Describe(rb_fc).spatialReference
+    proj_lb = arcpy.Describe(lb_fc).spatialReference
     
-    # Check to make sure the rb/lb and input points are in the same projection.
-    if proj.name != proj_rb.name:
-        arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(NodesFC, rb))
+    # Check to make sure the rb_fc/lb_fc and input points are in the same projection.
+    if proj_nodes.name != proj_rb.name:
+        arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(nodes_fc, rb_fc))
         sys.exit("Input points and right bank feature class do not have the same projection. Please reproject your data.")
     
-    if proj.name != proj_lb.name:
-            arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(NodesFC, lb))
+    if proj_nodes.name != proj_lb.name:
+            arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(nodes_fc, lb_fc))
             sys.exit("Input points and left bank feature class do not have the same projection. Please reproject your data.")     
     
-    nodexy_to_m = ToMetersUnitConversion(NodesFC)
+    nodexy_to_m = to_meters_con(nodes_fc)
     
-    AddFields = ["CHANWIDTH"]
+    addFields = ["CHANWIDTH", "LEFT", "RIGHT"]
 
     # Read the feature class data into a nested dictionary
-    NodeDict = ReadNodesFC(NodesFC, OverwriteData, AddFields)
+    nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
     
     # Read each of the bank polylines into geometry objects
-    rb_geom = ReadPolylineGeometry(rb, proj_rb)
-    lb_geom = ReadPolylineGeometry(lb, proj_lb)
+    rb_geom = read_polyline_geometry(rb_fc, proj_rb)
+    lb_geom = read_polyline_geometry(lb_fc, proj_lb)
     
     n = 1
-    for streamID in NodeDict:
-        print("Processing stream %s of %s" % (n, len(NodeDict)))
+    for streamID in nodeDict:
+        print("Processing stream %s of %s" % (n, len(nodeDict)))
         i =0 
-        for nodeID in NodeDict[streamID]:
+        for nodeID in nodeDict[streamID]:
             
-            node_x = float(NodeDict[streamID][nodeID]["POINT_X"])
-            node_y = float(NodeDict[streamID][nodeID]["POINT_Y"])
-            node_geom = arcpy.PointGeometry(arcpy.Point(node_x, node_y), proj)
+            node_x = float(nodeDict[streamID][nodeID]["POINT_X"])
+            node_y = float(nodeDict[streamID][nodeID]["POINT_Y"])
+            node_geom = arcpy.PointGeometry(arcpy.Point(node_x, node_y), proj_nodes)
             
-            #NodeDict[streamID][nodeID]["ASPECT"] = CalcAspect(NodeDict[streamID], streamID)
-            NodeDict[streamID][nodeID]["CHANWIDTH"] = CalcChannelWidth(node_geom, rb_geom, lb_geom) * nodexy_to_m
+            #nodeDict[streamID][nodeID]["ASPECT"] = CalcAspect(nodeDict[streamID], streamID)
+            lb_distance, rb_distance = calc_channel_width(node_geom, rb_geom, lb_geom)
+            nodeDict[streamID][nodeID]["CHANWIDTH"] = (lb_distance + rb_distance) * nodexy_to_m
+            nodeDict[streamID][nodeID]["LEFT"] = lb_distance * nodexy_to_m
+            nodeDict[streamID][nodeID]["RIGHT"] = rb_distance * nodexy_to_m
         n = n + 1         
         
-    UpdateNodesFC(NodeDict, NodesFC, AddFields)
+    update_nodes_fc(nodeDict, nodes_fc, addFields)
 
     gc.collect()
 
