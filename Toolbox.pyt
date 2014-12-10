@@ -3,8 +3,6 @@
 # python toolbox - v 9.0.0 beta 1
 # Ryan Michie
 
-# CHANGE THIS TO Toolbox.pyt
-
 # This is the master TTools code for the python toolbox used in ArcGIS 10.1 and 10.2. The code for each 
 # tool class comes from the individual python files.
 
@@ -35,64 +33,6 @@ from arcpy.sa import *
 from arcpy.management import *
 
 env.overwriteOutput = True
-
-def CreateNodeList(inLine):
-    """Reads an input stream centerline file and returns the NODE ID, STREAM ID, and X/Y coordinates as a list"""
-    NodeList = []
-    Incursorfields = ["SHAPE@",SIDname]
-    NID = 0
-    # Determine input point spatial units
-    proj = arcpy.Describe(inLine).spatialReference
-    with arcpy.da.SearchCursor(inLine,Incursorfields,"",proj) as Inrows:
-        print("Creating Nodes")	
-        for row in Inrows:
-            LineLength = row[0].getLength("PRESERVE_SHAPE")
-            numNodes = int(LineLength / node_dx)
-            nodes = range(0,numNodes+1)
-            arcpy.SetProgressor("step", "Creating Nodes", 0, numNodes+1, 1)
-            positions = [n * node_dx / LineLength for n in nodes] # list of Lengths in meters
-            for position in positions:
-                node = row[0].positionAlongLine(position,True).centroid
-                # list of "NODE_ID",STREAM_ID,"STREAM_KM","POINT_X","POINT_Y","SHAPE@X","SHAPE@Y"
-                NodeList.append((NID, row[1], float(position * LineLength /1000), node.X, node.Y, node.X, node.Y ))
-                NID = NID + 1
-            arcpy.SetProgressorPosition()
-    arcpy.ResetProgressor()
-    return(NodeList)
-
-def CreateNodesFC(NodeList, NodesFC, SIDname, proj):
-    """Create the output point feature class using the data from the nodes list"""
-    #arcpy.AddMessage("Exporting Data")
-    print("Exporting Data")
-
-    # Determine Stream ID field properties
-    SIDtype = arcpy.ListFields(inLine,SIDname)[0].type
-    SIDprecision = arcpy.ListFields(inLine,SIDname)[0].precision
-    SIDscale = arcpy.ListFields(inLine,SIDname)[0].scale
-    SIDlength = arcpy.ListFields(inLine,SIDname)[0].length    
-
-    #Create an empty output with the same projection as the input polyline
-    cursorfields = ["NODE_ID","STREAM_ID","STREAM_KM","LONGITUDE","LATITUDE","SHAPE@X","SHAPE@Y"]
-    arcpy.CreateFeatureclass_management(os.path.dirname(NodesFC),os.path.basename(NodesFC), "POINT","","DISABLED","DISABLED",proj)
-
-    # Add attribute fields
-    arcpy.AddField_management(NodesFC, "NODE_ID", "LONG", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(NodesFC, "STREAM_ID", SIDtype, SIDprecision, SIDscale, SIDlength, "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(NodesFC, "STREAM_KM", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(NodesFC, "LONGITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-    arcpy.AddField_management(NodesFC, "LATITUDE", "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")
-
-    with arcpy.da.InsertCursor(NodesFC, cursorfields) as cursor:
-        for row in NodeList:
-            cursor.insertRow(row)
-
-    #Change X/Y from input spatial units to decimal degrees
-    proj_dd = arcpy.SpatialReference(4269) #GCS_North_American_1983 
-    with arcpy.da.UpdateCursor(NodesFC,["SHAPE@X","SHAPE@Y","LONGITUDE","LATITUDE"],"",proj_dd) as cursor:
-        for row in cursor:
-            row[2] = row[0] # LONGITUDE
-            row[3] = row[1] # LATITUDE
-            cursor.updateRow(row)
 
 class Toolbox:
     def __init__(self):
