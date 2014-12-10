@@ -134,7 +134,7 @@ def GetElevation(samplexy, EleRaster, LowElev, con_z_to_m):
 def CalculateGradient(LowElev,LowElevUp):
     return (grad)
 
-def UpdateNodesFC(pointDict, NodesFC, AddFields): 
+def UpdateNodesFC(NodeDict, NodesFC, AddFields): 
     """Updates the input point feature class with all new data from the nodes dictionary"""
 
     with arcpy.da.UpdateCursor(NodesFC,["STREAM_ID","NODE_ID"] + AddFields) as cursor:
@@ -142,10 +142,10 @@ def UpdateNodesFC(pointDict, NodesFC, AddFields):
             for f in xrange(0,len(AddFields)):
                 streamID = row[0]
                 nodeID =row[1]
-                row[f+2] = pointDict[streamID][nodeID][AddFields[f]]
+                row[f+2] = NodeDict[streamID][nodeID][AddFields[f]]
                 cursor.updateRow(row)
 
-def UpdateNodesFC1(NodeDict,streamID, nodeID, NodesFC, AddFields): 
+def UpdateNodesFC1(NodeDict, streamID, nodeID, NodesFC, AddFields): 
     """Updates a single node in the input point feature class with data from the nodes dictionary"""
 
     # Build a query to retreive just the node row
