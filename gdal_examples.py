@@ -12,7 +12,8 @@ from __future__ import print_function
 from osgeo import ogr
 from osgeo import gdal
 
-raster = r"/Users/rmichie/Desktop/Test/44123C4319_Rasters/veght44123c4319/veght44123c4319.img"
+#raster = r"/Users/rmichie/Desktop/Test/44123C4319_Rasters/veght44123c4319/veght44123c4319.img"
+raster = r"D:\Projects\TTools_9\Raster\LiDAR\be\be_lidar"
 gdbpath = r"D:\Projects\TTools_9\Example_data.gdb"
 fc = "out_nodes"
 shpfile =  r"D:\Projects\TTools_9\out_nodes.shp"
