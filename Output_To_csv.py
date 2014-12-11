@@ -42,6 +42,7 @@ import csv
 #lcdatafile = parameters[3].valueAsText
 #morphfile = parameters[4].valueAsText
 
+# --------------------------------------------------------------------
 # Start Fill in Data
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 multiplecsv = False
@@ -49,6 +50,11 @@ outputdir = r"D:\Projects\TTools_9"
 lcdatafile = "lcdata.csv"
 morphfile = "morphdata.csv"
 # End Fill in Data
+# --------------------------------------------------------------------
+
+def nested_dict(): 
+    """Build a nested dictionary"""
+    return defaultdict(nested_dict)
 
 def read_nodes_fc(nodes_fc, readfields):
     """Reads an input point file and returns the NODE ID and X/Y coordinates as a nested dictionary"""
@@ -72,23 +78,6 @@ def write_csv(outputdir, filename, colnames, outlist):
         writer = csv.writer(file_object,  dialect= "excel")
         writer.writerows(outlist)        
 
-def nested_dict(): 
-    """Build a nested dictionary"""
-    return defaultdict(nested_dict)
-
-def read_csv(csvfile):
-    """Reads an input csv file and returns the header row as a list and the data as a nested dictionary"""
-    csv_dict = nested_dict()
-    with open(csvfile, "rb") as f:
-        reader = csv.reader(f)
-        header = reader.next()
-        if header[0] != "STREAM_ID":
-            sys.exit("csv file does not have STREAM_ID as first column")
-        for row in reader:
-            for key in xrange(0,len(header)):
-                csv_dict[row[0]][header[key]] = row[key]
-    return(header, csv_dict)
-
 #enable garbage collection
 gc.enable()
 
@@ -107,7 +96,7 @@ try:
                     "SED_THERMAL_DIFFUSIVITY","SED_HYPORHEIC_THICKNESSS",
                     "%HYPORHEIC_EXCHANGE","POROSITY"]
     
-    lcsample_headers = ["LC_T","ELE_T","LAI_T","k_T","CAN_T","OH_T"]
+    lcsample_headers = ["LC_T","HT_T","ELE_T","LAI_T","k_T","CAN_T","OH_T"]
     
     # This gets the landcover sample colnames by looking for them iteratively    
     for header in nodes_fc_headers:
