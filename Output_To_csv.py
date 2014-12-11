@@ -1,25 +1,28 @@
-#######################################################################################
+########################################################################
 # TTools
 # Output_To_csv - v 0.92
 # Ryan Michie
 
-# Output_To_csv will take the node point feature created from using steps 1-5 and 
-# output landcover and morphology data csv files formatted for heat source 9.
+# Output_To_csv will take the node point feature created from using 
+# steps 1-5 and output landcover and morphology data csv files formatted
+# for heat source 9.
 
 # INPUTS
 # 0: Input TTools point feature class (nodes_fc)
-# 1: create seperate csv files for each STREAM_ID (multiplecsv) True/False. if True will append stream ID to csv name.
+# 1: create seperate csv files for each STREAM_ID (multiplecsv) 
+#    True/False. if True will append stream ID to csv name.
 # 2: path directory where the output csv file will be saved (outputdir)
 # 3: name of the landcover data csv file (lcdatafile)
 # 4: name of the morphology data csv file (morphfile)
 
 # OUTPUTS
-# landcover and morphology data csv files formatted for input into heatsource 9
+# landcover and morphology data csv files formatted for input 
+# into heatsource 9
 
 # This version is for manual starts from within python.
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
 
-#######################################################################################
+########################################################################
 
 # Import system modules
 from __future__ import division, print_function
@@ -42,7 +45,7 @@ import csv
 #lcdatafile = parameters[3].valueAsText
 #morphfile = parameters[4].valueAsText
 
-# --------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Start Fill in Data
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 multiplecsv = False
@@ -50,14 +53,15 @@ outputdir = r"D:\Projects\TTools_9"
 lcdatafile = "lcdata.csv"
 morphfile = "morphdata.csv"
 # End Fill in Data
-# --------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 def nested_dict(): 
     """Build a nested dictionary"""
     return defaultdict(nested_dict)
 
 def read_nodes_fc(nodes_fc, readfields):
-    """Reads an input point file and returns the NODE ID and X/Y coordinates as a nested dictionary"""
+    """Reads an input point file and returns the NODE ID and X/Y
+    coordinates as a nested dictionary"""
     nodeDict = nested_dict()
     incursorFields = ["STREAM_ID","NODE_ID"] + readfields
     # Determine input point spatial units
@@ -98,7 +102,8 @@ try:
     
     lcsample_headers = ["LC_T","HT_T","ELE_T","LAI_T","k_T","CAN_T","OH_T"]
     
-    # This gets the landcover sample colnames by looking for them iteratively    
+    # This gets the landcover sample colnames by looking for 
+    # them iteratively    
     for header in nodes_fc_headers:
         if any(txt in header for txt in lcsample_headers):
             lcdataheaders.append(header)    
@@ -124,7 +129,8 @@ try:
                             val = nodeDict[streamID][nodeID][header]
                             row_list.append(val)
                         else:
-                            # use None when there is no data in the Nodes feature class
+                            # use None when there is no data in the Nodes 
+                            # feature class
                             row_list.append(None)
                     outlist.append(row_list)
                        
@@ -152,12 +158,13 @@ try:
                             val = nodeDict[streamID][nodeID][header]
                             row_list.append(val)
                         else:
-                            # use None when there is no data in the Nodes feature class
+                            # use None when there is no data in the 
+                            # Nodes feature class
                             row_list.append(None)
                     outlist.append(row_list)
 
             #sort the list by stream ID and then stream km
-            outlist = sorted(outlist, key=itemgetter(1,2), reverse=True)	
+            outlist = sorted(outlist, key=itemgetter(1,2), reverse=True)
     
             # name the output
             filename = file_name_list[i]

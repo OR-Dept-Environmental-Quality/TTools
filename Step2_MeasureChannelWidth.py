@@ -1,3 +1,26 @@
+########################################################################
+# TTools
+# Step 2: Measure Channel Widths - v 0.9
+# Ryan Michie
+
+# INPUTS
+# 0: Input TTools point feature class (nodes_fc)
+# 1: input Right Bank feature class(rb_fc)
+# 2: input Left Bank feature class(lb_fc)
+# 3: input flag if existing data can be over 
+#    written (overwrite_data) 1. True, 2. False
+
+# OUTPUTS
+# 0: point feature class (edit nodes_fc) - Added fields with AZIMUTH, 
+#    CHANWIDTH, LEFT, and RIGHT for each node
+
+# Future Updates
+# eliminate arcpy and use gdal for reading/writing feature class data
+
+# This version is for manual starts from within python.
+# This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
+
+########################################################################
 
 # Import system modules
 from __future__ import division, print_function
@@ -9,30 +32,6 @@ import arcpy
 from arcpy import env
 from math import ceil
 from collections import defaultdict
-#######################################################################################
-# TTools
-# Step 2: Measure Channel Widths - v 0.9
-# Ryan Michie
-
-# INPUTS
-# 0: Input TTools point feature class (nodes_fc)
-# 1: input Right Bank feature class(rb_fc)
-# 2: input Left Bank feature class(lb_fc)
-# 3: input flag if existing data can be over written (overwrite_data) 1. True, 2. False
-
-# OUTPUTS
-# point feature class (edit nodes_fc) - Added fields with ASPECT and CHANWIDTH for each node
-
-# Future Updates
-
-# This version is for manual starts from within python.
-# This script requires Python 2.6, comptypes package, and ArcGIS 10.1 or higher to run.
-
-#######################################################################################
-
-#Check out the ArcGIS Spatial Analyst extension license
-#arcpy.CheckOutExtension("Spatial")
-
 
 # Parameter fields for python toolbox
 #nodes_fc = parameters[0].valueAsText
@@ -40,18 +39,14 @@ from collections import defaultdict
 #lb_fc = parameters[2].valueAsText
 #overwrite_data = parameters[3].valueAsText
 
+# ----------------------------------------------------------------------
 # Start Fill in Data
-#nodes_fc = r"D:\Projects\TTools_9\Example_data.gdb\out_nodes"
-#rb_fc = r"D:\Projects\TTools_9\Example_data.gdb\McFee_RB"
-#lb_fc = r"D:\Projects\TTools_9\Example_data.gdb\McFee_LB"
-#overwrite_data = True
-
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
-rb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams_two"
-lb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams_two"
+rb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
+lb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
 overwrite_data = True
-
 # End Fill in Data
+# ----------------------------------------------------------------------
 
 def nested_dict(): 
     """Build a nested dictionary"""
@@ -84,29 +79,38 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
                 nodeDict[row[0]][row[1]]["POINT_Y"] = row[4]
         else:
             for row in Inrows:
-                # if the data is null or zero (0 = default for shapefile), it is retreived and will be overwritten.
+                # if the data is null or zero (0 = default for shapefile),
+                # it is retreived and will be overwritten.
                 if row[5] is None or row[5] == 0 or row[5] < -9998:
                     nodeDict[row[0]][row[1]]["STREAM_KM"] = row[2] 
                     nodeDict[row[0]][row[1]]["POINT_X"] = row[3]
                     nodeDict[row[0]][row[1]]["POINT_Y"] = row[4]
     if len(nodeDict) == 0:
-        sys.exit("The fields checked in the input point feature class have existing data. There is nothing to process. Exiting")
+        sys.exit("The fields checked in the input point feature class "+
+                 "have existing data. There is nothing to process. Exiting")
             
     return(nodeDict)
 
 def to_meters_con(inFeature):
-    """Returns the conversion factor to get from the input spatial units to meters"""
+    """Returns the conversion factor to get from the
+    input spatial units to meters"""
     try:
         con_to_m = arcpy.Describe(inFeature).SpatialReference.metersPerUnit
     except:
-        arcpy.AddError("{0} has a coordinate system that is not projected or not recognized. Use a projected coordinate system preferably in linear units of feet or meters.".format(inFeature))
-        sys.exit("Coordinate system is not projected or not recognized. Use a projected coordinate system, preferably in linear units of feet or meters.")   
+        arcpy.AddError("{0} has a coordinate system that ".format(inFeature)+
+                       "is not projected or not recognized. Use a "+
+                       "projected coordinate system preferably in linear "+
+                       "units of feet or meters.")
+        sys.exit("Coordinate system is not projected or not recognized. "+
+                 "Use a projected coordinate system, preferably in "+
+                 "linear units of feet or meters.")   
     return con_to_m
 
 def read_polyline_geometry(polyline_fc, proj_polyline):
     """Reads an input polyline into an arcpy polyline geometry object"""
     poly_list = []
-    # Get the x and y of each vertex in the polyline and save it as a list.
+    # Get the x and y of each vertex in the polyline and save 
+    # it as a list.
     for row in arcpy.da.SearchCursor(polyline_fc, ["SHAPE@"]):
         for part in row[0]:
             for pnt in part:
@@ -124,7 +128,8 @@ def calc_channel_width(node_geom, rb_geom, lb_geom):
     return(lb_distance, rb_distance)
 
 def update_nodes_fc(nodeDict, nodes_fc, addFields): 
-    """Updates the input point feature class with data from the nodes dictionary"""
+    """Updates the input point feature class with
+    data from the nodes dictionary"""
     print("Updating input point feature class")
 
     # Get a list of existing fields
@@ -135,9 +140,11 @@ def update_nodes_fc(nodeDict, nodes_fc, addFields):
     # Check to see if the field exists and add it if not
     for f in addFields:
         if (f in existingFields) is False:
-            arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")   
+            arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "",
+                                      "", "NULLABLE", "NON_REQUIRED")   
 
-    with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID"] + addFields) as cursor:
+    with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID"] +
+                               addFields) as cursor:
         for row in cursor:
             for f in xrange(0,len(addFields)):
                 streamID = row[0]
@@ -165,14 +172,19 @@ try:
     proj_rb = arcpy.Describe(rb_fc).spatialReference
     proj_lb = arcpy.Describe(lb_fc).spatialReference
     
-    # Check to make sure the rb_fc/lb_fc and input points are in the same projection.
+    # Check to make sure the rb_fc/lb_fc and input points are 
+    # in the same projection.
     if proj_nodes.name != proj_rb.name:
-        arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(nodes_fc, rb_fc))
-        sys.exit("Input points and right bank feature class do not have the same projection. Please reproject your data.")
+        arcpy.AddError("{0} and {1} do not have ".format(nodes_fc, rb_fc)+
+                       "the same projection. Please reproject your data.")
+        sys.exit("Input points and right bank feature class do not have "+
+                 "the same projection. Please reproject your data.")
     
     if proj_nodes.name != proj_lb.name:
-            arcpy.AddError("{0} and {1} do not have the same projection. Please reproject your data.".format(nodes_fc, lb_fc))
-            sys.exit("Input points and left bank feature class do not have the same projection. Please reproject your data.")     
+        arcpy.AddError("{0} and {1} do not have ".format(nodes_fc, lb_fc)+
+                        "the same projection. Please reproject your data.")
+        sys.exit("Input points and left bank feature class do not have "+
+                 "the same projection. Please reproject your data.")     
     
     nodexy_to_m = to_meters_con(nodes_fc)
     
