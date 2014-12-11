@@ -1,5 +1,18 @@
 # This is a junkyard for old methods or code that I want to keep around just in case.
 
+def read_csv(csvfile):
+    """Reads an input csv file and returns the header row as a list and the data as a nested dictionary"""
+    csv_dict = nested_dict()
+    with open(csvfile, "rb") as f:
+        reader = csv.reader(f)
+        header = reader.next()
+        if header[0] != "STREAM_ID":
+            sys.exit("csv file does not have STREAM_ID as first column")
+        for row in reader:
+            for key in xrange(0,len(header)):
+                csv_dict[row[0]][header[key]] = row[key]
+    return(header, csv_dict)
+
 def CalcChannelWidthAdvancedLic(nodexy, rb, lb):
     rb_near_result = arcpy.analysis.GenerateNearTable(
         nodexy, rb, r'in_memory\neartable', '', 'LOCATION','NO_ANGLE', 'CLOSEST')
