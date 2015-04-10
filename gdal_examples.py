@@ -27,11 +27,11 @@ northing = 945129.128
 easting = 551979.017
 northing = 945125.731
 
-def ReadFileGDB(gdbpath, fcfile):
+def ReadFileGDB(gdbpath, gdb_fc):
     # Read ESRI Filegeodatabase
     driver = ogr.GetDriverByName("OpenFileGDB")
     db = driver.Open(gdbpath, 0)
-    fc = db.GetLayer(fcfile)
+    fc = db.GetLayer(gdb_fc)
     sr = fc.GetSpatialRef()
     sr.ExportToProj4()
     return fc, sr
@@ -68,7 +68,7 @@ def RasterToArray(raster):
     band = data.GetRasterBand(1)
     arry = band.ReadAsArray(xoff=0, yoff=0, buf_obj=None)
     gt = data.GetGeoTransform()
-    proj = data.GetProjection
+    proj = data.GetProjection()
     rows = data.RasterYSize
     cols = data.RasterXSize
     return arry, gt, proj, rows, cols
