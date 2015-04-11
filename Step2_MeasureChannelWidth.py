@@ -1,18 +1,19 @@
 ########################################################################
 # TTools
-# Step 2: Measure Channel Widths - v 0.9
+# Step 2: Measure Channel Widths - v 0.91
 # Ryan Michie
 
 # INPUTS
-# 0: Input TTools point feature class (nodes_fc)
-# 1: input Right Bank feature class(rb_fc)
-# 2: input Left Bank feature class(lb_fc)
-# 3: input flag if existing data can be over 
-#    written (overwrite_data) 1. True, 2. False
+# 0: Tools point feature class (nodes_fc)
+# 1: Right Bank feature class(rb_fc)
+# 2: Left Bank feature class(lb_fc)
+# 3: True/False flag if existing data can be over written (overwrite_data)
 
 # OUTPUTS
-# 0: point feature class (edit nodes_fc) - Added fields with AZIMUTH, 
-#    CHANWIDTH, LEFT, and RIGHT for each node
+# 0: point feature class (edit nodes_fc) with the following fields added:
+#    CHANWIDTH - distance in meters between left and right banks
+#    LEFT - distance in meters from centerline to left bank feature
+#    RIGHT - distance in meters from centerline to right bank feature
 
 # Future Updates
 # eliminate arcpy and use gdal for reading/writing feature class data
