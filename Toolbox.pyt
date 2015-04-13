@@ -1,4 +1,4 @@
-#######################################################################################
+########################################################################
 # TTools for ArcGIS 10.1 and 10.2
 # python toolbox - v 9.0.0 beta 1
 # Ryan Michie
@@ -15,7 +15,7 @@
 
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
 
-#######################################################################################
+########################################################################
 
 # Import system modules
 import arcpy
@@ -34,24 +34,51 @@ from arcpy.management import *
 
 env.overwriteOutput = True
 
-class Toolbox:
+def parameter(display_name, name, datatype, defaultValue=None,  
+    parameter_type=None, direction=None):
+    '''
+    The parameter implementation makes it a little difficult to 
+    quickly create parameters with defaults. This method
+    prepopulates some of these values to make life easier while
+    also allowing setting a default vallue.
+    '''
+    # create parameter with a few default properties
+    param = arcpy.Parameter(
+        display_name = display_name,
+        name = name,
+        datatype = datatype,
+        parameter_type = 'Required',
+        direction = 'Input')
+
+    # set new parameter to a default value
+    param.value = defaultValue
+
+    # return complete parameter object
+    return param 
+
+
+class Toolbox(object):
     def __init__(self):
         """TTools is a series of ArcGIS arcsripts used to sample geospatial data and assemble high-resolution inputs for the Heat Source model or other water quality analysis."""
         self.label = "TTools"
-        self.alias = ""
+        self.alias = ""       
 
         # List of tool classes associated with this toolbox
         self.tools = [Step1_Create_Stream_Nodes]
         #self.tools = [Step1_Create_Stream_Nodes, Step4_Measure_Topographic_Angles, Step5_Sample_Landcover_PointMethod, Output_To_csv]
 
-class Step1_Create_Stream_Nodes:
+class Step1_Create_Stream_Nodes(object):
     def __init__(self):
         """This script will take an input polyline feature with unique stream IDs and generate evenly spaced points along each unique stream ID line at a user defined spacing measured from the downstream endpoint"""
         self.label = "Step1_Create_Stream_Nodes"
         self.description = ""
         self.canRunInBackground = False
-
-    def getParameterInfo(self, parameters):
+        
+        self.parameters = [
+            parameter(display_name, name, datatype)
+        ]
+        
+    def getParameterInfo(self):
         """Define parameter definitions"""
 
         inLine =arcpy.Parameter(
