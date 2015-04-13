@@ -431,9 +431,28 @@ try:
     
     # Determine input spatial units and set unit conversion factors
     proj = arcpy.Describe(nodes_fc).SpatialReference
+    proj_ele = arcpy.Describe(z_raster).spatialReference
+    proj_lc = arcpy.Describe(lc_raster).spatialReference
+    
     con_from_m = from_meters_con(nodes_fc)
     con_lc_to_m = from_z_units_to_meters_con(lc_units)
     con_z_to_m = from_z_units_to_meters_con(z_units)
+    
+    # Check to make sure the raster and input 
+    # points are in the same projection.
+    if proj.name != proj_ele.name:
+        arcpy.AddError("{0} and {1} do not ".format(nodes_fc,z_raster)+
+                       "have the same projection."+
+                       "Please reproject your data.")
+        sys.exit("Input points and elevation raster do not have the "+
+                 "same projection. Please reproject your data.")    
+    
+    if proj_lc.name != proj_ele.name:
+        arcpy.AddError("{0} and {1} do not ".format(proj_lc,z_raster)+
+                       "have the same projection."+
+                       "Please reproject your data.")
+        sys.exit("The landcover and elevation rasters do not have the "+
+                 "same projection. Please reproject your data.")    
     
     if block_size is "#": block_size = 5
     

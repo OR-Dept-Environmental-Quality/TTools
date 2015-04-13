@@ -62,6 +62,12 @@ env.overwriteOutput = True
 #z_raster = = parameters[4].valueAsText
 #nodes_fc = parameters[5].valueAsText
 
+#streamline_fc = arcpy.GetParameterAsText(0)
+#sid_field = arcpy.GetParameterAsText(1)
+#node_dx = arcpy.GetParameterAsText(2)
+#checkDirection = arcpy.GetParameterAsText(3)
+#z_raster = arcpy.GetParameterAsText(4)
+#nodes_fc = arcpy.GetParameterAsText(5)
 # ----------------------------------------------------------------------
 # Start Fill in Data
 streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
@@ -218,7 +224,7 @@ def check_stream_direction(stream, z_raster, streamID):
         # do not reverse stream km
         flip = 0
     else:
-        print("Reversing " + streamID)
+        print("Reversing {0}".format(streamID))
         # reversed stream km
         flip = 1
         

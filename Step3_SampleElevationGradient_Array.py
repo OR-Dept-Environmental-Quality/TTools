@@ -14,9 +14,10 @@
 #     node (searchCells) 1. [0],  2. [9], 3. [25]
 # 2: input flag for smoothing if gradient is zero 
 #     or negative (smooth_flag) 1. True, 2. False
-# 2: input elevation raster (z_raster)
-# 3: input elevation raster z units (z_units) 1. "Feet", 2. "Meters"
-# 5: input flag if existing data can 
+# 3: input elevation raster (z_raster)
+# 4: input elevation raster z units (z_units) 1. "Feet", 2. "Meters"
+# 5: input stream km distance to process within each array (block_size)
+# 6: input flag if existing data can 
 #     be over written (overwrite_data) 1. True, 2. False
 
 # OUTPUTS
@@ -49,7 +50,8 @@ from collections import defaultdict
 #smooth_flag = parameters[2].valueAsText # Needs to be a int
 #z_raster = parameters[3].valueAsText
 #z_units = parameters[4].valueAsText
-#overwrite_data = parameters[5].valueAsText
+#block_size =  parameters[5].valueAsText
+#overwrite_data = parameters[6].valueAsText
 
 # ----------------------------------------------------------------------
 # Start Fill in Data
