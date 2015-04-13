@@ -1,36 +1,36 @@
 ########################################################################
 # TTools
-# Step 1: Create Stream Nodes  version 0.93
+# Step 1: Create Stream Nodes  version 0.94
 # Ryan Michie
 
 # This script will take an input polyline feature with unique 
 # stream IDs and generate evenly spaced points along each 
-# unique stream ID line at a user defined spacing measured from 
-# the downstream endpoint.
+# unique stream ID polyline at a user defined spacing measured from 
+# the downstream endpoint. The script can also check the digitized
+# direction to determine the downstream end.
 
 # INPUTS
-# 0: input stream centerline polyline (streamline_fc)
-# 1: unique StreamID field (sid_field)
-# 2: spacing between nodes in meters (node_dx)
-# 3: OPTIONAL Check if the stream was digitized in 
-#    correct direction (checkDirection) True/False
+# 0: Stream centerline polyline (streamline_fc)
+# 1: Unique StreamID field (sid_field)
+# 2: Spacing between nodes in meters (node_dx)
+# 3: OPTIONAL True/False flag to check if the stream was digitized in 
+#    correct direction (checkDirection)
 # 4: OPTIONAL Elevation Raster used in the check stream 
 #    direction procedure (z_raster)
-# 5: output node feature class name/path (nodes_fc)
+# 5: Path/Name of output node feature class (nodes_fc)
 
 # OUTPUTS
 # point feature class
 
 # The output point feature class has the following fields: 
-# 0: "NODE_ID" - unique node ID
-# 1: "STREAM_ID" - field matching a unique polyline ID field identifed 
+# 0: NODE_ID - unique node ID
+# 1: STREAM_ID"- field matching a unique polyline ID field identifed 
 #     by the user,
-# 2: "STREAM_KM" - double measured from the downstream end of the stream 
+# 2: STREAM_KM - double measured from the downstream end of the stream 
 #     for each STREAM ID
-# 3: "POINT_X" - X coordinate of the node in units of the input point 
-#      projection.
-# 4: "POINT_Y" - Y coordinate of the node in units of the input point 
-#      projection.
+# 3: LONGITUDE - decimal degrees X coordinate of the node using GCS_WGS_1984 datum.
+# 4: LATITUDE - decimal degrees Y coordinate of the node using GCS_WGS_1984 datum.
+# 5. STREAM_AZMTH - stream azimuth in the direction of flow"
 
 # Future Updates
 # eliminate arcpy and use gdal for reading/writing feature class data
@@ -128,7 +128,7 @@ def create_node_list(streamline_fc, checkDirection, z_raster):
                                                 True).centroid
                 
                 # Get the coordinates at the up/down midway point along
-                # the line between nodes and calculate the azimuth
+                # the line between nodes and calculate the stream azimuth
                 if position == 0.0:
                     mid_up = row[0].positionAlongLine(
                         abs(flip - (position + mid_distance)),True).centroid
@@ -149,7 +149,7 @@ def create_node_list(streamline_fc, checkDirection, z_raster):
                     stream_azimuth = stream_azimuth + 360
                 
                 # list of "NODE_ID",STREAM_ID,"STREAM_KM",
-                # "POINT_X","POINT_Y", AZIMUTH, "SHAPE@X","SHAPE@Y"
+                # "POINT_X","POINT_Y", STREAM_AZMTH, "SHAPE@X","SHAPE@Y"
                 nodeList.append((nodeID, row[2],
                                  float(position * lineLength * con_to_m /1000),
                                  node.X, node.Y, stream_azimuth, node.X, node.Y))
@@ -176,7 +176,7 @@ def create_nodes_fc(nodeList, nodes_fc, sid_field, proj):
                     "STREAM_KM",
                     "LONGITUDE",
                     "LATITUDE",
-                    "AZIMUTH"]
+                    "STREAM_AZMTH"]
     arcpy.CreateFeatureclass_management(os.path.dirname(nodes_fc),
                                         os.path.basename(nodes_fc),
                                         "POINT","","DISABLED","DISABLED",proj)

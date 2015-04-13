@@ -21,26 +21,25 @@
 # 9. save to nodes feature class
 
 # INPUTS
-# 0: Input TTools point feature class (nodes_fc)
-# 1: input number of transects per node (trans_count)
-# 2: input number of samples per transect (transsample_count)
-# 3: input The distance between transect samples (transsample_distance)
-# 4: use heatsource 8 methods 1. True 2. False (heatsource8)
-# 5: input landcover code or height raster (lc_raster)
+# 0: TTools point feature class (nodes_fc)
+# 1: Number of transects per node (trans_count)
+# 2: Number of samples per transect (transsample_count)
+# 3: The distance between transect samples (transsample_distance)
+# 4: True/False flag if using heatsource 8 methods (heatsource8)
+# 5: Land cover code or height raster (lc_raster)
 # 6: input (optional) landcover height z units 
 #     1. "Feet", 2. "Meters" 3. "None" Float (lc_units)
-# 7: input (optional) landcover data type. 
+# 7: OPTIONAL - landcover data type:
 #     1."CanopyCover", or 2."LAI" (canopy_data_type)
-# 8: input (optional) canopy cover or LAI raster (canopy_raster)
-# 9: input (optional) k coeffcient raster (k_raster)
-# 10: input (optional) overhang raster (oh_raster)
-# 11: input elevation raster (z_raster)
-# 12: input elvation raster z units (z_units) 
+# 8: OPTIONAL - canopy cover or LAI raster (canopy_raster)
+# 9: OPTIONAL - k coeffcient raster (k_raster)
+# 10: OPTIONAL - overhang raster (oh_raster)
+# 11: Elevation raster (z_raster)
+# 12: Elvation raster z units (z_units) 
 #      1. "Feet", 2. "Meters" 3. "Other"
-# 13: output sample point file name/path (lc_point_fc)
-# 14: input stream km distance to process within each array (block_size)
-# 15: input flag if existing data can be over 
-#     written (overwrite_data) 1. True, 2. False
+# 13: Path/name of output sample point file (lc_point_fc)
+# 14: OPTIONAL - Stream km distance to process within each array (block_size)
+# 15: True/False flag if existing data can be over written (overwrite_data)
 
 # OUTPUTS
 # 0. point feature class (edit nodes_fc) - added fields with 
@@ -172,7 +171,7 @@ def create_lc_point_fc(pointList, LCFields, lc_point_fc, nodes_fc, proj):
     sid_length = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].length    
 
     cursorfields = ["POINT_X","POINT_Y"] +["STREAM_ID","NODE_ID",
-                                            "AZIMUTH","TRANSNUM",
+                                            "TRANS_AZIMUTH","TRANSNUM",
                                             "SAMPLENUM"] +LCFields
 
     # Add attribute fields # TODO add dictionary of field types 
@@ -300,7 +299,6 @@ def create_lc_point_list(nodeDict, streamID, block_size, dir, zone, transsample_
     return lc_pointList
 
 def sample_raster(x_coordList, y_coordList, raster, con):
-    
     
     x_cellsize = arcpy.Describe(raster).meanCellWidth
     y_cellsize = arcpy.Describe(raster).meanCellHeight    
