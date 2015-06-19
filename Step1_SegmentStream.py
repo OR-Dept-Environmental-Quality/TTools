@@ -268,13 +268,13 @@ try:
     startTime= time.time()
     
     # Check if the output exists
-    #if arcpy.Exists(nodes_fc):
-        #arcpy.AddError("\nThis output already exists: \n" +
-                       #"{0}\n".format(nodes_fc) + 
-                       #"Please rename your output.")
-        #sys.exit("This output already exists: \n" +
-                 #"{0}\n".format(nodes_fc) + 
-                 #"Please rename your output.")    
+    if not arcpy.Exists(nodes_fc):
+        arcpy.AddError("\nThis output already exists: \n" +
+                       "{0}\n".format(nodes_fc) +
+                       "Please rename your output.")
+        sys.exit("This output already exists: \n" +
+                 "{0}\n".format(nodes_fc) +
+                 "Please rename your output.")
     
     # Get the spatial projecton of the input stream lines
     proj = arcpy.Describe(streamline_fc).SpatialReference    

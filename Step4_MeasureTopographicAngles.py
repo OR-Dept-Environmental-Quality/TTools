@@ -26,6 +26,10 @@
 #     of the maximum elevation.
 
 # Future Updates
+# partial runs don't correctly update the topo sample fc
+# update after each sample so data isn't lost after larger runs
+# check to see if the outputs exist before running process
+# faster for larger runs
 # eliminate arcpy and use gdal for reading/writing feature class data
 
 # This version is for manual starts from within python.
@@ -144,6 +148,46 @@ def create_topo_fc(pointList, topo_fc, nodes_fc, proj):
         else:
             arcpy.AddField_management(topo_fc, f, "DOUBLE", "", "", "",
                                       "", "NULLABLE", "NON_REQUIRED")
+
+    with arcpy.da.InsertCursor(topo_fc, ["SHAPE@X","SHAPE@Y"] +
+                               cursorfields) as cursor:
+        for row in pointList:
+            cursor.insertRow(row)
+            
+def update_topo_fc(pointList, topo_fc, nodes_fc, proj):
+    """Creates and updates the output topo point feature class
+    using the data from the nodes list"""
+    #arcpy.AddMessage("Exporting Data")
+    #print("Exporting data to topo sample feature class")
+    
+    # Check to see if the topo fc exists, if not create it
+    if not arcpy.Exists(topo_fc):  
+        #Create an empty output with the same projection as the input polyline
+        cursorfields = ["POINT_X","POINT_Y","STREAM_ID","NODE_ID",
+                        "AZIMUTH","TOPOANGLE","TOPO_ELE","NODE_ELE",
+                        "ELE_CHANGE","TOPODIS","SEARCHDIS","NA_SAMPLES"]
+        arcpy.CreateFeatureclass_management(os.path.dirname(topo_fc),
+                                            os.path.basename(topo_fc),
+                                            "POINT","","DISABLED","DISABLED",
+                                            proj)
+        
+        # Determine Stream ID field properties
+        sid_type = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].type
+        sid_precision = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].precision
+        sid_scale = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].scale
+        sid_length = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].length    
+    
+        # Add attribute fields # TODO add dictionary 
+        # of field types so they aren't all double
+        for f in cursorfields:
+            if f == "STREAM_ID":
+                arcpy.AddField_management(topo_fc, f, sid_type,
+                                          sid_precision, sid_scale,
+                                          sid_length, "", "NULLABLE",
+                                          "NON_REQUIRED")
+            else:
+                arcpy.AddField_management(topo_fc, f, "DOUBLE", "", "", "",
+                                          "", "NULLABLE", "NON_REQUIRED")
 
     with arcpy.da.InsertCursor(topo_fc, ["SHAPE@X","SHAPE@Y"] +
                                cursorfields) as cursor:
@@ -363,6 +407,13 @@ try:
     #keeping track of time
     startTime= time.time()
     
+    # Check if the output exists
+    if not arcpy.Exists(nodes_fc):
+        arcpy.AddError("\nThis output does not exist: \n" +
+                       "{0}\n".format(nodes_fc))
+        sys.exit("This output does not exist: \n" +
+                 "{0}\n".format(nodes_fc))     
+    
     if overwrite_data is True: 
         env.overwriteOutput = True
     else:
@@ -429,10 +480,11 @@ try:
     # Read the feature class data into a nested dictionary
     nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
     
-    topoList = []
+    #topoList = []
     n = 1
     for streamID in nodeDict:
         
+        topoList = []
         nodes = nodeDict[streamID].keys()
         nodes.sort()
         i = 1
@@ -445,15 +497,22 @@ try:
                 topo_data_list = get_topo_angles(coordList, z_raster, a, azimuthdisdict, con_z_to_m)
                 topoList.append(topo_data_list) 
             i = i + 1
+            
+        for row in topoList:  #
+            k = azimuthdict[row[6]]  #
+            nodeDict[row[4]][row[5]][k] = row[7]  #          
+        
+        update_nodes_fc(nodeDict, nodes_fc, addFields)  #    
+        update_topo_fc(topoList, topo_fc, nodes_fc, proj)  #
         n = n + 1       
     
     # Update the nodeDict
-    for row in topoList:
-        k = azimuthdict[row[6]]
-        nodeDict[row[4]][row[5]][k] = row[7]    
+    #for row in topoList:
+        #k = azimuthdict[row[6]]
+        #nodeDict[row[4]][row[5]][k] = row[7]    
     
-    update_nodes_fc(nodeDict, nodes_fc, addFields)
-    create_topo_fc(topoList, topo_fc, nodes_fc, proj)
+    #update_nodes_fc(nodeDict, nodes_fc, addFields)
+    #create_topo_fc(topoList, topo_fc, nodes_fc, proj)
     
     gc.collect()
 

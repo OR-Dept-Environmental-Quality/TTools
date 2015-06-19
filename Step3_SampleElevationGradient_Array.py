@@ -281,6 +281,13 @@ try:
     
     #keeping track of time
     startTime= time.time()
+
+    # Check if the output exists
+    if not arcpy.Exists(nodes_fc):
+        arcpy.AddError("\nThis output does not exist: \n" +
+                       "{0}\n".format(nodes_fc))
+        sys.exit("This output does not exist: \n" +
+                 "{0}\n".format(nodes_fc))     
     
     if overwrite_data is True: 
         env.overwriteOutput = True

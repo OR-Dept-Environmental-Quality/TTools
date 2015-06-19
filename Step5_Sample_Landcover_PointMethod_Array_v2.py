@@ -8,6 +8,23 @@
 # specificed number of cardinal directions with point samples spaced 
 # at a user defined distance moving away from the stream.
 
+#land cover
+
+#- open nodes fc
+    #- iterate and read info from node fc into a dict
+
+#- create a list with the x/y and related info for each lc sample
+    #- calculate the extent bounding box for the entire dataset
+
+#- create a list holding the bounding box coords for each block itteration
+
+#- loop through each block
+    #- sample the raster for all samples in the block
+    #- update the node dict ????
+    #- update the node fc
+    #- update the lc sample fc
+    #- continue to the next block
+
 # General steps include:
 # 1. read nodes feature class
 # 2. build a lcsample output feature
@@ -303,6 +320,81 @@ def create_lc_point_list(nodeDict, streamID, block_size, dir, zone, transsample_
     return lc_pointList
 
 def sample_raster(x_coordList, y_coordList, raster, con):
+    
+    
+    
+    # NEW vvv-----------------------------------------------------------
+    
+    nodata_to_value = -9999 / con_z_to_m
+    
+    x_cellsize = arcpy.Describe(raster).meanCellWidth
+    y_cellsize = arcpy.Describe(raster).meanCellHeight
+    
+    # Get the coordinates of the upper left cell corner of the input raster
+    raster_max_y = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
+    raster_min_x = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))    
+    
+    # calculate the buffer distance (in raster spatial units) to add to 
+    # the raster bounding box when extracting to an array
+    buffer = x_cellsize * 2    
+    
+    # calculate lower left corner and nrows/cols for the bounding box    
+    x_min = min(x_coordList) - buffer
+    x_max = max(x_coordList) + buffer
+    y_min = min(y_coordList) - buffer
+    y_max = max(y_coordList) + buffer
+    
+    x_width = x_max - x_min
+    y_width = y_max - y_min
+    
+    # Loop over data blocks
+    for x in range(0, x_width, blocksize):
+        for y in range(0, y_width, blocksize):
+
+            # Lower left coordinate of block (in map units)
+            block_x_min = x_min + x * x_cellsize
+            block_y_min = y_min + y * y_cellsize
+            # Upper right coordinate of block (in map units)
+            block_x_max = min([x + blocksize, x_width])
+            block_y_max = min([y + blocksize, y_width])
+            
+            # Calculate the X and Y offset from the upper left node 
+            # coordinates block
+            x_minoffset = ((raster_min_x - block_x_min)%x_cellsize) - x_cellsize
+            y_maxoffset = (raster_max_y - block_y_min)%y_cellsize             
+            
+            block_lower_left = arcpy.Point(block_x_min, block_y_min)
+            bbox_upper_left = [block_x_min + x_minoffset, block_y_max +
+                               y_maxoffset, x_cellsize, y_cellsize]
+            
+            ncols = block_x_max-x
+            nrows = block_y_max-y
+            
+            # Construct the array. Note returned array is (row, col) so (y, x)
+            try:
+                raster_array = arcpy.RasterToNumPyArray(raster, block_lower_left,
+                                                        ncols, nrows, nodata_to_value)
+            except:
+                import traceback
+                tb = sys.exc_info()[2]
+                tbinfo = traceback.format_tb(tb)[0]
+                
+                pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"       
+                sys.exit(pymsg)    
+            
+            # convert array values to meters if needed
+            if con is not None:
+                raster_array = raster_array * con
+            
+            lc_list = []
+            
+            for i in range(0,len(x_coordList)):
+                xy = coord_to_array(x_coordList[i], y_coordList[i], bbox_upper_left)
+                lc_list.append(raster_array[xy[1], xy[0]])
+                return lc_list            
+    
+    
+    # NEW ^^^-----------------------------------------------------------
     
     x_cellsize = arcpy.Describe(raster).meanCellWidth
     y_cellsize = arcpy.Describe(raster).meanCellHeight    
