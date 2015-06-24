@@ -28,6 +28,7 @@ from __future__ import division, print_function
 import sys
 import gc
 import time
+import traceback
 from datetime import timedelta
 import arcpy
 from arcpy import env
@@ -240,11 +241,9 @@ except arcpy.ExecuteError:
 
 # For other errors
 except:
-    import traceback, sys
-    tb = sys.exc_info()[2]
-    tbinfo = traceback.format_tb(tb)[0]
+    tbinfo = traceback.format_exc()
 
-    pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" + str(sys.exc_info()[1])
+    pymsg = "PYTHON ERRORS:\n" + tbinfo + "\nError Info:\n" +str(sys.exc_info()[1])
     msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
 
     #arcpy.AddError(pymsg)
