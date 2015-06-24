@@ -66,6 +66,7 @@ import sys
 import os
 import gc
 import time
+import traceback
 from datetime import timedelta
 from math import radians, sin, cos, ceil
 from collections import defaultdict
@@ -329,7 +330,10 @@ def sample_raster(x_coordList, y_coordList, raster, con):
     nrows = int(ceil((y_max - y_min) / y_cellsize)) + 1
     bbox_lower_left = arcpy.Point(x_min, y_min) # must be in raster map units
     bbox_upper_left = [x_min + x_minoffset, y_max + y_maxoffset, x_cellsize, y_cellsize]
-    nodata_to_value = -9999 / con_z_to_m
+    if con is not None:
+        nodata_to_value = -9999 / con
+    else:
+        nodata_to_value = -9999
     
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
@@ -551,7 +555,6 @@ try:
     print("Process Complete in %s minutes. %s microseconds per sample" % (elapsedmin, mspersample))    
     #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per sample" % (elapsedmin, mspersample))
 
-
 # For arctool errors
 except arcpy.ExecuteError:
     msgs = arcpy.GetMessages(2)
@@ -560,11 +563,9 @@ except arcpy.ExecuteError:
 
 # For other errors
 except:
-    import traceback, sys
-    tb = sys.exc_info()[2]
-    tbinfo = traceback.format_tb(tb)[0]
+    tbinfo = traceback.format_exc()
 
-    pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" +str(sys.exc_info()[1])
+    pymsg = "PYTHON ERRORS:\n" + tbinfo + "\nError Info:\n" +str(sys.exc_info()[1])
     msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
 
     #arcpy.AddError(pymsg)
