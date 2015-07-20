@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 5: Sample Landcover - Star Pattern, Point Method v 0.99
+# Step 5: Sample Landcover - Star Pattern, Point Method v 0.995
 # Ryan Michie
 
 # Sample_Landcover_PointMethod will take an input point 
@@ -76,24 +76,6 @@ from arcpy import env
 
 env.overwriteOutput = True
 
-# Parameter fields for python toolbox
-#nodes_fc = parameters[0].valueAsText
-#trans_count = parameters[1].valueAsText # LONG
-#transsample_count = parameters[2].valueAsText # LONG
-#transsample_distance = parameters[3].valueAsText # LONG
-#heatsource8 = parameters[4].valueAsText # True/False
-#lc_raster = parameters[5].valueAsText # This is either landcover height or codes
-#lc_units = parameters[6].valueAsText # OPTIONAL One of these: 1. "Feet", 2. "Meters" 3. Float
-#canopy_data_type = parameters[7].valueAsText # OPTIONAL One of these: 1."CanopyCover", or 2."LAI"
-#canopy_raster = parameters[8].valueAsText # OPTIONAL This is either canopy cover or LAI raster
-#k_raster = parameters[9].valueAsText # OPTIONAL The k value raster for LAI
-#oh_raster = = parameters[10].valueAsText # OPTIONAL
-#z_raster = parameters[11].valueAsText
-#z_units = parameters[12].valueAsText One of these: 1. "Feet", 2. "Meters" 3. Float
-#lc_point_fc = parameters[13].valueAsText
-#block_size = parameters[14].valueAsText
-#overwrite_data = parameters[15].valueAsText # True/False
-
 # ----------------------------------------------------------------------
 # Start Fill in Data
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes_ogic"
@@ -114,6 +96,24 @@ block_size = "#" # OPTIONAL defualt to 5
 overwrite_data = True
 # End Fill in Data
 # ----------------------------------------------------------------------
+
+# Parameter fields for python toolbox
+#nodes_fc = parameters[0].valueAsText
+#trans_count = parameters[1].valueAsText # LONG
+#transsample_count = parameters[2].valueAsText # LONG
+#transsample_distance = parameters[3].valueAsText # LONG
+#heatsource8 = parameters[4].valueAsText # True/False
+#lc_raster = parameters[5].valueAsText # This is either landcover height or codes
+#lc_units = parameters[6].valueAsText # OPTIONAL One of these: 1. "Feet", 2. "Meters" 3. Float
+#canopy_data_type = parameters[7].valueAsText # OPTIONAL One of these: 1."CanopyCover", or 2."LAI"
+#canopy_raster = parameters[8].valueAsText # OPTIONAL This is either canopy cover or LAI raster
+#k_raster = parameters[9].valueAsText # OPTIONAL The k value raster for LAI
+#oh_raster = = parameters[10].valueAsText # OPTIONAL
+#z_raster = parameters[11].valueAsText
+#z_units = parameters[12].valueAsText One of these: 1. "Feet", 2. "Meters" 3. Float
+#lc_point_fc = parameters[13].valueAsText
+#block_size = parameters[14].valueAsText
+#overwrite_data = parameters[15].valueAsText # True/False
 
 def nested_dict(): 
     """Build a nested dictionary"""
@@ -309,8 +309,8 @@ def sample_raster(x_coordList, y_coordList, raster, con):
     y_cellsize = arcpy.Describe(raster).meanCellHeight    
     
     # Get the coordinates of the upper left cell corner of the input raster
-    top_y = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
-    left_x = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
+    raster_y_max = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
+    raster_x_min = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
     
     # calculate the buffer distance (in raster spatial units) to add to 
     # the raster bounding box when extracting to an array
@@ -323,11 +323,13 @@ def sample_raster(x_coordList, y_coordList, raster, con):
     
     # Calculate the X and Y offset from the upper left node 
     # coordinates bounding box
-    x_minoffset = ((left_x - x_min)%x_cellsize) - x_cellsize
-    y_maxoffset = (top_y - y_max)%y_cellsize
+    x_minoffset = ((raster_x_min - x_min)%x_cellsize) - x_cellsize
+    y_maxoffset = ((raster_y_max - y_max)%y_cellsize) - y_cellsize    
      
-    ncols = int(ceil((max(x_coordList) + buffer - x_min) / x_cellsize)) + 1
-    nrows = int(ceil((y_max - y_min) / y_cellsize)) + 1
+    x_max = max(x_coordList) + buffer
+    ncols = max([int(ceil((x_max - x_min) / x_cellsize)), 1])
+    nrows = max([int(ceil((y_max - y_min) / y_cellsize)), 1])
+    
     bbox_lower_left = arcpy.Point(x_min, y_min) # must be in raster map units
     bbox_upper_left = [x_min + x_minoffset, y_max + y_maxoffset, x_cellsize, y_cellsize]
     if con is not None:
