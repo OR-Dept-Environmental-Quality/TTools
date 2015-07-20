@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 1: Create Stream Nodes  version 0.94
+# Step 1: Create Stream Nodes  version 0.95
 # Ryan Michie
 
 # This script will take an input polyline feature with unique 
@@ -55,6 +55,17 @@ from arcpy import env
 
 env.overwriteOutput = True
 
+# ----------------------------------------------------------------------
+# Start Fill in Data
+streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
+sid_field = "NAME"
+node_dx = 50
+checkDirection = True
+z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+# End Fill in Data
+# ----------------------------------------------------------------------
+
 # Parameter fields for python toolbox
 #streamline_fc = parameters[0].valueAsText
 #sid_field = parameters[1].valueAsText
@@ -69,16 +80,6 @@ env.overwriteOutput = True
 #checkDirection = arcpy.GetParameterAsText(3)
 #z_raster = arcpy.GetParameterAsText(4)
 #nodes_fc = arcpy.GetParameterAsText(5)
-# ----------------------------------------------------------------------
-# Start Fill in Data
-streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
-sid_field = "NAME"
-node_dx = 50
-checkDirection = True
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
-# End Fill in Data
-# ----------------------------------------------------------------------
 
 def create_node_list(streamline_fc, checkDirection, z_raster):
     """Reads an input stream centerline file and returns the NODE ID,
@@ -123,11 +124,17 @@ def create_node_list(streamline_fc, checkDirection, z_raster):
             arcpy.SetProgressor("step", "Creating Nodes", 0, numNodes+1, 1)
             # list of percentage of feature length to traverse
             positions = [n * node_dx * con_from_m / lineLength for n in nodes]
+            segment_length = [node_dx] * numNodes + [lineLength * con_to_m % node_dx]
             mid_distance = node_dx * con_from_m / lineLength
+            if mid_distance > 1:
+                # this situation occurs when the stream < node_dx.
+                # The azimith is calculated for the entire stream line.
+                mid_distance = 1
+                
+            i = 0
             for position in positions:
                 node = row[0].positionAlongLine(abs(flip - position),
                                                 True).centroid
-                
                 # Get the coordinates at the up/down midway point along
                 # the line between nodes and calculate the stream azimuth
                 if position == 0.0:
@@ -149,12 +156,13 @@ def create_node_list(streamline_fc, checkDirection, z_raster):
                 if stream_azimuth < 0:
                     stream_azimuth = stream_azimuth + 360
                 
-                # list of "NODE_ID",STREAM_ID,"STREAM_KM",
-                # "POINT_X","POINT_Y", STREAM_AZMTH, "SHAPE@X","SHAPE@Y"
-                nodeList.append((nodeID, row[2],
+                # list of "NODE_ID","STREAM_ID". "LENGTH", "STREAM_KM",
+                # "POINT_X","POINT_Y", "STREAM_AZMTH", "SHAPE@X", "SHAPE@Y"
+                nodeList.append((nodeID, row[2], segment_length[i], 
                                  float(position * lineLength * con_to_m /1000),
                                  node.X, node.Y, stream_azimuth, node.X, node.Y))
                 nodeID = nodeID + 1
+                i = i + 1
         arcpy.SetProgressorPosition()
     arcpy.ResetProgressor()
     return(nodeList)
@@ -175,6 +183,7 @@ def create_nodes_fc(nodeList, nodes_fc, sid_field, proj):
     cursorfields = ["NODE_ID",
                     "STREAM_ID",
                     "STREAM_KM",
+                    "LENGTH",
                     "LONGITUDE",
                     "LATITUDE",
                     "STREAM_AZMTH"]
