@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 5: Sample Landcover - Star Pattern, Point Method v 0.99
+# Step 5: Sample Landcover - Star Pattern, Point Method v 0.995
 # Ryan Michie
 
 # Sample_Landcover_PointMethod will take an input point 
@@ -8,34 +8,20 @@
 # specificed number of cardinal directions with point samples spaced 
 # at a user defined distance moving away from the stream.
 
-#land cover
+# General scripts steps include:
+# 1. open nodes fc. iterate and read info from node fc into a dict
 
-#- open nodes fc
-    #- iterate and read info from node fc into a dict
+# 2. create a list with the x/y and related info for each lc sample
+#    calculate the extent bounding box for the entire dataset
 
-#- create a list with the x/y and related info for each lc sample
-    #- calculate the extent bounding box for the entire dataset
+# 3. create a list holding the bounding box coords for each block itteration
 
-#- create a list holding the bounding box coords for each block itteration
-
-#- loop through each block
+# 4. loop through each block
     #- sample the raster for all samples in the block
-    #- update the node dict ????
+    #- update the node dict
     #- update the node fc
     #- update the lc sample fc
     #- continue to the next block
-
-# General steps include:
-# 1. read nodes feature class
-# 2. build a lcsample output feature
-# 3. calculate all sample easting/northing coordinates, iterate by stream
-# 4. calculate the bounding box of the coordinates + extra
-# 5. import elevation/veght rasters and convert to arrays for the 
-#     stream bounding box
-# 6. sample array
-# 7. save to dictionary
-# 8. output to lc sample feature class
-# 9. save to nodes feature class
 
 # INPUTS
 # 0: TTools point feature class (nodes_fc)
@@ -55,7 +41,7 @@
 # 12: Elvation raster z units (z_units) 
 #      1. "Feet", 2. "Meters" 3. "Other"
 # 13: Path/name of output sample point file (lc_point_fc)
-# 14: OPTIONAL - Stream km distance to process within each array (block_size)
+# 14: OPTIONAL - km distance to process within each array (block_size)
 # 15: True/False flag if existing data can be over written (overwrite_data)
 
 # OUTPUTS
@@ -65,12 +51,12 @@
 #     the sample raster values
 
 # Future Updates
-# partial runs don't correctly update the lc sample fc
-# update after each sample so data isn't lost after larger runs
-# check to see if the outputs exist before running process
-# faster for larger runs
-# include stream sample in transect count (True/False)
-# eliminate arcpy and use gdal for reading/writing feature class data
+# -Change the node dict so the node is the primary key
+# -Build the block list based on the nodes and then build point list itterativly
+# instead of building them into one huge list. The huge list results
+# in a memory error for large areas
+# -Include stream sample in transect count (True/False)
+# -Eliminate arcpy and use gdal for reading/writing feature class data
 
 # This version is for manual starts from within python.
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
@@ -83,14 +69,36 @@ import sys
 import os
 import gc
 import time
+import traceback
 from datetime import timedelta
-from math import radians, sin, cos, ceil
+from math import radians, sin, cos, ceil, sqrt
 from collections import defaultdict
 import numpy
 import arcpy
 from arcpy import env
 
 env.overwriteOutput = True
+
+# ----------------------------------------------------------------------
+# Start Fill in Data
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+trans_count = 8 
+transsample_count = 4 # does not include a sample at the stream node
+transsample_distance = 8
+heatsource8 = False
+lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
+lc_units = "Meters"
+canopy_data_type = "#" # OPTIONAL This is either 1. "CanopyCover", or 2."LAI"
+canopy_raster = "#" # OPTIONAL This is either canopy cover or a LAI raster
+k_raster = "#" # OPTIONAL This is the k value for LAI
+oh_raster = "#" # OPTIONAL This is the overhang raster
+z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_units = "Meters"
+lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint"
+block_size = 5 # OPTIONAL defualt to 5
+overwrite_data = True
+# End Fill in Data
+# ----------------------------------------------------------------------
 
 # Parameter fields for python toolbox
 #nodes_fc = parameters[0].valueAsText
@@ -109,27 +117,6 @@ env.overwriteOutput = True
 #lc_point_fc = parameters[13].valueAsText
 #block_size = parameters[14].valueAsText
 #overwrite_data = parameters[15].valueAsText # True/False
-
-# ----------------------------------------------------------------------
-# Start Fill in Data
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes_ogic"
-trans_count = 8 
-transsample_count = 4 # does not include a sample at the stream node
-transsample_distance = 8
-heatsource8 = False
-lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
-lc_units = "Meters"
-canopy_data_type = "#" # OPTIONAL This is either 1. "CanopyCover", or 2."LAI"
-canopy_raster = "#" # OPTIONAL This is either canopy cover or a LAI raster
-k_raster = "#" # OPTIONAL This is the k value for LAI
-oh_raster = "#" # OPTIONAL This is the overhang raster
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
-z_units = "Meters"
-lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint_ogic"
-block_size = "#" # OPTIONAL defualt to 5
-overwrite_data = True
-# End Fill in Data
-# ----------------------------------------------------------------------
 
 def nested_dict(): 
     """Build a nested dictionary"""
@@ -180,31 +167,33 @@ def create_lc_point_fc(pointList, LCFields, lc_point_fc, nodes_fc, proj):
     """Creates the output landcover sample point feature
     class using the data from the point list"""
     print("Exporting data to land cover sample feature class")
-
-    arcpy.CreateFeatureclass_management(os.path.dirname(lc_point_fc),
-                                        os.path.basename(lc_point_fc),
-                                        "POINT","","DISABLED","DISABLED",proj)
     
-    # Determine Stream ID field properties
-    sid_type = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].type
-    sid_precision = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].precision
-    sid_scale = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].scale
-    sid_length = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].length    
-
     cursorfields = ["POINT_X","POINT_Y"] +["STREAM_ID","NODE_ID",
-                                            "TRANS_AZIMUTH","TRANSNUM",
-                                            "SAMPLENUM"] +LCFields
-
-    # Add attribute fields # TODO add dictionary of field types 
-    # so they aren't all double
-    for f in cursorfields:
-        if f == "STREAM_ID":
-            arcpy.AddField_management(lc_point_fc, f, sid_type,
-                                      sid_precision, sid_scale, sid_length,
-                                      "", "NULLABLE", "NON_REQUIRED")
-        else:
-            arcpy.AddField_management(lc_point_fc, f, "DOUBLE", "", "", "",
-                                      "", "NULLABLE", "NON_REQUIRED")
+                                           "TRANS_AZIMUTH","TRANSNUM",
+                                           "SAMPLENUM"] +LCFields    
+    
+    # Check if the output exists and create if not
+    if not arcpy.Exists(lc_point_fc):
+        arcpy.CreateFeatureclass_management(os.path.dirname(lc_point_fc),
+                                            os.path.basename(lc_point_fc),
+                                            "POINT","","DISABLED","DISABLED",proj)
+        
+        # Determine Stream ID field properties
+        sid_type = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].type
+        sid_precision = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].precision
+        sid_scale = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].scale
+        sid_length = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].length    
+    
+        # Add attribute fields # TODO add dictionary of field types 
+        # so they aren't all double
+        for f in cursorfields:
+            if f == "STREAM_ID":
+                arcpy.AddField_management(lc_point_fc, f, sid_type,
+                                          sid_precision, sid_scale, sid_length,
+                                          "", "NULLABLE", "NON_REQUIRED")
+            else:
+                arcpy.AddField_management(lc_point_fc, f, "DOUBLE", "", "", "",
+                                          "", "NULLABLE", "NON_REQUIRED")
 
     with arcpy.da.InsertCursor(lc_point_fc, ["SHAPE@X","SHAPE@Y"] +
                                cursorfields) as cursor:
@@ -256,176 +245,112 @@ def coord_to_array(easting, northing, bbox_upper_left):
     xy.append((northing - bbox_upper_left[1]) / bbox_upper_left[3] * -1)  # row, y 
     return xy
 
-def create_lc_point_list(nodeDict, streamID, block_size, dir, zone, transsample_distance):
+def create_lc_point_list(origin_x, origin_y, streamID,
+                          nodeID, dir, zone, transsample_distance):
     """This builds a unique long form list of information for all the
     landcover samples. This list is used to create the output point
     feature class. The outer list holds all the nodes within a specified
     km extent (block_size). This is done for memory managment when the
     raster is converted to an array. Really large arrays will use up all
-    the memory and cause a crash."""   
+    the memory and cause a crash."""
     
-    lc_pointList = []
-    nodeBlocks = []
-    # Build a list of km every 10 km from 10 to 6700. 
-    # if there is a stream longer than 6700 km we are not on Earth
-    km_blocks = [x for x in range(block_size, 6700, block_size)]     
-    i = 0
+    point_list = []
     
-    nodes = nodeDict.keys()
-    nodes.sort()
+    # This is the emergent/stream sample
+    point_list.append([origin_x, origin_y, origin_x, origin_y,
+                       streamID, nodeID, 0, 0, 0])
 
-    for nodeID in nodes:
-        origin_x = nodeDict[nodeID]["POINT_X"]
-        origin_y = nodeDict[nodeID]["POINT_Y"]
-        stream_km = nodeDict[nodeID]["STREAM_KM"]
+    for d in range(0,len(dir)):
+        for z in zone:
+            # Calculate the x and y coordinate of the 
+            # landcover sample location
+            pt_x = (z * transsample_distance * con_from_m *
+                    sin(radians(dir[d]))) + origin_x
+            pt_y = (z * transsample_distance * con_from_m *
+                    cos(radians(dir[d]))) + origin_y
+
+            # Add to the list          
+            point_list.append([pt_x, pt_y, pt_x, pt_y,
+                               streamID, nodeID, dir[d], d+1, z])
+     
+    return point_list
+
+def create_block_list(lc_pointList, block_size):
         
-        if stream_km < km_blocks[i]:
-            # This is the emergent/stream sample
-            nodeBlocks.append([origin_x, origin_y, origin_x, origin_y,
-                               streamID, nodeID, 0, 0, 0])
-                
-            for d in range(0,len(dir)):
-                for z in zone:
-                    # Calculate the x and y coordinate of the 
-                    # landcover sample location
-                    lc_x = (z * transsample_distance * con_from_m *
-                            sin(radians(dir[d]))) + origin_x
-                    lc_y = (z * transsample_distance * con_from_m *
-                            cos(radians(dir[d]))) + origin_y
-    
-                    # Add the all the data to the list
-                    nodeBlocks.append([lc_x, lc_y, lc_x, lc_y, streamID,
-                                       nodeID, dir[d], d+1, z])
-        else: # New block
-            lc_pointList.append([list(x) for x in zip(*nodeBlocks)]) 
-            nodeBlocks = []
-            # This is the emergent/stream sample
-            nodeBlocks.append([origin_x, origin_y, origin_x, origin_y,
-                               streamID, nodeID, 0, 0, 0])
-                
-            for d in range(0,len(dir)):
-                for z in zone:
-                    # Calculate the x and y coordinate of the 
-                    # landcover sample location
-                    lc_x = (z * transsample_distance * con_from_m *
-                            sin(radians(dir[d]))) + origin_x
-                    lc_y = (z * transsample_distance * con_from_m *
-                            cos(radians(dir[d]))) + origin_y
-    
-                    # Add the all the data to the list
-                    nodeBlocks.append([lc_x, lc_y, lc_x, lc_y, streamID,
-                                       nodeID, dir[d], d+1, z])
-            i = i + 1
-    lc_pointList.append([list(x) for x in zip(*nodeBlocks)])            
-    return lc_pointList
-
-def sample_raster(x_coordList, y_coordList, raster, con):
-    
-    
-    
-    # NEW vvv-----------------------------------------------------------
-    
-    nodata_to_value = -9999 / con_z_to_m
-    
-    x_cellsize = arcpy.Describe(raster).meanCellWidth
-    y_cellsize = arcpy.Describe(raster).meanCellHeight
-    
-    # Get the coordinates of the upper left cell corner of the input raster
-    raster_max_y = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
-    raster_min_x = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))    
+    x_coord_list = [i[0] for i in lc_pointList]
+    y_coord_list = [i[1] for i in lc_pointList]
     
     # calculate the buffer distance (in raster spatial units) to add to 
     # the raster bounding box when extracting to an array
-    buffer = x_cellsize * 2    
+    buffer = 0     
     
-    # calculate lower left corner and nrows/cols for the bounding box    
-    x_min = min(x_coordList) - buffer
-    x_max = max(x_coordList) + buffer
-    y_min = min(y_coordList) - buffer
-    y_max = max(y_coordList) + buffer
+    # calculate bounding box extent for samples
+    x_min = min(x_coord_list)
+    x_max = max(x_coord_list)
+    y_min = min(y_coord_list) 
+    y_max = max(y_coord_list)
     
-    x_width = x_max - x_min
-    y_width = y_max - y_min
+    x_width = int(x_max - x_min + 1)
+    y_width = int(y_max - y_min + 1)
     
-    # Loop over data blocks
-    for x in range(0, x_width, blocksize):
-        for y in range(0, y_width, blocksize):
+    block_extents = []
+    block_points = []
+      
+    # Build data blocks
+    for x in range(0, x_width, block_size):
+        for y in range(0, y_width, block_size):
 
             # Lower left coordinate of block (in map units)
-            block_x_min = x_min + x * x_cellsize
-            block_y_min = y_min + y * y_cellsize
+            block_x_min = min([x_min + x, x_max])
+            block_y_min = min([y_min + y, y_max])
             # Upper right coordinate of block (in map units)
-            block_x_max = min([x + blocksize, x_width])
-            block_y_max = min([y + blocksize, y_width])
+            block_x_max = min([block_x_min + block_size, x_max])
+            block_y_max = min([block_y_min + block_size, y_max])
             
-            # Calculate the X and Y offset from the upper left node 
-            # coordinates block
-            x_minoffset = ((raster_min_x - block_x_min)%x_cellsize) - x_cellsize
-            y_maxoffset = (raster_max_y - block_y_min)%y_cellsize             
+            samples_in_block = []
+            for sample in lc_pointList:
+                if block_x_min <= sample[0] <= block_x_max and block_y_min <= sample[1] <= block_y_max:
+                    samples_in_block.append(sample)
             
-            block_lower_left = arcpy.Point(block_x_min, block_y_min)
-            bbox_upper_left = [block_x_min + x_minoffset, block_y_max +
-                               y_maxoffset, x_cellsize, y_cellsize]
-            
-            ncols = block_x_max-x
-            nrows = block_y_max-y
-            
-            # Construct the array. Note returned array is (row, col) so (y, x)
-            try:
-                raster_array = arcpy.RasterToNumPyArray(raster, block_lower_left,
-                                                        ncols, nrows, nodata_to_value)
-            except:
-                import traceback
-                tb = sys.exc_info()[2]
-                tbinfo = traceback.format_tb(tb)[0]
-                
-                pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"       
-                sys.exit(pymsg)    
-            
-            # convert array values to meters if needed
-            if con is not None:
-                raster_array = raster_array * con
-            
-            lc_list = []
-            
-            for i in range(0,len(x_coordList)):
-                xy = coord_to_array(x_coordList[i], y_coordList[i], bbox_upper_left)
-                lc_list.append(raster_array[xy[1], xy[0]])
-                return lc_list            
+            if samples_in_block:      
+                # order is left, bottom, right, top
+                block_extents.append([block_x_min - buffer, block_y_min - buffer,
+                                      block_x_max + buffer, block_y_max - + buffer])
+                # 0 left,      1 bottom,    2 right,     3 top
+                # block_x_min, block_y_min, block_x_max, block_y_max, ncols, nrows             
+                block_points.append(samples_in_block)
     
+    return block_extents, block_points
     
-    # NEW ^^^-----------------------------------------------------------
+def sample_raster(block, block_point_list, raster, con):
+        
+    nodata_to_value = -9999 / con
     
     x_cellsize = arcpy.Describe(raster).meanCellWidth
     y_cellsize = arcpy.Describe(raster).meanCellHeight    
-    
+
     # Get the coordinates of the upper left cell corner of the input raster
-    top_y = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
-    left_x = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
+    raster_y_max = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
+    raster_x_min = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
     
-    # calculate the buffer distance (in raster spatial units) to add to 
-    # the raster bounding box when extracting to an array
-    buffer = x_cellsize * 2
-    
-    # calculate lower left corner and nrows/cols for the bounding box    
-    x_min = min(x_coordList) - buffer
-    y_min = min(y_coordList) - buffer
-    y_max = max(y_coordList) + buffer
+    # block list order:
+    # 0 left,      1 bottom,    2 right,     3 top
+    # block_x_min, block_y_min, block_x_max, block_y_max, ncols, nrows
+    ncols = max([int(ceil((block[2] - block[0]) / x_cellsize)), 1])
+    nrows = max([int(ceil((block[3] - block[1]) / y_cellsize)), 1])
     
     # Calculate the X and Y offset from the upper left node 
     # coordinates bounding box
-    x_minoffset = ((left_x - x_min)%x_cellsize) - x_cellsize
-    y_maxoffset = (top_y - y_max)%y_cellsize
-     
-    ncols = int(ceil((max(x_coordList) + buffer - x_min) / x_cellsize)) + 1
-    nrows = int(ceil((y_max - y_min) / y_cellsize)) + 1
-    bbox_lower_left = arcpy.Point(x_min, y_min) # must be in raster map units
-    bbox_upper_left = [x_min + x_minoffset, y_max + y_maxoffset, x_cellsize, y_cellsize]
-    nodata_to_value = -9999 / con_z_to_m
+    x_minoffset = ((raster_x_min - block[0])%x_cellsize) - x_cellsize
+    y_maxoffset = ((raster_y_max - block[3])%y_cellsize) - y_cellsize
     
+    block_lower_left = arcpy.Point(block[0], block[1])
+    bbox_upper_left = [block[0] + x_minoffset, block[3] +
+               y_maxoffset, x_cellsize, y_cellsize]
+
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
-        raster_array = arcpy.RasterToNumPyArray(raster, bbox_lower_left,
+        raster_array = arcpy.RasterToNumPyArray(raster, block_lower_left,
                                                 ncols, nrows, nodata_to_value)
     except:
         import traceback
@@ -439,30 +364,21 @@ def sample_raster(x_coordList, y_coordList, raster, con):
     if con is not None:
         raster_array = raster_array * con
     
-    lc_list = []
-    
-    #print("Extracting raster values")
-    for i in range(0,len(x_coordList)):
-        xy = coord_to_array(x_coordList[i], y_coordList[i], bbox_upper_left)
-        lc_list.append(raster_array[xy[1], xy[0]])
-    return lc_list
+    point_list = []
+    for point in block_point_list:
+        xy = coord_to_array(point[0], point[1], bbox_upper_left)
+        point.append(raster_array[xy[1], xy[0]])
+        point_list.append(point)
+    return point_list            
 
-def update_nodes_fc(nodeDict, nodes_fc, addFields): 
+def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
     """Updates the input point feature class with data from the nodes dictionary"""
     print("Updating input point feature class")
+    
+    # Build a query to retreive just the nodes that need updating    
+    whereclause = """%s IN %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), tuple(nodes_to_query))
 
-    # Get a list of existing fields
-    existingFields = []
-    for f in arcpy.ListFields(nodes_fc):
-        existingFields.append(f.name)     
-
-    # Check to see if the field exists and add it if not
-    for f in addFields:
-        if (f in existingFields) is False:
-            arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "",
-                                      "", "NULLABLE", "NON_REQUIRED")   
-
-    with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID"] + addFields) as cursor:
+    with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID"] + addFields, whereclause) as cursor:  
         for row in cursor:
             for f in xrange(0,len(addFields)):
                 streamID = row[0]
@@ -514,14 +430,14 @@ try:
         if overwrite_data is True:
             arcpy.Delete_management(lc_point_fc)
         else:
-            arcpy.AddError("\nThis output already exists: \n" +
+            arcpy.AddMessage("\nThis output already exists: \n" +
                            "{0}\n".format(lc_point_fc) + 
-                           "Please rename your output or choose to"+
-                           "overwrite your data.")
-            sys.exit("This output already exists: \n" +
+                           "overwrite data = False. New data will be " +
+                           "appended to the existing feature class.")
+            print("This output already exists: \n" +
                            "{0}\n".format(lc_point_fc) + 
-                           "Please rename your output or choose to" +
-                           "overwrite your data.")    
+                           "overwrite data = False. New data will be " +
+                           "appended to the existing feature class.")    
     
     # Determine input spatial units and set unit conversion factors
     proj = arcpy.Describe(nodes_fc).SpatialReference
@@ -531,6 +447,15 @@ try:
     con_from_m = from_meters_con(nodes_fc)
     con_lc_to_m = from_z_units_to_meters_con(lc_units)
     con_z_to_m = from_z_units_to_meters_con(z_units)
+    
+    # convert block size from km to meters into units of the node fc
+    # in the future block size should be estimated based on availiable memory
+    # memorysize = datatypeinbytes*nobands*block_size^2
+    # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
+    if block_size in ["#", ""]:
+        block_size = 5
+    else:
+        block_size = int(con_from_m * block_size / 1000)
     
     # Check to make sure the raster and input 
     # points are in the same projection.
@@ -547,9 +472,7 @@ try:
                        "Please reproject your data.")
         sys.exit("The landcover and elevation rasters do not have the "+
                  "same projection. Please reproject your data.")    
-    
-    if block_size is "#": block_size = 5
-    
+       
     # Setup the raster list
     typeraster = [lc_raster, z_raster]
     if canopy_data_type == "LAI":  #Use LAI methods
@@ -590,56 +513,76 @@ try:
                                             canopy_data_type, stream_sample,
                                             heatsource8)
     nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
-       
+    
+    # Add the new fields to nodes_fc
+    # Get a list of existing fields
+    existingFields = []
+    for f in arcpy.ListFields(nodes_fc):
+        existingFields.append(f.name)     
+    
+    # Check to see if the field exists and add it if not
+    for f in addFields:
+        if (f in existingFields) is False:
+            arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "",
+                                      "", "NULLABLE", "NON_REQUIRED")
+            
     lc_pointList = []
-    lc_pointList2 = []
-    n = 1 
+    n = 1
     for streamID in nodeDict:
-        print("Processing stream %s of %s" % (n, len(nodeDict)))
-        lc_pointList = create_lc_point_list(nodeDict[streamID], streamID,
-                                            block_size, dir, zone,
-                                            transsample_distance)
-        for NodeBlock in lc_pointList:
-            for raster in typeraster:
-                if raster is None:
-                    lc_list = [-9999 for i in NodeBlock[0]]
-                else: 
-                    if raster == z_raster:
-                        con = con_z_to_m
-                    elif raster == lc_raster:
-                        con = con_lc_to_m
-                    else:
-                        con = None
-                    lc_list = sample_raster(NodeBlock[0],NodeBlock[1], raster, con)
-                NodeBlock.append(lc_list)
-            # Transpose the list and append to ouput
-            lc_pointList2 = lc_pointList2 + [list(x) for x in zip(*NodeBlock)]
-        n = n + 1       
+        
+        nodes = nodeDict[streamID].keys()
+        nodes.sort()
+        
+        for nodeID in nodes:
+            origin_x = nodeDict[streamID][nodeID]["POINT_X"]
+            origin_y = nodeDict[streamID][nodeID]["POINT_Y"]
+            
+            lc_pointList += create_lc_point_list(origin_x, origin_y,
+                                                  streamID, nodeID,
+                                                  dir, zone,
+                                                  transsample_distance)
+    block_extents, block_points = create_block_list(lc_pointList, block_size)
     
-    # Update the nodeDict
-    for row in lc_pointList2:
-        for t in range(0,len(type)):
-            lc_key = type[t]+'_T'+str(row[7])+'_S'+str(row[8])
-            nodeDict[row[4]][row[5]][lc_key] = row[9 + t]
-
+    p = 0
+    for block in block_extents:
+        print("Processing block %s of %s" % (p + 1, len(block_extents)))
+        #point_list = block_points[p]
+        for raster in typeraster:
+            if raster is None:
+                for i in range(0, len(point_list)):
+                    point_list[i].append(-9999)
+                    
+            else: 
+                if raster == z_raster:
+                    con = con_z_to_m
+                elif raster == lc_raster:
+                    con = con_lc_to_m
+                else:
+                    con = None
+                point_list = sample_raster(block, block_points[p], raster, con)    
+            
+        # Update the node fc
+        nodes_to_query = []
+        for row in point_list:
+            nodes_to_query.append(row[5])
+            for t in range(0,len(type)):                
+                lc_key = type[t]+'_T'+str(row[7])+'_S'+str(row[8])
+                nodeDict[row[4]][row[5]][lc_key] = row[9 + t]
+        
+        # Write the landcover data to the TTools point feature class 
+        update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query)
+        
+        # Build the output point feature class using the data         
+        create_lc_point_fc(point_list, type, lc_point_fc, nodes_fc, proj)
+        p = p + 1
+        del point_list
+    
     endTime = time.time()
-    arcpy.ResetProgressor()		
     gc.collect()
-
-    # Create the landcover headers to be added to the TTools point 
-    # feature class
-    #addFields = addFields + ["NUM_DIR","NUM_ZONES","SAMPLE_DIS"]    
     
-    # Write the landcover data to the TTools point feature class
-    update_nodes_fc(nodeDict, nodes_fc, addFields)    
-    
-    # Build the output point feature class using the data 
-    # from the LCPointList
-    create_lc_point_fc(lc_pointList2, type, lc_point_fc, nodes_fc, proj)
-
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
     mspersample = timedelta(seconds=(endTime - startTime) /
-                            len(lc_pointList2)).microseconds
+                            len(lc_pointList)).microseconds
     print("Process Complete in %s minutes. %s microseconds per sample" % (elapsedmin, mspersample))    
     #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per sample" % (elapsedmin, mspersample))
 
@@ -652,11 +595,9 @@ except arcpy.ExecuteError:
 
 # For other errors
 except:
-    import traceback, sys
-    tb = sys.exc_info()[2]
-    tbinfo = traceback.format_tb(tb)[0]
+    tbinfo = traceback.format_exc()
 
-    pymsg = "PYTHON ERRORS:\nTraceback info:\n" + tbinfo + "\nError Info:\n" +str(sys.exc_info()[1])
+    pymsg = "PYTHON ERRORS:\n" + tbinfo + "\nError Info:\n" +str(sys.exc_info()[1])
     msgs = "ArcPy ERRORS:\n" + arcpy.GetMessages(2) + "\n"
 
     #arcpy.AddError(pymsg)
