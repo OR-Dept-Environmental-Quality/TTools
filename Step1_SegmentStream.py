@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 1: Create Stream Nodes  version 0.95
+# Step 1: Create Stream Nodes  version 0.951
 # Ryan Michie
 
 # This script will take an input polyline feature with unique 
@@ -278,7 +278,7 @@ try:
     startTime= time.time()
     
     # Check if the output exists
-    if not arcpy.Exists(nodes_fc):
+    if arcpy.Exists(nodes_fc):
         arcpy.AddError("\nThis output already exists: \n" +
                        "{0}\n".format(nodes_fc) +
                        "Please rename your output.")
