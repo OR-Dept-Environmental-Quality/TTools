@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 3: Sample Stream Elevations/ Gradient - v 0.9
+# Step 3: Sample Stream Elevations/ Gradient - v 0.96
 # Ryan Michie
 
 # Sample_ElevationsGradient will take an input point feature 
@@ -10,13 +10,13 @@
 
 # INPUTS
 # 0: Input TTools point feature class (nodes_fc)
-# 1: input the number of samples around the 
-#     node (searchCells) 1. [0],  2. [9], 3. [25]
+# 1: input the number of cells to search out around the node 
+#     for the lowest elevation (searchCells)
 # 2: input flag for smoothing if gradient is zero 
 #     or negative (smooth_flag) 1. True, 2. False
 # 3: input elevation raster (z_raster)
 # 4: input elevation raster z units (z_units) 1. "Feet", 2. "Meters"
-# 5: input stream km distance to process within each array (block_size)
+# 5: OPTIONAL - km distance to process within each array (block_size)
 # 6: input flag if existing data can 
 #     be over written (overwrite_data) 1. True, 2. False
 
@@ -45,6 +45,18 @@ from arcpy import env
 from math import ceil
 from collections import defaultdict
 
+# ----------------------------------------------------------------------
+# Start Fill in Data
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+searchCells = 0
+smooth_flag = True
+z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_units = "Meters"
+block_size = 5 # OPTIONAL defualt to 5
+overwrite_data = True
+# End Fill in Data
+# ----------------------------------------------------------------------
+
 # Parameter fields for python toolbox
 #nodes_fc = parameters[0].valueAsText
 #searchCells = parameters[1].valueAsText # Needs to be a int
@@ -54,28 +66,58 @@ from collections import defaultdict
 #block_size =  parameters[5].valueAsText
 #overwrite_data = parameters[6].valueAsText
 
-# ----------------------------------------------------------------------
-# Start Fill in Data
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
-searchCells = 0
-smooth_flag = True
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
-z_units = "Meters"
-block_size = 5 # OPTIONAL defualt to 5
-overwrite_data = False
-# End Fill in Data
-# ----------------------------------------------------------------------
-
 def nested_dict(): 
     """Build a nested dictionary"""
     return defaultdict(nested_dict)
 
-def read_nodes_fc(nodes_fc, overwrite_data, addFields):
-    """Reads the input point file, adds new fields, and returns the
-    STREAM_ID, NODE_ID, and X/Y coordinates as a nested dictionary"""
+def read_nodes_fc1(nodes_fc, overwrite_data, addFields):
+    """Reads the input point feature class and returns the
+    NODE_ID and X/Y coordinates as a nested dictionary"""
     nodeDict = nested_dict()
-    incursorFields = ["STREAM_ID","NODE_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y"]
+    incursorFields = ["NODE_ID", "SHAPE@X","SHAPE@Y"]
 
+    # Get a list of existing fields
+    existingFields = []
+    for f in arcpy.ListFields(nodes_fc):
+        existingFields.append(f.name)
+
+    # Check to see if the last field exists if yes add it. 
+    # Grabs last field becuase often the first field, emergent, is zero
+    if overwrite_data is False and (addFields[len(addFields)-1] in existingFields) is True:
+        incursorFields.append(addFields[len(addFields)-1])
+    else:
+        overwrite_data = True
+        
+    # Check to see if all the new fields exist and add them if not
+    for f in addFields:
+        if (f in existingFields) is False:
+            arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")    
+
+    # Determine input point spatial units
+    proj = arcpy.Describe(nodes_fc).spatialReference
+
+    with arcpy.da.SearchCursor(nodes_fc, incursorFields,"",proj) as Inrows:
+        if overwrite_data is True:
+            for row in Inrows:
+                nodeDict[row[0]]["POINT_X"] = row[1]
+                nodeDict[row[0]]["POINT_Y"] = row[2]
+        else:
+            for row in Inrows:
+                # Is the data null or zero, if yes grab it.
+                if row[3] is None or row[3] == 0 or row[3] < -9998:
+                    nodeDict[row[0]]["POINT_X"] = row[1]
+                    nodeDict[row[0]]["POINT_Y"] = row[2]
+              
+    return nodeDict
+
+def read_nodes_fc2(nodes_fc, overwrite_data, addFields):
+    """Reads the input point file, adds new fields, and returns the
+    STREAM_ID, NODE_ID, STREAM_KM, LENGTH, ELEVATION, and X/Y coordinates
+    as a nested dictionary"""
+    
+    nodeDict = nested_dict()
+    incursorFields = ["STREAM_ID", "STREAM_KM", "NODE_ID", "LENGTH", "ELEVATION", "SHAPE@X","SHAPE@Y"]
+    
     # Get a list of existing fields
     existingFields = []
     for f in arcpy.ListFields(nodes_fc):
@@ -99,165 +141,221 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     with arcpy.da.SearchCursor(nodes_fc,incursorFields,"",proj) as Inrows:
         if overwrite_data is True:
             for row in Inrows:
-                nodeDict[row[0]][row[1]]["STREAM_KM"] = row[2] 
-                nodeDict[row[0]][row[1]]["POINT_X"] = row[3]
-                nodeDict[row[0]][row[1]]["POINT_Y"] = row[4]
+                nodeDict[row[0]][row[1]]["NODE_ID"] = row[2]
+                nodeDict[row[0]][row[1]]["LENGTH"] = row[3]
+                nodeDict[row[0]][row[1]]["ELEVATION"] = row[4]
+                nodeDict[row[0]][row[1]]["POINT_X"] = row[5]
+                nodeDict[row[0]][row[1]]["POINT_Y"] = row[6]
         else:
             for row in Inrows:
                 # if the data is null or zero (0 = default for shapefile),
                 # it is retreived and will be overwritten.
-                if row[5] is None or row[5] == 0 or row[5] < -9998:
+                if row[7] is None or row[7] < -9998:
                     nodeDict[row[0]][row[1]]["STREAM_KM"] = row[2] 
-                    nodeDict[row[0]][row[1]]["POINT_X"] = row[3]
-                    nodeDict[row[0]][row[1]]["POINT_Y"] = row[4]
+                    nodeDict[row[0]][row[1]]["LENGTH"] = row[3]
+                    nodeDict[row[0]][row[1]]["ELEVATION"] = row[4]
+                    nodeDict[row[0]][row[1]]["POINT_X"] = row[5]
+                    nodeDict[row[0]][row[1]]["POINT_Y"] = row[6]
+    if len(nodeDict) == 0:
+        sys.exit("The gradient field checked in the input point feature class "+
+                 "have existing data. There is nothing to process. Exiting")    
     return nodeDict
 
-def calculate_gradient(zList, kmList, smooth_flag):
+def calculate_gradient(zList, len_list, smooth_flag):
     
-    skipdownNodes = [1]
+    skipupNodes = [0]
     gradientList = [0 for i in zList]
+    
     for i in range(1,len(zList)):
         z = zList[i]
-        zDown = zList[i- max(skipdownNodes)]
-        
+        zUp = zList[i - 1 - max(skipupNodes)]
+    
         # Check if the gradient is <= 0, if yes keep going until
         # it is positive again. Then recalculate the gradient over 
         # the longer distance		
-        if z < zDown and smooth_flag is True:
-            skipdownNodes.append(max(skipdownNodes) + 1)
+        if z > zUp and smooth_flag is True:
+            skipupNodes.append(max(skipupNodes) + 1)
         else:
-            dx_meters = float(kmList[i] - kmList[i- max(skipdownNodes)]) * 1000
-            gradientDown = (z - zDown) / dx_meters
-            for Skip in skipdownNodes:
-                gradientList[i-Skip] = gradientDown
-            skipdownNodes = [1]     
+            dx_meters = sum(len_list[i:i+max(skipupNodes)+1])
+            #dx_meters = float(kmList[i] - kmList[i- max(skipdownNodes)]) * 1000
+            gradient = (zUp - z) / dx_meters
+            for Skip in skipupNodes:
+                gradientList[i-Skip] = gradient
+            skipupNodes = [0]
+            
     return (gradientList)
 
-def update_nodes_fc(nodeDict, nodes_fc, addFields): 
+def update_nodes_fc1(nodeDict, nodes_fc, addFields, nodes_to_query):
+    """Updates the input point feature class with data from the nodes dictionary"""
+    #print("Updating input point feature class")
+    
+    # Build a query to retreive just the nodes that needs updating
+    if len(nodes_to_query) == 1:
+        whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), nodes_to_query[0])
+    else:
+        whereclause = """%s IN %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), tuple(nodes_to_query))
+
+    with arcpy.da.UpdateCursor(nodes_fc,["NODE_ID"] + addFields, whereclause) as cursor:  
+        for row in cursor:
+            for f in xrange(0,len(addFields)):
+                nodeID =row[0]
+                row[f+1] = nodeDict[nodeID][addFields[f]]
+                cursor.updateRow(row)
+
+def update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query):
     """Updates the input point feature class with data from
     the nodes dictionary"""
     print("Updating input point feature class")
 
-    # Get a list of existing fields
-    existingFields = []
-    for f in arcpy.ListFields(nodes_fc):
-        existingFields.append(f.name)     
+    # Build a query to retreive just the nodes that needs updating
+    if len(nodes_to_query) == 1:
+        whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), nodes_to_query[0])
+    else:
+        whereclause = """%s IN %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), tuple(nodes_to_query)) 
 
-    # Check to see if the field exists and add it if not
-    for f in addFields:
-        if (f in existingFields) is False:
-            arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "", "", "NULLABLE", "NON_REQUIRED")   
-
-    with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID"] + addFields) as cursor:
+    with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID","STREAM_KM"] + addFields, whereclause) as cursor:  
         for row in cursor:
             for f in xrange(0,len(addFields)):
                 streamID = row[0]
-                nodeID =row[1]
-                row[f+2] = nodeDict[streamID][nodeID][addFields[f]]
+                stream_km =row[2]
+                row[f+3] = nodeDict[streamID][stream_km][addFields[f]]
                 cursor.updateRow(row)
 
-def create_node_list(nodeDict, streamID, block_size):
-    """This builds a nested list of node information. The outer
-    list holds all the nodes within a specified km extent (block_size).
-    This is done for memory managmentwhen the raster is converted to an
-    array. Really large arrays will use up all the memory and cause
-    a crash"""
+def create_block_list(nodeDict, nodes, cellsize, block_size):
+    """Returns two lists, one containting the coordinate extent
+    for each block that will be itterativly extracted to an array
+    and the other containing the stream and node IDs within each block extent."""
     
-    nodeList = []
-    nodeBlocks = []
-    # Build a km list at intervals identifed by the block size 
-    # if there is a stream longer than 6700 km we are not on Earth
-    km_blocks = [x for x in range(block_size, 6700, block_size)] 
-    i = 0
-    
-    nodes = nodeDict.keys()
-    nodes.sort()
-    
-    for nodeID in nodes:  
-        origin_x = nodeDict[nodeID]["POINT_X"]
-        origin_y = nodeDict[nodeID]["POINT_Y"]
-        stream_km = nodeDict[nodeID]["STREAM_KM"]
-        if stream_km < km_blocks[i]:
-            nodeBlocks.append([origin_x, origin_y, streamID, nodeID, stream_km])
-        else:
-            # New block
-            nodeList.append([list(x) for x in zip(*nodeBlocks)])
-            nodeBlocks = []
-            nodeBlocks.append([origin_x, origin_y, streamID, nodeID, stream_km])
-            i = i + 1
-    nodeList.append([list(x) for x in zip(*nodeBlocks)])
-    
-    return(nodeList)
+    print("Calculating block extents")    
+    x_coord_list = [nodeDict[nodeID]["POINT_X"] for nodeID in nodes]
+    y_coord_list = [nodeDict[nodeID]["POINT_Y"] for nodeID in nodes]    
 
-def coord_to_array(easting, northing, bbox_upper_left):
+    # calculate the buffer distance (in raster spatial units) to add to 
+    # the base bounding box when extracting to an array. The buffer is 
+    # equal to the cellsize * 3 to make sure the block includes 
+    # the surrounding cells at each corner if searchCells = 2
+    buffer = int(3 * cellsize)
+    
+    # calculate bounding box extent for samples
+    x_min = min(x_coord_list)
+    x_max = max(x_coord_list)
+    y_min = min(y_coord_list) 
+    y_max = max(y_coord_list)
+    
+    x_width = int(x_max - x_min + 1)
+    y_width = int(y_max - y_min + 1)
+    
+    block_extents = []
+    block_nodes = []
+      
+    # Build data blocks
+    for x in range(0, x_width, block_size):
+        for y in range(0, y_width, block_size):
+
+            # Lower left coordinate of block (in map units)
+            block_x_min = min([x_min + x, x_max])
+            block_y_min = min([y_min + y, y_max])
+            # Upper right coordinate of block (in map units)
+            block_x_max = min([block_x_min + block_size, x_max])
+            block_y_max = min([block_y_min + block_size, y_max])
+            
+            nodes_in_block = []
+            for nodeID in nodes:
+                node_x = nodeDict[nodeID]["POINT_X"]
+                node_y = nodeDict[nodeID]["POINT_Y"]
+                if block_x_min <= node_x <= block_x_max and block_y_min <= node_y <= block_y_max:
+                    nodes_in_block.append([nodeID, node_x, node_y])
+            
+            if nodes_in_block:      
+                # order 0 left,      1 bottom,    2 right,     3 top
+                block_extents.append([block_x_min - buffer, block_y_min - buffer,
+                                      block_x_max + buffer, block_y_max - + buffer])           
+                block_nodes.append(nodes_in_block)
+    
+    return block_extents, block_nodes
+
+def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
     """converts x/y coordinates to col and row of the array"""
     xy = []
-    xy.append((easting - bbox_upper_left[0]) / bbox_upper_left[2])  # col, x
-    xy.append((northing - bbox_upper_left[1]) / bbox_upper_left[3] * -1)  # row, y     
-    
+    xy.append(int((easting - block_x_min) / x_cellsize))  # col, x
+    xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y 
     return xy
 
-def get_elevations(x_coordList, y_coordList, z_raster, cellcoords, con_z_to_m):
+def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
+    
+    if con_z_to_m is not None:
+        nodata_to_value = -9999 / con_z_to_m
+    else:
+        nodata_to_value = -9999
+        
+    # localize the block extent values
+    block_x_min = block[0]
+    block_y_min = block[1]
+    block_x_max = block[2]
+    block_y_max = block[3]
     
     x_cellsize = arcpy.Describe(z_raster).meanCellWidth
-    y_cellsize = arcpy.Describe(z_raster).meanCellHeight
-    
-    # Get the coordinates of the upper left cell corner of the input z_raster
-    top_y = float(arcpy.GetRasterProperties_management(z_raster, "TOP").getOutput(0))
-    left_x = float(arcpy.GetRasterProperties_management(z_raster, "LEFT").getOutput(0))
+    y_cellsize = arcpy.Describe(z_raster).meanCellHeight    
 
-    # calculate the buffer distance (in z_raster spatial units) to 
-    # add to the z_raster bounding box when extracting to an array
-    buffer = x_cellsize * 2
-    
-    # calculate lower left corner and nrows/cols for the bounding box    
-    x_min = min(x_coordList) - buffer
-    y_min = min(y_coordList) - buffer
-    y_max = max(y_coordList) + buffer
-    
+    # Get the coordinates extent of the input raster
+    raster_x_min = float(arcpy.GetRasterProperties_management(z_raster, "LEFT").getOutput(0))
+    raster_y_min = float(arcpy.GetRasterProperties_management(z_raster, "BOTTOM").getOutput(0))
+    raster_x_max = float(arcpy.GetRasterProperties_management(z_raster, "RIGHT").getOutput(0))
+    raster_y_max = float(arcpy.GetRasterProperties_management(z_raster, "TOP").getOutput(0))
+      
     # Calculate the X and Y offset from the upper left node 
-    # coordinates bounding box
-    x_minoffset = ((left_x - x_min)%x_cellsize) - x_cellsize
-    y_maxoffset = (top_y - y_max)%y_cellsize
-     
-    ncols = int(ceil((max(x_coordList) + buffer - x_min) / x_cellsize)) + 1
-    nrows = int(ceil((y_max - y_min) / y_cellsize)) + 1
-    bbox_lower_left = arcpy.Point(x_min, y_min) # must be in z_raster map units
-    bbox_upper_left = [x_min + x_minoffset, y_max + y_maxoffset, x_cellsize, y_cellsize]
-    nodata_to_value = -9999 / con_z_to_m
+    # coordinates bounding box    
+    x_minoffset = (block_x_min - raster_x_min)%x_cellsize
+    y_minoffset = (block_y_min - raster_y_min)%y_cellsize
+    x_maxoffset = (raster_x_max - block_x_max)%x_cellsize 
+    y_maxoffset = (raster_y_max - block_y_max)%y_cellsize
+    
+    # adjust so the coordinates are at the raster cell corners
+    block_x_min = block_x_min - x_minoffset 
+    block_y_min = block_y_min - y_minoffset
+    block_x_max = block_x_max + x_maxoffset
+    block_y_max = block_y_max + y_maxoffset
+    
+    # Get the lower left cell center coordinate. This is for ESRI's
+    # RastertoNumpyArray function which defaults to the adjacent 
+    # lower left cell
+    block_x_min_center = block_x_min + (x_cellsize / 2)
+    block_y_min_center = block_y_min + (y_cellsize / 2)    
+    
+    # calculate the number or cols/ros from the lower left
+    ncols = max([int(ceil((block_x_max - block_x_min)/ x_cellsize)), 1])
+    nrows = max([int(ceil((block_y_max - block_y_min)/ y_cellsize)), 1])
     
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
-        z_array = arcpy.RasterToNumPyArray(z_raster, bbox_lower_left, ncols, nrows, nodata_to_value)
+        raster_array = arcpy.RasterToNumPyArray(z_raster, arcpy.Point(block_x_min_center, block_y_min_center),
+                                                ncols, nrows, nodata_to_value)
     except:
-        import traceback
-        tb = sys.exc_info()[2]
-        tbinfo = traceback.format_tb(tb)[0]
-        
+        tbinfo = traceback.format_exc()
         pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"       
-        sys.exit(pymsg)
-        
+        sys.exit(pymsg)    
+    
     # convert array values to meters if needed
-    z_array = z_array * con_z_to_m
+    if con_z_to_m is not None:
+        raster_array = raster_array * con_z_to_m
     
-    zList = []
-    
-    #print("Extracting raster values")
-    for i in range(0,len(x_coordList)):
-        xy = coord_to_array(x_coordList[i], y_coordList[i], bbox_upper_left)
+    z_list = []
+    for node in nodes_in_block:
+        xy = coord_to_array(node[1], node[2], block_x_min, block_y_max, x_cellsize, y_cellsize)
         z_sampleList = []
         for coord in cellcoords:
             # Calculate the cell X/Y based on the base coordinate movement
             cell_x = xy[0] + coord[0]
             cell_y = xy[1] + coord[1]
-            z_sampleList.append(z_array[cell_y,cell_x])
-        
+            z_sampleList.append(raster_array[cell_y,cell_x])
+    
         # Remove no data values (-9999) unless they are all no data
         if not max(z_sampleList) < -9998:
             z_sampleList = [z for z in z_sampleList if z > -9999]
-        # Get the lowest elevation
-        zList.append(min(z_sampleList))
-    return zList
+        # Get the lowest elevation        
+        node.append(min(z_sampleList))
+        z_list.append(node)
+    return z_list
 
 def from_z_units_to_meters_con(zUnits):
     """Returns the converstion factor to get from the input z
@@ -274,6 +372,21 @@ def from_z_units_to_meters_con(zUnits):
     
     return con_z_to_m
 
+def from_meters_con(inFeature):
+    """Returns the conversion factor to get from
+    meters to the spatial units of the input feature class"""
+    try:
+        con_from_m = 1 / arcpy.Describe(inFeature).SpatialReference.metersPerUnit
+    except:
+        arcpy.AddError("{0} has a coordinate system that ".format(inFeature)+
+                       "is not projected or not recognized. Use a "+
+                       "projected coordinate system preferably in "+
+                       "linear units of feet or meters.")
+        sys.exit("Coordinate system is not projected or not recognized. "+
+                 "Use a projected coordinate system, preferably in "+
+                 "linear units of feet or meters.")   
+    return con_from_m
+
 #enable garbage collection
 gc.enable()
 
@@ -283,7 +396,7 @@ try:
     #keeping track of time
     startTime= time.time()
 
-    # Check if the output exists
+    # Check if the node fc exists
     if not arcpy.Exists(nodes_fc):
         arcpy.AddError("\nThis output does not exist: \n" +
                        "{0}\n".format(nodes_fc))
@@ -311,63 +424,103 @@ try:
     if block_size == "#": block_size = 5
 
     # Get the units conversion factor
-    con_z_to_m = from_z_units_to_meters_con(z_units) 	
-
+    con_z_to_m = from_z_units_to_meters_con(z_units)
+    con_from_m = from_meters_con(nodes_fc)
+    
+    # convert block size from km to meters to units of the node fc
+    # in the future block size should be estimated based on availiable memory
+    # memorysize = datatypeinbytes*nobands*block_size^2
+    # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
+    if block_size in ["#", ""]:
+        block_size = int(con_from_m * 5000)
+    else:
+        block_size = int(con_from_m * block_size * 1000)
+    
     # Get the elevation raster cell size
-    cellsizeResult = arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX")
-    cellsize = float(cellsizeResult.getOutput(0))
+    cellsize = arcpy.Describe(z_raster).meanCellWidth    
 
-    # Make a list of the base x/y coordinate movments. 
-    # These values will be multipled by the cell size.
-    # search only at the sample point
-    if searchCells == 0: 
-        cellcoords = list(itertools.product([0],[0]))
-
-    # search 1 cell width around point = 9 cells
-    if searchCells == 1:
-        cellcoords = list(itertools.product([-1,0,1],[-1,0,1]))
-
-    # search 2 cell widths around point = 25 cells
-    if searchCells == 2:
-        cellcoords = list(itertools.product([-2,-1,0,1,2],[-2,-1,0,1,2]))
-
+    # Make a list of the base x/y coordinate movments 
+    # from the node origin. These values will be 
+    # multipled by the cell size.
+    # searchCells = 0 samples at the node
+    # searchCells = 1 cell width around node = 9 cells
+    # searchCells =2 cell widths around node = 25 cells ...
+    cell_moves = [i for i in range(searchCells*-1, searchCells+1, 1)]
+    cellcoords = list(itertools.product(cell_moves, cell_moves))
+    
     # read the data into a nested dictionary
-    addFields = ["ELEVATION","GRADIENT"]
-    nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
-    nodeList = []
-    n_nodes = 0
+    addFields = ["ELEVATION"]
+    nodeDict = read_nodes_fc1(nodes_fc, overwrite_data, addFields)
+    if len(nodeDict) != 0:
+        
+        # Get a list of the nodes, sort them
+        nodes = nodeDict.keys()
+        nodes.sort()
+        n_nodes = len(nodes)
+        
+        # Build the block list
+        block_extents, block_nodes = create_block_list(nodeDict, nodes, cellsize, block_size)
+        
+        # Itterate through each block, calculate sample coordinates,
+        # convert raster to array, sample the raster
+        p = 0
+        total_samples = 0
+        for block in block_extents:
+            nodes_in_block = block_nodes[p]
+            nodes_in_block.sort()
+            print("Sampling elevations block %s of %s" % (p + 1, len(block_extents)))
+        
+            z_list = sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m)
+            
+            # Update the node fc
+            for row in z_list:
+                nodeDict[row[0]]["ELEVATION"] = row[3]
+            
+            nodes_to_query = [row[0] for row in z_list]
+            
+            # Write the elevation data to the TTools point feature class 
+            update_nodes_fc1(nodeDict, nodes_fc, addFields, nodes_to_query)
+        
+            p = p + 1
+            total_samples = total_samples + len(z_list)
+            del z_list        
+        
+    else:
+        print("The elevation field checked in the input point feature class " +
+              "have existing data. Andvancing to gradient processing")
+    del(nodeDict)
+    
+    # Start on gradients
+    
+    # read the data into a nested dictionary
+    addFields = ["GRADIENT"]
+    nodeDict = read_nodes_fc2(nodes_fc, overwrite_data, addFields)    
+    nodes_to_query = []
     n = 1
     for streamID in nodeDict:
-        print("Processing stream %s of %s" % (n, len(nodeDict)))
-        nodeList = create_node_list(nodeDict[streamID],
-                                    streamID, block_size)
-        
-        # Get the Elevations
-        for NodeBlock in nodeList:
-            zList = get_elevations(NodeBlock[0],NodeBlock[1], z_raster,
-                                   cellcoords, con_z_to_m)
-            NodeBlock.append(zList)
-        
-            # Calculate Gradient
-            gradientList = calculate_gradient(zList, NodeBlock[4],
-                                              smooth_flag)
-            NodeBlock.append(gradientList)
+        print("Calculating gradients stream %s of %s" % (n, len(nodeDict)))
             
-            # Transpose the list
-            NodeBlock = [list(x) for x in zip(*NodeBlock)]
+        stream_kms = nodeDict[streamID].keys()
+        stream_kms.sort(reverse=True)        
+    
+        z_list = [nodeDict[streamID][km]["ELEVATION"] for km in stream_kms]
+        len_list = [nodeDict[streamID][km]["LENGTH"] for km in stream_kms]
         
-            # Update the nodeDict
-            for row in NodeBlock:
-                nodeDict[row[2]][row[3]]["ELEVATION"] = row[5]
-                nodeDict[row[2]][row[3]]["GRADIENT"] = row[6]
-            n_nodes = n_nodes + len(NodeBlock)
+        # Calculate Gradient
+        gradientList = calculate_gradient(z_list, len_list, smooth_flag)
+        
+        i = 0
+        for km in stream_kms:
+            nodeDict[streamID][km]["GRADIENT"] = gradientList[i]
+            nodes_to_query.append(nodeDict[streamID][km]["NODE_ID"])
+            i = i + 1
         n = n + 1
+
+    update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query)
+    #update_nodes_fc2(nodeDict, nodes_fc, addFields) 
     
     endTime = time.time()
-    gc.collect()
-       
-    # Write the Elevation and Gradient to the TTools point feature class
-    update_nodes_fc(nodeDict, nodes_fc, addFields)    
+    gc.collect()  
     
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
     mspernode = timedelta(seconds=(endTime - startTime) / n_nodes).microseconds
