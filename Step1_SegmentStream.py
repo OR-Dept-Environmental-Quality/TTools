@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 1: Create Stream Nodes  version 0.951
+# Step 1: Create Stream Nodes  version 0.952
 # Ryan Michie
 
 # This script will take an input polyline feature with unique 
@@ -57,7 +57,7 @@ env.overwriteOutput = True
 
 # ----------------------------------------------------------------------
 # Start Fill in Data
-streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
+streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams_two"
 sid_field = "NAME"
 node_dx = 50
 checkDirection = True
@@ -156,10 +156,11 @@ def create_node_list(streamline_fc, checkDirection, z_raster):
                 if stream_azimuth < 0:
                     stream_azimuth = stream_azimuth + 360
                 
-                # list of "NODE_ID","STREAM_ID". "LENGTH", "STREAM_KM",
+                # list of "NODE_ID","STREAM_ID". "STREAM_KM", "LENGTH", 
                 # "POINT_X","POINT_Y", "STREAM_AZMTH", "SHAPE@X", "SHAPE@Y"
-                nodeList.append((nodeID, row[2], segment_length[i], 
+                nodeList.append((nodeID, row[2], 
                                  float(position * lineLength * con_to_m /1000),
+                                 segment_length[i],
                                  node.X, node.Y, stream_azimuth, node.X, node.Y))
                 nodeID = nodeID + 1
                 i = i + 1
