@@ -221,7 +221,7 @@ def update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query):
                 row[f+3] = nodeDict[streamID][stream_km][addFields[f]]
                 cursor.updateRow(row)
 
-def create_block_list(nodeDict, nodes, cellsize, block_size):
+def create_block_list(nodeDict, nodes, buffer, block_size):
     """Returns two lists, one containting the coordinate extent
     for each block that will be itterativly extracted to an array
     and the other containing the stream and node IDs within each block extent."""
@@ -229,12 +229,6 @@ def create_block_list(nodeDict, nodes, cellsize, block_size):
     print("Calculating block extents")    
     x_coord_list = [nodeDict[nodeID]["POINT_X"] for nodeID in nodes]
     y_coord_list = [nodeDict[nodeID]["POINT_Y"] for nodeID in nodes]    
-
-    # calculate the buffer distance (in raster spatial units) to add to 
-    # the base bounding box when extracting to an array. The buffer is 
-    # equal to the cellsize * 3 to make sure the block includes 
-    # the surrounding cells at each corner if searchCells = 2
-    buffer = int(3 * cellsize)
     
     # calculate bounding box extent for samples
     x_min = min(x_coord_list)
@@ -437,7 +431,13 @@ try:
         block_size = int(con_from_m * block_size * 1000)
     
     # Get the elevation raster cell size
-    cellsize = arcpy.Describe(z_raster).meanCellWidth    
+    cellsize = arcpy.Describe(z_raster).meanCellWidth
+    
+    # calculate the buffer distance (in raster spatial units) to add to 
+    # the base bounding box when extracting to an array. The buffer is 
+    # equal to the cellsize * the searchcells to make sure the block includes 
+    # the surrounding cells at each corner
+    buffer = int((searchCells + 1)* cellsize)    
 
     # Make a list of the base x/y coordinate movments 
     # from the node origin. These values will be 
@@ -459,7 +459,7 @@ try:
         n_nodes = len(nodes)
         
         # Build the block list
-        block_extents, block_nodes = create_block_list(nodeDict, nodes, cellsize, block_size)
+        block_extents, block_nodes = create_block_list(nodeDict, nodes, buffer, block_size)
         
         # Itterate through each block, calculate sample coordinates,
         # convert raster to array, sample the raster
