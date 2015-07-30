@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 5: Sample Landcover - Star Pattern, Point Method v 0.9962
+# Step 5: Sample Landcover - Star Pattern, Point Method v 0.9963
 # Ryan Michie
 
 # Sample_Landcover_PointMethod will take an input point 
@@ -230,8 +230,8 @@ def setup_LC_data_headers(transsample_count, trans_count,
 def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
     """converts x/y coordinates to col and row of the array"""
     xy = []
-    xy.append((easting - block_x_min) / x_cellsize)  # col, x
-    xy.append((northing - block_y_max) / y_cellsize * -1)  # row, y 
+    xy.append(int((easting - block_x_min) / x_cellsize))  # col, x
+    xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y 
     return xy
 
 def create_lc_point_list(nodeDict, nodes_in_block, dir, zone, transsample_distance):
@@ -336,7 +336,7 @@ def sample_raster(block, lc_point_list, raster, con):
     x_cellsize = arcpy.Describe(raster).meanCellWidth
     y_cellsize = arcpy.Describe(raster).meanCellHeight    
 
-    # Get the coordinates of the upper left cell corner of the input raster
+    # Get the coordinates extent of the input raster
     raster_x_min = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
     raster_y_min = float(arcpy.GetRasterProperties_management(raster, "BOTTOM").getOutput(0))
     raster_x_max = float(arcpy.GetRasterProperties_management(raster, "RIGHT").getOutput(0))
@@ -346,7 +346,7 @@ def sample_raster(block, lc_point_list, raster, con):
     # coordinates bounding box    
     x_minoffset = (block_x_min - raster_x_min)%x_cellsize
     y_minoffset = (block_y_min - raster_y_min)%y_cellsize
-    x_maxoffset = (raster_x_max - block_x_max)% x_cellsize 
+    x_maxoffset = (raster_x_max - block_x_max)%x_cellsize 
     y_maxoffset = (raster_y_max - block_y_max)%y_cellsize
     
     # adjust so the coordinates are at the raster cell corners
@@ -355,13 +355,19 @@ def sample_raster(block, lc_point_list, raster, con):
     block_x_max = block_x_max + x_maxoffset
     block_y_max = block_y_max + y_maxoffset
     
+    # Get the lower left cell center coordinate. This is for ESRI's
+    # RastertoNumpyArray function which defaults to the adjacent 
+    # lower left cell
+    block_x_min_center = block_x_min + (x_cellsize / 2)
+    block_y_min_center = block_y_min + (y_cellsize / 2)    
+    
     # calculate the number or cols/ros from the lower left
     ncols = max([int(ceil((block_x_max - block_x_min)/ x_cellsize)), 1])
-    nrows = max([int(ceil((block_y_max - block_y_min)/ y_cellsize)), 1])    
+    nrows = max([int(ceil((block_y_max - block_y_min)/ y_cellsize)), 1])
     
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
-        raster_array = arcpy.RasterToNumPyArray(raster, arcpy.Point(block_x_min, block_y_min),
+        raster_array = arcpy.RasterToNumPyArray(raster, arcpy.Point(block_x_min_center, block_y_min_center),
                                                 ncols, nrows, nodata_to_value)
     except:
         tbinfo = traceback.format_exc()
@@ -435,7 +441,14 @@ try:
     #keeping track of time
     startTime= time.time()
     
-    # Check if the output exists and delete or throw an error
+    # Check if the node fc exists
+    if not arcpy.Exists(nodes_fc):
+        arcpy.AddError("\nThis output does not exist: \n" +
+                       "{0}\n".format(nodes_fc))
+        sys.exit("This output does not exist: \n" +
+                 "{0}\n".format(nodes_fc))
+    
+    # Check if the lc point fc exists and delete or throw an error
     if arcpy.Exists(lc_point_fc):
         if overwrite_data is True:
             arcpy.Delete_management(lc_point_fc)
