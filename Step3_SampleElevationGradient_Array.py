@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 3: Sample Stream Elevations/ Gradient - v 0.96
+# Step 3: Sample Stream Elevations/ Gradient - v 0.961
 # Ryan Michie
 
 # Sample_ElevationsGradient will take an input point feature 
@@ -247,23 +247,37 @@ def create_block_list(nodeDict, nodes, buffer, block_size):
         for y in range(0, y_width, block_size):
 
             # Lower left coordinate of block (in map units)
-            block_x_min = min([x_min + x, x_max])
-            block_y_min = min([y_min + y, y_max])
+            block0_x_min = min([x_min + x, x_max])
+            block0_y_min = min([y_min + y, y_max])
             # Upper right coordinate of block (in map units)
-            block_x_max = min([block_x_min + block_size, x_max])
-            block_y_max = min([block_y_min + block_size, y_max])
+            block0_x_max = min([block0_x_min + block_size, x_max])
+            block0_y_max = min([block0_y_min + block_size, y_max])
+            
+            block_x_min = block0_x_max
+            block_x_max = block0_x_min
+            block_y_min = block0_y_max
+            block_y_max = block0_y_min            
             
             nodes_in_block = []
             for nodeID in nodes:
                 node_x = nodeDict[nodeID]["POINT_X"]
                 node_y = nodeDict[nodeID]["POINT_Y"]
-                if block_x_min <= node_x <= block_x_max and block_y_min <= node_y <= block_y_max:
+                if (block0_x_min <= node_x <= block0_x_max and
+                    block0_y_min <= node_y <= block0_y_max):
                     nodes_in_block.append([nodeID, node_x, node_y])
+                    
+                    # Minimize the size of the block0 by the true 
+                    # extent of the nodes in the block
+                    if block_x_min > node_x: block_x_min = node_x
+                    if block_x_max < node_x: block_x_max = node_x
+                    if block_y_min > node_y: block_y_min = node_y
+                    if block_y_max < node_y: block_y_max = node_y
             
-            if nodes_in_block:      
+            if nodes_in_block:
+                # add the block extent for processing
                 # order 0 left,      1 bottom,    2 right,     3 top
                 block_extents.append([block_x_min - buffer, block_y_min - buffer,
-                                      block_x_max + buffer, block_y_max - + buffer])           
+                                      block_x_max + buffer, block_y_max + buffer])           
                 block_nodes.append(nodes_in_block)
     
     return block_extents, block_nodes
@@ -334,21 +348,37 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
         raster_array = raster_array * con_z_to_m
     
     z_list = []
-    for node in nodes_in_block:
-        xy = coord_to_array(node[1], node[2], block_x_min, block_y_max, x_cellsize, y_cellsize)
-        z_sampleList = []
-        for coord in cellcoords:
-            # Calculate the cell X/Y based on the base coordinate movement
-            cell_x = xy[0] + coord[0]
-            cell_y = xy[1] + coord[1]
-            z_sampleList.append(raster_array[cell_y,cell_x])
+    z_node = []
+    if raster_array.max() > -9999:
+        # There is at least one pixel of data
+        for node in nodes_in_block:
+            xy = coord_to_array(node[1], node[2], block_x_min, block_y_max, x_cellsize, y_cellsize)
+            z_sampleList = []
+            for coord in cellcoords:
+                # Calculate the cell X/Y based on the base coordinate movement
+                cell_x = xy[0] + coord[0]
+                cell_y = xy[1] + coord[1]
+                z_sampleList.append(raster_array[cell_y,cell_x])
+                
+                # sample at node:
+                if coord[0] == 0 and coord[1] == 0:
+                    z_node = raster_array[cell_y,cell_x]
+                
+            # Remove no data values (-9999) unless they are all no data
+            if not max(z_sampleList) < -9998:
+                z_sampleList = [z for z in z_sampleList if z > -9999]
+            # Get the lowest elevation        
+            node.append(min(z_sampleList))
+            node.append(z_node)
+            z_list.append(node)
     
-        # Remove no data values (-9999) unless they are all no data
-        if not max(z_sampleList) < -9998:
-            z_sampleList = [z for z in z_sampleList if z > -9999]
-        # Get the lowest elevation        
-        node.append(min(z_sampleList))
-        z_list.append(node)
+    else:
+        # No data, add -9999 for elevation and z_node
+        for node in nodes_in_block:
+            node.append(-9999)
+            node.append(-9999)
+            z_list.append(node)
+        
     return z_list
 
 def from_z_units_to_meters_con(zUnits):
@@ -444,12 +474,12 @@ try:
     # multipled by the cell size.
     # searchCells = 0 samples at the node
     # searchCells = 1 cell width around node = 9 cells
-    # searchCells =2 cell widths around node = 25 cells ...
+    # searchCells = 2 cell widths around node = 25 cells ...
     cell_moves = [i for i in range(searchCells*-1, searchCells+1, 1)]
     cellcoords = list(itertools.product(cell_moves, cell_moves))
     
     # read the data into a nested dictionary
-    addFields = ["ELEVATION"]
+    addFields = ["ELEVATION", "Z_NODE"]
     nodeDict = read_nodes_fc1(nodes_fc, overwrite_data, addFields)
     if len(nodeDict) != 0:
         
@@ -463,27 +493,29 @@ try:
         
         # Itterate through each block, calculate sample coordinates,
         # convert raster to array, sample the raster
-        p = 0
         total_samples = 0
-        for block in block_extents:
+        
+        for p, block in enumerate(block_extents):
             nodes_in_block = block_nodes[p]
             nodes_in_block.sort()
-            print("Sampling elevations block %s of %s" % (p + 1, len(block_extents)))
+            
+            print("Processing block {0} of {1}".format(p + 1, len(block_extents)))
         
             z_list = sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m)
             
             # Update the node fc
             for row in z_list:
                 nodeDict[row[0]]["ELEVATION"] = row[3]
-            
+                nodeDict[row[0]]["Z_NODE"] = row[4]
+                
             nodes_to_query = [row[0] for row in z_list]
             
             # Write the elevation data to the TTools point feature class 
             update_nodes_fc1(nodeDict, nodes_fc, addFields, nodes_to_query)
         
-            p = p + 1
             total_samples = total_samples + len(z_list)
-            del z_list        
+            del z_list
+            gc.collect()
         
     else:
         print("The elevation field checked in the input point feature class " +
@@ -496,9 +528,9 @@ try:
     addFields = ["GRADIENT"]
     nodeDict = read_nodes_fc2(nodes_fc, overwrite_data, addFields)    
     nodes_to_query = []
-    n = 1
-    for streamID in nodeDict:
-        print("Calculating gradients stream %s of %s" % (n, len(nodeDict)))
+
+    for n, streamID in enumerate(nodeDict):
+        print("Calculating gradients stream {0} of {1}".format(n + 1, len(nodeDict)))
             
         stream_kms = nodeDict[streamID].keys()
         stream_kms.sort(reverse=True)        
@@ -509,22 +541,18 @@ try:
         # Calculate Gradient
         gradientList = calculate_gradient(z_list, len_list, smooth_flag)
         
-        i = 0
-        for km in stream_kms:
+        for i, km in enumerate(stream_kms):
             nodeDict[streamID][km]["GRADIENT"] = gradientList[i]
             nodes_to_query.append(nodeDict[streamID][km]["NODE_ID"])
-            i = i + 1
-        n = n + 1
 
     update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query)
-    #update_nodes_fc2(nodeDict, nodes_fc, addFields) 
     
     endTime = time.time()
     gc.collect()  
     
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
     mspernode = timedelta(seconds=(endTime - startTime) / n_nodes).microseconds
-    print("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))    
+    print("Process Complete in {0} minutes. {1} microseconds per node".format(elapsedmin, mspernode))    
 
 # For arctool errors
 except arcpy.ExecuteError:
