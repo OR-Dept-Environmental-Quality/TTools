@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 5: Sample Landcover - Star Pattern, Point Method v 0.9963
+# Step 5: Sample Landcover - Star Pattern, Point Method v 0.9964
 # Ryan Michie
 
 # Sample_Landcover_PointMethod will take an input point 
@@ -81,7 +81,7 @@ env.overwriteOutput = True
 
 # ----------------------------------------------------------------------
 # Start Fill in Data
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes_major"
 trans_count = 8 
 transsample_count = 5 # does not include a sample at the stream node
 transsample_distance = 8
@@ -94,7 +94,7 @@ k_raster = "#" # OPTIONAL This is the k value for LAI
 oh_raster = "#" # OPTIONAL This is the overhang raster
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 z_units = "Meters"
-lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint"
+lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint_major"
 block_size = "#" # OPTIONAL defualt to 5
 overwrite_data = True
 # End Fill in Data
@@ -150,7 +150,7 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
 def create_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc, proj):
     """Creates/updates the output landcover sample point feature
     class using the data from the landcover point list"""
-    print("Exporting data to land cover sample feature class")
+    #print("Exporting data to land cover sample feature class")
     
     cursorfields = ["POINT_X","POINT_Y"] +["STREAM_ID","NODE_ID",
                                            "TRANS_AZIMUTH","TRANSECT",
@@ -208,22 +208,22 @@ def setup_LC_data_headers(transsample_count, trans_count,
     # a flag indicating the model should use the heat source 8 methods 
     # (same as 8 directions but no north)
     if heatsource8 is True:
-        dir = ["T{0}".format(x) for x in range(1, 8)]
+        dirs = ["T{0}".format(x) for x in range(1, 8)]
     else:        
-        dir = ["T{0}".format(x) for x in range(1, trans_count + 1)]
+        dirs = ["T{0}".format(x) for x in range(1, trans_count + 1)]
 
-    zone = range(1,int(transsample_count)+1)
+    zones = range(1,int(transsample_count)+1)
     
     # Concatenate the type, dir, and zone and order in the correct way
     for t in type:
-        for d in range(0,len(dir)):
-            for z in range(0,len(zone)):
+        for d, dir in enumerate(dirs):
+            for z, zone in enumerate(zones):
                 if stream_sample is True and t !="ELE" and d==0 and z==0:
                     #lcdataheaders.append(t+"_EMERGENT") # add emergent
                     lcdataheaders.append(t+"_T0_S0") # add emergent
-                    lcdataheaders.append("{0}_{1}_S{2}".format(t, dir[d], zone[z]))
+                    lcdataheaders.append("{0}_{1}_S{2}".format(t, dir, zone))
                 else:
-                    lcdataheaders.append("{0}_{1}_S{2}".format(t, dir[d], zone[z]))
+                    lcdataheaders.append("{0}_{1}_S{2}".format(t, dir, zone))
     
     return lcdataheaders, type
 
@@ -234,7 +234,7 @@ def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_ce
     xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y 
     return xy
 
-def create_lc_point_list(nodeDict, nodes_in_block, dir, zone, transsample_distance):
+def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_distance):
     """This builds a unique long form list of information for all the
     landcover samples in the block. This list is used to
     create/update the output feature class."""
@@ -250,20 +250,20 @@ def create_lc_point_list(nodeDict, nodes_in_block, dir, zone, transsample_distan
         lc_point_list.append([origin_x, origin_y, origin_x, origin_y,
                               streamID, nodeID, 0, 0, 0, "LC_T0_S0"])
     
-        for d in range(0,len(dir)):
-            for z in zone:
+        for d, dir in enumerate(dirs):
+            for z in zones:
                 # Calculate the x and y coordinate of the 
                 # landcover sample location
                 pt_x = (z * transsample_distance * con_from_m *
-                        sin(radians(dir[d]))) + origin_x
+                        sin(radians(dir))) + origin_x
                 pt_y = (z * transsample_distance * con_from_m *
-                        cos(radians(dir[d]))) + origin_y
+                        cos(radians(dir))) + origin_y
                 
                 lc_key = 'LC_T{0}_S{1}'.format(d+1, z)
         
                 # Add to the list          
                 lc_point_list.append([pt_x, pt_y, pt_x, pt_y,
-                                      streamID, nodeID, dir[d], d+1, z, lc_key])    
+                                      streamID, nodeID, dir, d+1, z, lc_key])    
      
     return lc_point_list
 
@@ -299,23 +299,38 @@ def create_block_list(nodes, block_size):
         for y in range(0, y_width, block_size):
 
             # Lower left coordinate of block (in map units)
-            block_x_min = min([x_min + x, x_max])
-            block_y_min = min([y_min + y, y_max])
+            block0_x_min = min([x_min + x, x_max])
+            block0_y_min = min([y_min + y, y_max])
             # Upper right coordinate of block (in map units)
-            block_x_max = min([block_x_min + block_size, x_max])
-            block_y_max = min([block_y_min + block_size, y_max])
+            block0_x_max = min([block0_x_min + block_size, x_max])
+            block0_y_max = min([block0_y_min + block_size, y_max])
+            
+            block_x_min = block0_x_max
+            block_x_max = block0_x_min
+            block_y_min = block0_y_max
+            block_y_max = block0_y_min
             
             nodes_in_block = []
             for nodeID in nodes:
                 node_x = nodeDict[nodeID]["POINT_X"]
                 node_y = nodeDict[nodeID]["POINT_Y"]
-                if block_x_min <= node_x <= block_x_max and block_y_min <= node_y <= block_y_max:
+                if (block0_x_min <= node_x <= block0_x_max and
+                    block0_y_min <= node_y <= block0_y_max):
+                    
                     nodes_in_block.append(nodeID)
+                    
+                    # Minimize the size of the block0 by the true 
+                    # extent of the nodes in the block
+                    if block_x_min > node_x: block_x_min = node_x
+                    if block_x_max < node_x: block_x_max = node_x
+                    if block_y_min > node_y: block_y_min = node_y
+                    if block_y_max < node_y: block_y_max = node_y
             
-            if nodes_in_block:      
+            if nodes_in_block:
+                # add the block extent for processing
                 # order 0 left,      1 bottom,    2 right,     3 top
-                block_extents.append([block_x_min - buffer, block_y_min - buffer,
-                                      block_x_max + buffer, block_y_max - + buffer])           
+                block_extents.append((block_x_min - buffer, block_y_min - buffer,
+                                      block_x_max + buffer, block_y_max + buffer))           
                 block_nodes.append(nodes_in_block)
     
     return block_extents, block_nodes
@@ -379,15 +394,22 @@ def sample_raster(block, lc_point_list, raster, con):
         raster_array = raster_array * con
     
     lc_point_list_new = []
-    for point in lc_point_list:
-        xy = coord_to_array(point[0], point[1], block_x_min, block_y_max, x_cellsize, y_cellsize)
-        point.append(raster_array[xy[1], xy[0]])
-        lc_point_list_new.append(point)
+    if raster_array.max() > -9999:
+        # There is at least one pixel of data
+        for point in lc_point_list:
+            xy = coord_to_array(point[0], point[1], block_x_min, block_y_max, x_cellsize, y_cellsize)
+            point.append(raster_array[xy[1], xy[0]])
+            lc_point_list_new.append(point)
+    else:
+        # No data, add -9999
+        for point in lc_point_list:
+            point.append(raster_array[-9999])
+            lc_point_list_new.append(point)
     return lc_point_list_new            
 
 def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
     """Updates the input point feature class with data from the nodes dictionary"""
-    print("Updating input point feature class")
+    #print("Updating input point feature class")
     
     # Build a query to retreive just the nodes that needs updating
     if len(nodes_to_query) == 1:
@@ -516,11 +538,11 @@ try:
     # flag indicating the model should use the heat source 8 methods 
     # (same as 8 directions but no north)
     if heatsource8 is True:
-        dir = [45,90,135,180,225,270,315]
+        dirs = [45,90,135,180,225,270,315]
     else:        
-        dir = [x * 360.0 / trans_count for x in range(1,trans_count+ 1)]
+        dirs = [x * 360.0 / trans_count for x in range(1,trans_count+ 1)]
 
-    zone = range(1,int(transsample_count+1))
+    zones = range(1,int(transsample_count+1))
     
     # TODO 
     # This is a future function that may replace the emergent methods.
@@ -558,15 +580,14 @@ try:
     
     # Itterate through each block, calculate sample coordinates,
     # convert raster to array, sample the raster
-    p = 0
     total_samples = 0
-    for block in block_extents:
+    for p, block in enumerate(block_extents):
         nodes_in_block = block_nodes[p]
         nodes_in_block.sort()
-        print("Processing block %s of %s" % (p + 1, len(block_extents)))
+        print("Processing block {0} of {1}".format(p + 1, len(block_extents)))
         
         # build the landcover sample list
-        lc_point_list= create_lc_point_list(nodeDict, nodes_in_block, dir, zone, transsample_distance)
+        lc_point_list= create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_distance)
                 
         for raster in typeraster:
             if raster is None:
@@ -584,8 +605,8 @@ try:
         
         # Update the node fc
         for row in lc_point_list:
-            for t in range(0,len(type)):
-                lc_key = '{0}_T{1}_S{2}'.format(type[t], row[7], row[8])
+            for t, item, in enumerate(type):
+                lc_key = '{0}_T{1}_S{2}'.format(item, row[7], row[8])
                 nodeDict[row[5]][lc_key] = row[10 + t]
         
         # Write the landcover data to the TTools point feature class 
@@ -594,19 +615,17 @@ try:
         # Build the output point feature class using the data         
         create_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc, proj)
     
-        p = p + 1
         total_samples = total_samples + len(lc_point_list)
         del lc_point_list
+        gc.collect()
     
     endTime = time.time()
-    gc.collect()
     
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
     mspersample = timedelta(seconds=(endTime - startTime) /
                             total_samples).microseconds
-    print("Process Complete in %s minutes. %s microseconds per sample" % (elapsedmin, mspersample))    
+    print("Process Complete in {0} minutes. {1} microseconds per sample".format(elapsedmin, mspersample))
     #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per sample" % (elapsedmin, mspersample))
-
 
 # For arctool errors
 except arcpy.ExecuteError:
