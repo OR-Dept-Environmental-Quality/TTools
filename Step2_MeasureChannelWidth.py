@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 2: Measure Channel Widths - v 0.91
+# Step 2: Measure Channel Widths - v 0.911
 # Ryan Michie
 
 # INPUTS
@@ -120,6 +120,7 @@ def read_polyline_geometry(polyline_fc, proj_polyline):
     poly_array = arcpy.Array(poly_list)
     # put it into a geometry object.
     poly_geom = arcpy.Polyline(poly_array, proj_polyline)
+    del row
     return(poly_geom)
         
 def calc_channel_width(node_geom, rb_geom, lb_geom):
@@ -206,22 +207,18 @@ try:
     rb_geom = read_polyline_geometry(rb_fc, proj_rb)
     lb_geom = read_polyline_geometry(lb_fc, proj_lb)
     
-    n = 1
-    for streamID in nodeDict:
-        print("Processing stream %s of %s" % (n, len(nodeDict)))
-        i =0 
+    for n, streamID in enumerate(nodeDict):
+        print("Processing stream {0} of {1}".format(n+1, len(nodeDict)))
+
         for nodeID in nodeDict[streamID]:
-            
             node_x = float(nodeDict[streamID][nodeID]["POINT_X"])
             node_y = float(nodeDict[streamID][nodeID]["POINT_Y"])
             node_geom = arcpy.PointGeometry(arcpy.Point(node_x, node_y), proj_nodes)
             
-            #nodeDict[streamID][nodeID]["ASPECT"] = CalcAspect(nodeDict[streamID], streamID)
             lb_distance, rb_distance = calc_channel_width(node_geom, rb_geom, lb_geom)
             nodeDict[streamID][nodeID]["CHANWIDTH"] = (lb_distance + rb_distance) * nodexy_to_m
             nodeDict[streamID][nodeID]["LEFT"] = lb_distance * nodexy_to_m
-            nodeDict[streamID][nodeID]["RIGHT"] = rb_distance * nodexy_to_m
-        n = n + 1         
+            nodeDict[streamID][nodeID]["RIGHT"] = rb_distance * nodexy_to_m        
         
     update_nodes_fc(nodeDict, nodes_fc, addFields)
 
@@ -230,7 +227,7 @@ try:
     endTime = time.time()
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
     mspernode = timedelta(seconds=(endTime - startTime) / n).microseconds
-    print("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
+    print("Process Complete in {0} minutes. {1} microseconds per node".format(elapsedmin, mspernode))
     #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
 
 # For arctool errors
