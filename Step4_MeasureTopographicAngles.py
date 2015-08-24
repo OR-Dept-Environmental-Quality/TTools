@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 4: Measure Topographic Angles - v 0.96
+# Step 4: Measure Topographic Angles - v 0.961
 # Ryan Michie
 
 # Measure_Topographic_Angles will take an input point feature 
@@ -51,6 +51,19 @@ from math import radians, sin, cos, hypot, ceil
 from collections import defaultdict
 import numpy as np
 
+# ----------------------------------------------------------------------
+# Start Fill in Data
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+directions = 1
+searchDistance_max_km = 10
+skippy = False
+z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_units = "Meters"
+topo_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\topo_samples"
+overwrite_data = True
+# End Fill in Data
+# ----------------------------------------------------------------------
+
 # Parameter fields for python toolbox
 #nodes_fc = parameters[0].valueAsText
 #directions = parameters[1].valueAsText # Needs to be a long
@@ -59,19 +72,6 @@ import numpy as np
 #z_units = parameters[4].valueAsText
 #topo_fc = parameters[5].valueAsText
 #overwrite_data = parameters[6].valueAsText True/False
-
-# ----------------------------------------------------------------------
-# Start Fill in Data
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
-directions = 1
-searchDistance_max_km = 20
-skippy = False
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
-z_units = "Meters"
-topo_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\topo_samples"
-overwrite_data = True
-# End Fill in Data
-# ----------------------------------------------------------------------
 
 def nested_dict(): 
     """Build a nested dictionary"""
@@ -165,8 +165,8 @@ def update_topo_fc(pointList, topo_fc, nodes_fc, proj):
     if not arcpy.Exists(topo_fc):  
         #Create an empty output with the same projection as the input polyline
         cursorfields = ["POINT_X","POINT_Y","STREAM_ID","NODE_ID",
-                        "AZIMUTH","TOPOANGLE","TOPO_ELE","NODE_ELE",
-                        "ELE_CHANGE","TOPODIS","SEARCHDIS","NA_SAMPLES"]
+                        "AZIMUTH","TOPOANGLE","Z_TOPO","Z_NODE",
+                        "Z_CHANGE","TOPODIS","SEARCHDIS","NA_SAMPLES"]
         arcpy.CreateFeatureclass_management(os.path.dirname(topo_fc),
                                             os.path.basename(topo_fc),
                                             "POINT","","DISABLED","DISABLED",
@@ -366,36 +366,37 @@ def get_topo_angles(coordList, z_raster, a, azimuthdisdict, con_z_to_m):
     # convert array values to meters if needed
     z_array = z_array * con_z_to_m             
     
-    topo_z_list = []
+    z_topo_list = []
     
     #print("Extracting raster values")
     for i in range(0,len(coordList)):
         xy = coord_to_array(coordList[i][0], coordList[i][1], bbox_upper_left)
-        topo_z_list.append(z_array[xy[1], xy[0]])
+        z_topo_list.append(z_array[xy[1], xy[0]])
         #topoList[i].append(z_array[xy[1], xy[0]])
     
-    topo_z_array = np.array(topo_z_list)
-    distance_array = azimuthdisdict[a] * con_to_m
-    angle_array = np.degrees(np.arctan((topo_z_array - topo_z_array[0]) / distance_array))
+    z_topo_array = np.array(z_topo_list)
+    # in meters
+    distance_array = azimuthdisdict[a]
+    angle_array = np.degrees(np.arctan((z_topo_array - z_topo_array[0]) / distance_array))
     # remove the off raster samples
-    naindex = np.where(topo_z_array < -9998)
+    naindex = np.where(z_topo_array < -9998)
     for x in naindex[0]: angle_array[x] = -9999            
     # Find the max topo angle
     topoAngle = angle_array.max()
     # array index at the max topo angle 
     arryindex = np.where(angle_array==topoAngle)[0][0]
-    topo_z = topo_z_array[arryindex]
+    z_topo = z_topo_array[arryindex]
     # elevation change between topo angle location and node elevation
-    z_change = topo_z - topo_z_array[0]
+    z_change = z_topo - z_topo_array[0]
     # distance from the node to topo angle location (meters)
     topoAngleDistance = azimuthdisdict[a][arryindex]
     searchDistance_m = azimuthdisdict[a].max()
     topoAngle_x = (topoAngleDistance * con_from_m * sin(radians(a))) + coordList[0][0]
     topoAngle_y = (topoAngleDistance * con_from_m * cos(radians(a))) + coordList[0][1]
-    off_rastersamples = (topo_z_array < -9998).sum()
+    off_rastersamples = (z_topo_array < -9998).sum()
     
     topo_data_list = [topoAngle_x, topoAngle_y, topoAngle_x, topoAngle_y, 
-                    streamID, nodeID, a, topoAngle, topo_z, topo_z_array[0], 
+                    streamID, nodeID, a, topoAngle, z_topo, z_topo_array[0], 
                     z_change, topoAngleDistance, searchDistance_m, off_rastersamples]
     return topo_data_list
 
@@ -420,7 +421,7 @@ try:
     else:
         env.overwriteOutput = False    
     
-    # Check if the output exists and delete or throw an error
+    # Check if the topo output exists and delete or throw an error
     if arcpy.Exists(topo_fc):
         if overwrite_data is True:
             arcpy.Delete_management(topo_fc)
@@ -481,46 +482,36 @@ try:
     # Read the feature class data into a nested dictionary
     nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
     
-    #topoList = []
+    topoList = []
     n = 1
     for streamID in nodeDict:
         
-        topoList = []
         nodes = nodeDict[streamID].keys()
         nodes.sort()
-        i = 1
-        for nodeID in nodes:
+
+        for i, nodeID in enumerate(nodes):
             print("Processing stream {0} of {1}. {2:.0%} complete".format(n, len(nodeDict), i / len(nodes)))
             origin_x = nodeDict[streamID][nodeID]["POINT_X"]
             origin_y = nodeDict[streamID][nodeID]["POINT_Y"]
             for a in azimuths:
                 coordList = create_coord_list(origin_x, origin_y, a, azimuthdisdict, con_from_m)
                 topo_data_list = get_topo_angles(coordList, z_raster, a, azimuthdisdict, con_z_to_m)
-                topoList.append(topo_data_list) 
-            i = i + 1
-            
-        for row in topoList:  #
-            k = azimuthdict[row[6]]  #
-            nodeDict[row[4]][row[5]][k] = row[7]  #          
-        
-        update_nodes_fc(nodeDict, nodes_fc, addFields)  #    
-        update_topo_fc(topoList, topo_fc, nodes_fc, proj)  #
-        n = n + 1       
+                topoList.append(topo_data_list)   
     
     # Update the nodeDict
-    #for row in topoList:
-        #k = azimuthdict[row[6]]
-        #nodeDict[row[4]][row[5]][k] = row[7]    
+    for row in topoList:
+        k = azimuthdict[row[6]]
+        nodeDict[row[4]][row[5]][k] = row[7]    
     
-    #update_nodes_fc(nodeDict, nodes_fc, addFields)
-    #create_topo_fc(topoList, topo_fc, nodes_fc, proj)
+    update_nodes_fc(nodeDict, nodes_fc, addFields)
+    create_topo_fc(topoList, topo_fc, nodes_fc, proj)
     
     gc.collect()
 
     endTime = time.time()
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
     mspernode = timedelta(seconds=(endTime - startTime) / len(topoList) / len(azimuths)).microseconds
-    print("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
+    print("Process Complete in {0} minutes. {1} microseconds per node".format(elapsedmin, mspernode))
     #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
 
 # For arctool errors
