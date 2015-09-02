@@ -226,7 +226,7 @@ try:
 
     endTime = time.time()
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
-    mspernode = timedelta(seconds=(endTime - startTime) / n).microseconds
+    mspernode = timedelta(seconds=(endTime - startTime) / (n+1)).microseconds
     print("Process Complete in {0} minutes. {1} microseconds per node".format(elapsedmin, mspernode))
     #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
 

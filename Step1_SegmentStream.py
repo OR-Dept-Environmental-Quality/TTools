@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 1: Create Stream Nodes  version 0.952
+# Step 1: Create Stream Nodes  version 0.953
 # Ryan Michie
 
 # This script will take an input polyline feature with unique 
@@ -57,7 +57,7 @@ env.overwriteOutput = True
 
 # ----------------------------------------------------------------------
 # Start Fill in Data
-streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams_two"
+streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
 sid_field = "NAME"
 node_dx = 50
 checkDirection = True
@@ -316,7 +316,7 @@ try:
     endTime = time.time()
     elapsedmin = ceil(((endTime - startTime) / 60)* 10)/10
     mspernode = timedelta(seconds=(endTime - startTime) / len(nodeList)).microseconds
-    print("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
+    print("Process Complete in {0} minutes. {1} microseconds per node".format(elapsedmin, mspernode))
     #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))	
 
 # For arctool errors
