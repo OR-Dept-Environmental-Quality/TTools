@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 5: Sample Landcover - Star Pattern, Point Method v 0.9964
+# Step 5: Sample Landcover - Star Pattern, Point Method v 0.997
 # Ryan Michie
 
 # Sample_Landcover_PointMethod will take an input point 
@@ -126,7 +126,7 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     proj = arcpy.Describe(nodes_fc).spatialReference
 
     with arcpy.da.SearchCursor(nodes_fc, incursorFields,"",proj) as Inrows:
-        if overwrite_data is True:
+        if overwrite_data:
             for row in Inrows:
                 nodeDict[row[0]]["STREAM_ID"] = row[1] 
                 nodeDict[row[0]]["STREAM_KM"] = row[2] 
@@ -147,12 +147,12 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
               
     return nodeDict
 
-def create_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc, proj):
+def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc, nodes_in_block, overwrite_data, proj):
     """Creates/updates the output landcover sample point feature
     class using the data from the landcover point list"""
     #print("Exporting data to land cover sample feature class")
     
-    cursorfields = ["POINT_X","POINT_Y"] +["STREAM_ID","NODE_ID",
+    cursorfields = ["POINT_X","POINT_Y"] +["STREAM_ID","NODE_ID", "SAMPLE_ID", 
                                            "TRANS_AZIMUTH","TRANSECT",
                                            "SAMPLE", "LC_KEY"] + type    
     
@@ -176,13 +176,23 @@ def create_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc, proj):
                                           sid_precision, sid_scale, sid_length,
                                           "", "NULLABLE", "NON_REQUIRED")
                 
-            elif f == "LC_KEY":
+            elif f in ["LC_KEY","SAMPLE_ID"]:
                 arcpy.AddField_management(lc_point_fc, f, "TEXT", "", "", "",
                                           "", "NULLABLE", "NON_REQUIRED")                
                 
             else:
                 arcpy.AddField_management(lc_point_fc, f, "DOUBLE", "", "", "",
                                           "", "NULLABLE", "NON_REQUIRED")
+    
+    if not overwrite_data:
+        # Build a query to retreive existing rows from the nodes 
+        # that need updating
+        whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_in_block))        
+        
+        # delete those rows
+        with arcpy.da.UpdateCursor(lc_point_fc,["NODE_ID"], whereclause) as cursor:  
+            for row in cursor:
+                cursor.deleteRow()     
 
     with arcpy.da.InsertCursor(lc_point_fc, ["SHAPE@X","SHAPE@Y"] +
                                cursorfields) as cursor:
@@ -207,7 +217,7 @@ def setup_LC_data_headers(transsample_count, trans_count,
     lcdataheaders =[]
     # a flag indicating the model should use the heat source 8 methods 
     # (same as 8 directions but no north)
-    if heatsource8 is True:
+    if heatsource8:
         dirs = ["T{0}".format(x) for x in range(1, 8)]
     else:        
         dirs = ["T{0}".format(x) for x in range(1, trans_count + 1)]
@@ -218,7 +228,7 @@ def setup_LC_data_headers(transsample_count, trans_count,
     for t in type:
         for d, dir in enumerate(dirs):
             for z, zone in enumerate(zones):
-                if stream_sample is True and t !="ELE" and d==0 and z==0:
+                if stream_sample and t !="ELE" and d==0 and z==0:
                     #lcdataheaders.append(t+"_EMERGENT") # add emergent
                     lcdataheaders.append(t+"_T0_S0") # add emergent
                     lcdataheaders.append("{0}_{1}_S{2}".format(t, dir, zone))
@@ -245,10 +255,12 @@ def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_dist
         origin_x = nodeDict[nodeID]["POINT_X"]
         origin_y = nodeDict[nodeID]["POINT_Y"]
         streamID = nodeDict[nodeID]["STREAM_ID"]
+        sampleID = '{0}{1}{2}'.format(nodeID, '000', '00')
 
         # This is the emergent/stream sample
         lc_point_list.append([origin_x, origin_y, origin_x, origin_y,
-                              streamID, nodeID, 0, 0, 0, "LC_T0_S0"])
+                              streamID, nodeID, sampleID,
+                              0, 0, 0, "LC_T0_S0"])
     
         for d, dir in enumerate(dirs):
             for z in zones:
@@ -260,10 +272,14 @@ def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_dist
                         cos(radians(dir))) + origin_y
                 
                 lc_key = 'LC_T{0}_S{1}'.format(d+1, z)
+                tran_num = '{:{}{}}'.format(d+1, 0, 3)
+                samp_num = '{:{}{}}'.format(z, 0, 2)
+                sampleID = '{0}{1}{2}'.format(nodeID, tran_num, samp_num)
         
                 # Add to the list          
                 lc_point_list.append([pt_x, pt_y, pt_x, pt_y,
-                                      streamID, nodeID, dir, d+1, z, lc_key])    
+                                      streamID, nodeID, sampleID,
+                                      dir, d+1, z, lc_key])    
      
     return lc_point_list
 
@@ -403,7 +419,7 @@ def sample_raster(block, lc_point_list, raster, con):
     else:
         # No data, add -9999
         for point in lc_point_list:
-            point.append(raster_array[-9999])
+            point.append(-9999)
             lc_point_list_new.append(point)
     return lc_point_list_new            
 
@@ -412,16 +428,13 @@ def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
     #print("Updating input point feature class")
     
     # Build a query to retreive just the nodes that needs updating
-    if len(nodes_to_query) == 1:
-        whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), nodes_to_query[0])
-    else:
-        whereclause = """%s IN %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), tuple(nodes_to_query))
+    whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_to_query))
 
     with arcpy.da.UpdateCursor(nodes_fc,["NODE_ID"] + addFields, whereclause) as cursor:  
         for row in cursor:
-            for f in xrange(0,len(addFields)):
+            for f, field in enumerate(addFields):
                 nodeID =row[0]
-                row[f+1] = nodeDict[nodeID][addFields[f]]
+                row[f+1] = nodeDict[nodeID][field]
                 cursor.updateRow(row)
 
 def from_meters_con(inFeature):
@@ -470,19 +483,10 @@ try:
         sys.exit("This output does not exist: \n" +
                  "{0}\n".format(nodes_fc))
     
-    # Check if the lc point fc exists and delete or throw an error
-    if arcpy.Exists(lc_point_fc):
-        if overwrite_data is True:
-            arcpy.Delete_management(lc_point_fc)
-        else:
-            arcpy.AddMessage("\nThis output already exists: \n" +
-                           "{0}\n".format(lc_point_fc) + 
-                           "overwrite data = False. New data will be " +
-                           "appended to the existing feature class.")
-            print("This output already exists: \n" +
-                           "{0}\n".format(lc_point_fc) + 
-                           "overwrite data = False. New data will be " +
-                           "appended to the existing feature class.")    
+    # Check if the lc point fc exists and delete if needed
+    if arcpy.Exists(lc_point_fc) and overwrite_data:
+        arcpy.Delete_management(lc_point_fc)
+    
     
     # Determine input spatial units and set unit conversion factors
     proj = arcpy.Describe(nodes_fc).SpatialReference
@@ -537,7 +541,7 @@ try:
     stream_sample = True
     # flag indicating the model should use the heat source 8 methods 
     # (same as 8 directions but no north)
-    if heatsource8 is True:
+    if heatsource8:
         dirs = [45,90,135,180,225,270,315]
     else:        
         dirs = [x * 360.0 / trans_count for x in range(1,trans_count+ 1)]
@@ -606,14 +610,15 @@ try:
         # Update the node fc
         for row in lc_point_list:
             for t, item, in enumerate(type):
-                lc_key = '{0}_T{1}_S{2}'.format(item, row[7], row[8])
-                nodeDict[row[5]][lc_key] = row[10 + t]
+                lc_key = '{0}_T{1}_S{2}'.format(item, row[8], row[9])
+                nodeDict[row[5]][lc_key] = row[11 + t]
         
         # Write the landcover data to the TTools point feature class 
         update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_in_block)
         
         # Build the output point feature class using the data         
-        create_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc, proj)
+        update_lc_point_fc(lc_point_list, type, lc_point_fc,
+                           nodes_fc, nodes_in_block, overwrite_data, proj)
     
         total_samples = total_samples + len(lc_point_list)
         del lc_point_list
