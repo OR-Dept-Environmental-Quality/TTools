@@ -13,6 +13,8 @@
 # 0: Stream centerline polyline (streamline_fc)
 # 1: Unique StreamID field (sid_field)
 # 2: Spacing between nodes in meters (node_dx)
+# 3: Outputs a continous stream km regardless of 
+#    unique the values in the stream ID field (cont_stream_km)
 # 3: OPTIONAL True/False flag to check if the stream was digitized in 
 #    correct direction (checkDirection)
 # 4: OPTIONAL Elevation Raster used in the check stream 
@@ -57,9 +59,10 @@ env.overwriteOutput = True
 
 # ----------------------------------------------------------------------
 # Start Fill in Data
-streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
+streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams_major"
 sid_field = "NAME"
 node_dx = 50
+cont_stream_km = True
 checkDirection = True
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
@@ -158,13 +161,15 @@ def create_node_list(streamline_fc, checkDirection, z_raster):
                 
                 # list of "NODE_ID","STREAM_ID". "STREAM_KM", "LENGTH", 
                 # "POINT_X","POINT_Y", "STREAM_AZMTH", "SHAPE@X", "SHAPE@Y"
-                nodeList.append((nodeID, row[2], 
+                nodeList.append([nodeID, row[2], 
                                  float(position * lineLength * con_to_m /1000),
                                  segment_length[i],
-                                 node.X, node.Y, stream_azimuth, node.X, node.Y))
+                                 node.X, node.Y, stream_azimuth, node.X, node.Y])
                 nodeID = nodeID + 1
                 i = i + 1
+        
         arcpy.SetProgressorPosition()
+            
     arcpy.ResetProgressor()
     return(nodeList)
 
@@ -304,11 +309,24 @@ try:
     
     # Create the stream nodes and return them as a list
     nodeList = create_node_list(streamline_fc, checkDirection, z_raster)
-
-    #sort the list by stream ID and then stream km
-    nodeList = sorted(nodeList, key=itemgetter(1,2), reverse=True)
     
-# Create the output node feature class with the nodes list
+    if cont_stream_km:
+        #sort the list by stream ID and stream km
+        nodeList = sorted(nodeList, key=itemgetter(1, 2))
+        
+        skm = 0.0
+        for i in range(0, len(nodeList)):
+            nodeList[i][2] = skm
+            skm = skm + (node_dx * 0.001)            
+    
+        # re sort the list by stream km (with downstream end at the top)
+        nodeList = sorted(nodeList, key=itemgetter(2), reverse=True)
+    
+    else:
+        #sort the list by stream ID and then stream km (downstream end at the top)
+        nodeList = sorted(nodeList, key=itemgetter(1,2), reverse=True)    
+    
+    # Create the output node feature class with the nodes list
     create_nodes_fc(nodeList, nodes_fc, sid_field, proj)
 
     gc.collect()
