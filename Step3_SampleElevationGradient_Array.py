@@ -10,7 +10,7 @@
 
 # INPUTS
 # 0: Input TTools point feature class (nodes_fc)
-# 1: input the number of cells to search out around the node 
+# 1: input the number of cells to search around the node 
 #     for the lowest elevation (searchCells)
 # 2: input flag for smoothing if gradient is zero 
 #     or negative (smooth_flag) 1. True, 2. False
@@ -48,7 +48,7 @@ from collections import defaultdict
 # ----------------------------------------------------------------------
 # Start Fill in Data
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
-searchCells = 0
+searchCells = 2
 smooth_flag = True
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 z_units = "Meters"
@@ -190,16 +190,13 @@ def update_nodes_fc1(nodeDict, nodes_fc, addFields, nodes_to_query):
     #print("Updating input point feature class")
     
     # Build a query to retreive just the nodes that needs updating
-    if len(nodes_to_query) == 1:
-        whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), nodes_to_query[0])
-    else:
-        whereclause = """%s IN %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), tuple(nodes_to_query))
+    whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_to_query))
 
-    with arcpy.da.UpdateCursor(nodes_fc,["NODE_ID"] + addFields, whereclause) as cursor:  
+    with arcpy.da.UpdateCursor(nodes_fc,["NODE_ID"] + addFields, whereclause) as cursor:
         for row in cursor:
-            for f in xrange(0,len(addFields)):
+            for f, field in enumerate(addFields):
                 nodeID =row[0]
-                row[f+1] = nodeDict[nodeID][addFields[f]]
+                row[f+1] = nodeDict[nodeID][field]
                 cursor.updateRow(row)
 
 def update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query):
@@ -208,17 +205,14 @@ def update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query):
     print("Updating input point feature class")
 
     # Build a query to retreive just the nodes that needs updating
-    if len(nodes_to_query) == 1:
-        whereclause = """%s = %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), nodes_to_query[0])
-    else:
-        whereclause = """%s IN %s""" % (arcpy.AddFieldDelimiters(nodes_fc, "NODE_ID"), tuple(nodes_to_query)) 
+    whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_to_query))
 
     with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID","STREAM_KM"] + addFields, whereclause) as cursor:  
         for row in cursor:
-            for f in xrange(0,len(addFields)):
+            for f, field in enumerate(addFields):
                 streamID = row[0]
                 stream_km =row[2]
-                row[f+3] = nodeDict[streamID][stream_km][addFields[f]]
+                row[f+3] = nodeDict[streamID][stream_km][field]
                 cursor.updateRow(row)
 
 def create_block_list(nodeDict, nodes, buffer, block_size):
@@ -360,9 +354,8 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
                 cell_y = xy[1] + coord[1]
                 z_sampleList.append(raster_array[cell_y,cell_x])
                 
-                # sample at node:
-                if coord[0] == 0 and coord[1] == 0:
-                    z_node = raster_array[cell_y,cell_x]
+            # sample at node:
+            z_node = raster_array[xy[1], xy[0]]
                 
             # Remove no data values (-9999) unless they are all no data
             if not max(z_sampleList) < -9998:
