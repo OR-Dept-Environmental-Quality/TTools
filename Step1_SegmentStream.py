@@ -13,7 +13,7 @@
 # 0: Stream centerline polyline (streamline_fc)
 # 1: Unique StreamID field (sid_field)
 # 2: Spacing between nodes in meters (node_dx)
-# 3: Outputs a continous stream km regardless of 
+# 3: Outputs a continuous stream km regardless of 
 #    unique the values in the stream ID field (cont_stream_km)
 # 3: OPTIONAL True/False flag to check if the stream was digitized in 
 #    correct direction (checkDirection)
