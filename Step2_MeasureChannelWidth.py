@@ -149,10 +149,10 @@ def update_nodes_fc(nodeDict, nodes_fc, addFields):
     with arcpy.da.UpdateCursor(nodes_fc,["STREAM_ID","NODE_ID"] +
                                addFields) as cursor:
         for row in cursor:
-            for f in xrange(0,len(addFields)):
+            for f, field in enumerate(addFields):
                 streamID = row[0]
                 nodeID =row[1]
-                row[f+2] = nodeDict[streamID][nodeID][addFields[f]]
+                row[f+2] = nodeDict[streamID][nodeID][field]
                 cursor.updateRow(row)
     
 
