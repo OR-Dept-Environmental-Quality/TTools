@@ -1,21 +1,29 @@
-########################################################################
 # TTools for ArcGIS 10.1 and 10.2
 # python toolbox - v 9.0.0 beta 1
 # Ryan Michie
 
-# This is the master TTools code for the python toolbox used in ArcGIS 10.1 and 10.2. The code for each 
-# tool class comes from the individual python files.
+# This is the master TTools code for the python toolbox used in ArcGIS 10.1 and 10.2.
 
 # Step 1: Create Stream Nodes  version 0.92
-# Step 2: Measure Channel Widths TBA
-# Step 3: Sample Stream Elevations/ Gradient TBA
+# Step 2: Measure Channel Widths
+# Step 3: Sample Stream Elevations/ Gradient
 # Step 4: Measure Topographic Angles - v 0.92
 # Step 5: Sample Landcover - Star Pattern, Point Method v 0.98
 # Output To csv - v 0.91
 
 # This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
 
-########################################################################
+# TTools.pyt
+#  \--site-packages
+#     \--ttools
+#        |  __init__.py
+#        |  Step1_SegmentStream.py
+#        |  Step2_MeasureChannelWidth.py
+#        |  Step3_SampleElevationGradient_Array.py
+#        |  Step4_MeasureTopographicAngles.py
+#        |  Step5_LandcoverSampler_ZoneMethod.py
+#        |  Output_To_csv.py
+# -----------------------------------------------------------------------
 
 # Import system modules
 import arcpy
@@ -34,39 +42,49 @@ from arcpy.management import *
 
 env.overwriteOutput = True
 
-def parameter(display_name, name, datatype, defaultValue=None,  
-    parameter_type=None, direction=None):
-    '''
-    The parameter implementation makes it a little difficult to 
-    quickly create parameters with defaults. This method
-    prepopulates some of these values to make life easier while
-    also allowing setting a default vallue.
-    '''
-    # create parameter with a few default properties
+import ttools.Step1_SegmentStream.Create_Stream_Nodes as step1
+import ttools.Step2_MeasureChannelWidth.py.MeasureChannelWidth as step2
+import ttools.Step3_SampleElevationGradient_Array.Step3_SampleElevationGradient_Array as step3
+import ttools.Step4_MeasureTopographicAngles.Step4_MeasureTopographicAngles as step4
+import ttools.Step5_Sample_Landcover_PointMethod_Array.Step5_Sample_Landcover_PointMethod_Array as step5
+import ttools.Output_To_csv.Output_To_csv as step5
+
+def parameter(displayName, argName, datatype, defaultValue=None,
+    parameterType="Required", direction="Input"):
+    """
+    This method prepopulates the parameterType
+    and direction parameters and leaves the setting a default value for the
+    newly created parameter as optional. The displayName, name and datatype are
+    the only required inputs.
+    """
+    # create parameter with a few defaults
     param = arcpy.Parameter(
-        display_name = display_name,
-        name = name,
-        datatype = datatype,
-        parameter_type = 'Required',
-        direction = 'Input')
+        displayName=displayName,
+        name=name,
+        datatype=datatype,
+        parameterType=parameterType,
+        direction=direction
+    )
 
     # set new parameter to a default value
     param.value = defaultValue
 
-    # return complete parameter object
-    return param 
-
+    return param
 
 class Toolbox(object):
     def __init__(self):
-        """TTools is a series of ArcGIS arcsripts used to sample geospatial data and assemble high-resolution inputs for the Heat Source model or other water quality analysis."""
-        self.label = "TTools"
-        self.alias = ""       
+        """
+        TTools is a series of ArcGIS arcsripts used to sample geospatial
+        data and assemble high-resolution inputs for the Heat Source
+        model or other water quality analysis.
+        """
+        
+        self.label = 'Toolbox'
+        self.alias = ''       
 
         # List of tool classes associated with this toolbox
-        self.tools = [Step1_Create_Stream_Nodes]
-        #self.tools = [Step1_Create_Stream_Nodes, Step4_Measure_Topographic_Angles, Step5_Sample_Landcover_PointMethod, Output_To_csv]
-
+        self.tools = [step1, step2, step3, step4, step5, step6]
+        
 class Step1_Create_Stream_Nodes(object):
     def __init__(self):
         """This script will take an input polyline feature with unique stream IDs and generate evenly spaced points along each unique stream ID line at a user defined spacing measured from the downstream endpoint"""
@@ -75,44 +93,49 @@ class Step1_Create_Stream_Nodes(object):
         self.canRunInBackground = False
         
         self.parameters = [
-            parameter(display_name, name, datatype)
+            Parameter(argName="streamline_fc",
+                      displayName="Input stream centerline/s",
+                      direction="Input",
+                      datatype="GPFeatureLayer",
+                      parameterType="Required"),
+            
+            Parameter(name="sid_field",
+                      displayName="Stream Identifier Field Name",
+                      direction="Input",
+                      datatype="Field",
+                      parameterType="Required"), 
+            
+            Parameter(name="node_dx",
+                      displayName="Desired distance between nodes (meters)",
+                      direction="Input",
+                      datatype="Double",
+                      parameterType="Required"), 
+            
+            Parameter(name="checkDirection",
+                      displayName="Check if the stream was digitized in correct direction", 
+                      direction="Input", 
+                      datatype="GPBoolean", 
+                      parameterType="Required"), 
+            
+            Parameter(name="z_raster",
+                      displayName="Elevation raster",
+                      direction="Input", 
+                      datatype=None, 
+                      parameterType=None),
+            
+            Parameter(name="nodes_fc",
+                      displayName="Output nodes feature class",
+                      direction="Output", 
+                      datatype="DEFeatureClass",
+                      parameterType="Required")
         ]
         
     def getParameterInfo(self):
         """Define parameter definitions"""
+        
+        self.param[0].filter.list = ["LINE"]
 
-        inLine =arcpy.Parameter(
-            name="inLine",
-            displayName="Input Stream Centerlines/s",
-            direction="Input",
-            datatype="GPFeatureLayer",
-            parameterType="Required")
-        inLine.filter.list = ["LINE"])
-
-        SIDname =arcpy.Parameter(
-            name="SIDname",
-            displayName="Stream Identifier Field Name",
-            direction="Input",
-            datatype="Field",
-            parameterType="Required")      
-
-        node_dx =arcpy.Parameter(
-            name="node_dx",
-            displayName="Desired distance between nodes (meters)",
-            direction="Input",
-            datatype="Double",
-            parameterType="Required")
-
-        outpoint_final =arcpy.Parameter(
-            name="outpoint_final",
-            displayName="Output point features",
-            direction="Output", 
-            datatype="DEFeatureClass",
-            parameterType="Required")
-
-        parameters = [inLine, SIDname, node_dx, outpoint_final]
-
-        return parameters
+        return self.parameters
 
     def updateParameters(self, parameters):
         """Modify the values and properties of parameters before internal
@@ -134,39 +157,7 @@ class Step1_Create_Stream_Nodes(object):
 
     def execute(self, parameters, messages):
         """The source code of the tool."""
-
-        inLine = parameters[0].valueAsText
-        SIDname = parameters[1].valueAsText
-        node_dx = parameters[2].valueAsText
-        outpoint_final = parameters[3].valueAsText
         
-        #enable garbage collection
-        gc.enable()
-
-        #keeping track of time
-        startTime= time.time()   
-    
-        # Create the stream nodes and return them as a list
-        NodeList = CreateNodeList(inLine)
-    
-        #sort the list by stream ID and then stream km
-        NodeList = sorted(NodeList, key=itemgetter(1,2), reverse=True)
-    
-        # Get the spatial projecton of the input stream lines
-        proj = arcpy.Describe(inLine).SpatialReference
-    
-        # Create the output point feature class with the nodes list
-        CreateNodesFC(NodeList, outpoint_final, SIDname, proj)
-    
-        gc.collect()
-    
-        endTime = time.time()
-        elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
-        mspernode = timedelta(seconds=(endTime - startTime) / len(NodeList)).microseconds
-        print("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))
-        #arcpy.AddMessage("Process Complete in %s minutes. %s microseconds per node" % (elapsedmin, mspernode))       
-
-        return        
 
 class Step4_Measure_Topographic_Angles(object):
     def __init__(self):
