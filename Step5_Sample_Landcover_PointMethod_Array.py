@@ -147,7 +147,8 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
               
     return nodeDict
 
-def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc, nodes_in_block, overwrite_data, proj):
+def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc,
+                       nodes_in_block, overwrite_data, proj):
     """Creates/updates the output landcover sample point feature
     class using the data from the landcover point list"""
     #print("Exporting data to land cover sample feature class")
@@ -204,7 +205,7 @@ def setup_LC_data_headers(transsample_count, trans_count,
     """Generates a list of the landcover data file
     column header names and data types"""
     
-    type = ["LC","ELE"]
+    type = ["ELE"]
      
     #Use LAI methods   
     if canopy_data_type == "LAI":
@@ -214,7 +215,8 @@ def setup_LC_data_headers(transsample_count, trans_count,
     if canopy_data_type == "CanopyCover":  
         type = type + ["CAN","OH"]
     
-    lcdataheaders =[]
+    lcheaders = []
+    otherheaders = []
     # a flag indicating the model should use the heat source 8 methods 
     # (same as 8 directions but no north)
     if heatsource8:
@@ -225,17 +227,27 @@ def setup_LC_data_headers(transsample_count, trans_count,
     zones = range(1,int(transsample_count)+1)
     
     # Concatenate the type, dir, and zone and order in the correct way
+    
+    for d, dir in enumerate(dirs):
+        for z, zone in enumerate(zones):
+            if stream_sample and d==0 and z==0:
+                lcheaders.append("LC_T0_S0") # add emergent
+                lcheaders.append("LC_{0}_S{1}".format(dir, zone))
+            else:
+                lcheaders.append("LC_{0}_S{1}".format(dir, zone))
+    
     for t in type:
         for d, dir in enumerate(dirs):
             for z, zone in enumerate(zones):
                 if stream_sample and t !="ELE" and d==0 and z==0:
-                    #lcdataheaders.append(t+"_EMERGENT") # add emergent
-                    lcdataheaders.append(t+"_T0_S0") # add emergent
-                    lcdataheaders.append("{0}_{1}_S{2}".format(t, dir, zone))
+                    otherheaders.append(t+"_T0_S0") # add emergent
+                    otherheaders.append("{0}_{1}_S{2}".format(t, dir, zone))
                 else:
-                    lcdataheaders.append("{0}_{1}_S{2}".format(t, dir, zone))
+                    otherheaders.append("{0}_{1}_S{2}".format(t, dir, zone))    
+                    
+    type = ["LC"] + type
     
-    return lcdataheaders, type
+    return lcheaders, otherheaders, type
 
 def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
     """converts x/y coordinates to col and row of the array"""
@@ -424,7 +436,8 @@ def sample_raster(block, lc_point_list, raster, con):
     return lc_point_list_new            
 
 def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
-    """Updates the input point feature class with data from the nodes dictionary"""
+    """Updates the input point feature class with data from the
+    nodes dictionary"""
     #print("Updating input point feature class")
     
     # Build a query to retreive just the nodes that needs updating
@@ -558,16 +571,24 @@ try:
     #else:
         #zone = range(1,int(transsample_count+1))
 
-    addFields, type = setup_LC_data_headers(transsample_count, trans_count,
+    lcheaders, otherheaders, type = setup_LC_data_headers(transsample_count, trans_count,
                                             canopy_data_type, stream_sample,
                                             heatsource8)
+    
+    addFields = lcheaders + otherheaders
     # Get a list of existing fields
     existingFields = []
     for f in arcpy.ListFields(nodes_fc):
-        existingFields.append(f.name)     
+        existingFields.append(f.name)
+        
+    # Check to see if the field exists and add it if not
+    for f in lcheaders:
+        if (f in existingFields) is False:
+            arcpy.AddField_management(nodes_fc, f, "TEXT", "", "", "",
+                                      "", "NULLABLE", "NON_REQUIRED")    
 
     # Check to see if the field exists and add it if not
-    for f in addFields:
+    for f in otherheaders:
         if (f in existingFields) is False:
             arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "",
                                       "", "NULLABLE", "NON_REQUIRED")    

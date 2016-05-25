@@ -1,6 +1,6 @@
 ########################################################################
 # TTools
-# Step 3: Sample Stream Elevations/ Gradient - v 0.961
+# Step 3: Sample Stream Elevations/ Gradient - v 0.97
 # Ryan Michie
 
 # Sample_ElevationsGradient will take an input point feature 
@@ -99,20 +99,22 @@ def read_nodes_fc1(nodes_fc, overwrite_data, addFields):
     with arcpy.da.SearchCursor(nodes_fc, incursorFields,"",proj) as Inrows:
         if overwrite_data is True:
             for row in Inrows:
-                nodeDict[row[0]]["POINT_X"] = row[1]
-                nodeDict[row[0]]["POINT_Y"] = row[2]
+                nodeID =row[0]
+                nodeDict[nodeID]["POINT_X"] = row[1]
+                nodeDict[nodeID]["POINT_Y"] = row[2]
         else:
             for row in Inrows:
                 # Is the data null or zero, if yes grab it.
                 if row[3] is None or row[3] == 0 or row[3] < -9998:
-                    nodeDict[row[0]]["POINT_X"] = row[1]
-                    nodeDict[row[0]]["POINT_Y"] = row[2]
+                    nodeID =row[0]
+                    nodeDict[nodeID]["POINT_X"] = row[1]
+                    nodeDict[nodeID]["POINT_Y"] = row[2]
               
     return nodeDict
 
 def read_nodes_fc2(nodes_fc, overwrite_data, addFields):
     """Reads the input point file, adds new fields, and returns the
-    STREAM_ID, NODE_ID, STREAM_KM, LENGTH, ELEVATION, and X/Y coordinates
+    STREAM_ID, STREAM_KM, NODE_ID, LENGTH, ELEVATION, and X/Y coordinates
     as a nested dictionary"""
     
     nodeDict = nested_dict()
@@ -141,21 +143,25 @@ def read_nodes_fc2(nodes_fc, overwrite_data, addFields):
     with arcpy.da.SearchCursor(nodes_fc,incursorFields,"",proj) as Inrows:
         if overwrite_data is True:
             for row in Inrows:
-                nodeDict[row[0]][row[1]]["NODE_ID"] = row[2]
-                nodeDict[row[0]][row[1]]["LENGTH"] = row[3]
-                nodeDict[row[0]][row[1]]["ELEVATION"] = row[4]
-                nodeDict[row[0]][row[1]]["POINT_X"] = row[5]
-                nodeDict[row[0]][row[1]]["POINT_Y"] = row[6]
+                streamID = row[0]
+                stream_km = row[1]
+                nodeDict[streamID][stream_km]["NODE_ID"] = row[2]
+                nodeDict[streamID][stream_km]["LENGTH"] = row[3]
+                nodeDict[streamID][stream_km]["ELEVATION"] = row[4]
+                nodeDict[streamID][stream_km]["POINT_X"] = row[5]
+                nodeDict[streamID][stream_km]["POINT_Y"] = row[6]
         else:
             for row in Inrows:
                 # if the data is null or zero (0 = default for shapefile),
                 # it is retreived and will be overwritten.
                 if row[7] is None or row[7] < -9998:
-                    nodeDict[row[0]][row[1]]["STREAM_KM"] = row[2] 
-                    nodeDict[row[0]][row[1]]["LENGTH"] = row[3]
-                    nodeDict[row[0]][row[1]]["ELEVATION"] = row[4]
-                    nodeDict[row[0]][row[1]]["POINT_X"] = row[5]
-                    nodeDict[row[0]][row[1]]["POINT_Y"] = row[6]
+                    streamID = row[0]
+                    stream_km = row[1]                    
+                    nodeDict[streamID][stream_km]["NODE_ID"] = row[2] 
+                    nodeDict[streamID][stream_km]["LENGTH"] = row[3]
+                    nodeDict[streamID][stream_km]["ELEVATION"] = row[4]
+                    nodeDict[streamID][stream_km]["POINT_X"] = row[5]
+                    nodeDict[streamID][stream_km]["POINT_Y"] = row[6]
     if len(nodeDict) == 0:
         sys.exit("The gradient field checked in the input point feature class "+
                  "have existing data. There is nothing to process. Exiting")    
@@ -186,7 +192,8 @@ def calculate_gradient(zList, len_list, smooth_flag):
     return (gradientList)
 
 def update_nodes_fc1(nodeDict, nodes_fc, addFields, nodes_to_query):
-    """Updates the input point feature class with data from the nodes dictionary"""
+    """Updates the input point feature class with data from
+    the nodes dictionary with node_id as the primary key"""
     #print("Updating input point feature class")
     
     # Build a query to retreive just the nodes that needs updating
@@ -201,7 +208,7 @@ def update_nodes_fc1(nodeDict, nodes_fc, addFields, nodes_to_query):
 
 def update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query):
     """Updates the input point feature class with data from
-    the nodes dictionary"""
+    the nodes dictionary with stream IDs as the primary key"""
     print("Updating input point feature class")
 
     # Build a query to retreive just the nodes that needs updating
@@ -218,7 +225,8 @@ def update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query):
 def create_block_list(nodeDict, nodes, buffer, block_size):
     """Returns two lists, one containting the coordinate extent
     for each block that will be itterativly extracted to an array
-    and the other containing the stream and node IDs within each block extent."""
+    and the other containing the stream and node IDs within each
+    block extent."""
     
     print("Calculating block extents")    
     x_coord_list = [nodeDict[nodeID]["POINT_X"] for nodeID in nodes]

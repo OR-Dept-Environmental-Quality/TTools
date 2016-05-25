@@ -73,9 +73,10 @@ nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 #streamline_fc = parameters[0].valueAsText
 #sid_field = parameters[1].valueAsText
 #node_dx = parameters[2].valueAsText
-#checkDirection = parameters[3].valueAsText
-#z_raster = = parameters[4].valueAsText
-#nodes_fc = parameters[5].valueAsText
+#cont_stream_km = parameters[3].valueAsText
+#checkDirection = parameters[4].valueAsText
+#z_raster = = parameters[5].valueAsText
+#nodes_fc = parameters[6].valueAsText
 
 #streamline_fc = arcpy.GetParameterAsText(0)
 #sid_field = arcpy.GetParameterAsText(1)
