@@ -2,8 +2,7 @@
 # TTools
 # Step 5: Sample Landcover - Star Pattern, Zone Method v 0.97 
 #
-#
-# WARNING: DO NOT USE THIS SCRIPT. Still under development.
+# WARNING: This script is still under development.
 #
 # This script will take a point input (from Step 1) and generate a series of pie shapped
 # polygon zones extending outward from the point. The number of polygon zones and the 
@@ -25,11 +24,18 @@
 # 6: output table file name/path (outtable_final)
 
 # Import system modules
-from __future__ import division, print_function
-import sys, os, string, gc, shutil, time
+from __future__ import division
+from __future__ import print_function
+import sys
+import os
+import gc
+import time
+import traceback
+from datetime import timedelta
+from math import radians, sin, cos
+from collections import defaultdict
 import arcpy
 from arcpy import env
-from math import radians, sin, cos
 
 # Check out the ArcGIS Spatial Analyst extension license
 arcpy.CheckOutExtension("Spatial")
@@ -42,11 +48,12 @@ gc.enable()
 
 # ----------------------------------------------------------------------
 # Start Fill in Data
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes_major"
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 trans_count = 8 
 transsample_count = 5 # does not include a sample at the stream node
 transsample_distance = 8
 heatsource8 = False
+sampleID_for_code = True  # Use the sampleID instead of height for hte landcover
 lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
 lc_units = "Meters"
 canopy_data_type = "#" # OPTIONAL This is either 1. "CanopyCover", or 2."LAI"
@@ -55,11 +62,12 @@ k_raster = "#" # OPTIONAL This is the k value for LAI
 oh_raster = "#" # OPTIONAL This is the overhang raster
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 z_units = "Meters"
-zones_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint_major"
+zones_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_zones_two"
 overwrite_data = True
 # End Fill in Data
 # ----------------------------------------------------------------------
 
+env.workspace = os.path.dirname(nodes_fc)
 
 def nested_dict(): 
     """Build a nested dictionary"""
@@ -72,9 +80,7 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     incursorFields = ["NODE_ID", "STREAM_ID", "STREAM_KM", "SHAPE@X","SHAPE@Y"]
 
     # Get a list of existing fields
-    existingFields = []
-    for f in arcpy.ListFields(nodes_fc):
-        existingFields.append(f.name)
+    existingFields = [f.name for f in arcpy.ListFields(nodes_fc)] 
 
     # Check to see if the last field exists if yes add it. 
     # Grabs last field becuase often the first field, emergent, is zero
@@ -89,18 +95,22 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     with arcpy.da.SearchCursor(nodes_fc, incursorFields,"",proj) as Inrows:
         if overwrite_data:
             for row in Inrows:
-                nodeDict[row[0]]["STREAM_ID"] = row[1] 
-                nodeDict[row[0]]["STREAM_KM"] = row[2] 
-                nodeDict[row[0]]["POINT_X"] = row[3]
-                nodeDict[row[0]]["POINT_Y"] = row[4]
+                # NodeID should always be int.
+                nodeID = int(row[0])
+                nodeDict[nodeID]["STREAM_ID"] = row[1] 
+                nodeDict[nodeID]["STREAM_KM"] = row[2] 
+                nodeDict[nodeID]["POINT_X"] = row[3]
+                nodeDict[nodeID]["POINT_Y"] = row[4]
         else:
             for row in Inrows:
                 # Is the data null or zero, if yes grab it.
                 if row[5] is None or row[5] == 0 or row[5] < -9998:
-                    nodeDict[row[0]]["STREAM_ID"] = row[1] 
-                    nodeDict[row[0]]["STREAM_KM"] = row[2] 
-                    nodeDict[row[0]]["POINT_X"] = row[3]
-                    nodeDict[row[0]]["POINT_Y"] = row[4]
+                    # NodeID should always be int.
+                    nodeID = int(row[0])                    
+                    nodeDict[nodeID]["STREAM_ID"] = row[1] 
+                    nodeDict[nodeID]["STREAM_KM"] = row[2] 
+                    nodeDict[nodeID]["POINT_X"] = row[3]
+                    nodeDict[nodeID]["POINT_Y"] = row[4]
     
     if len(nodeDict) == 0:
         sys.exit("The fields checked in the input point feature class " +
@@ -109,28 +119,26 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     return nodeDict
 
 
-def sample_raster(zone_list, raster, con):
-                
-    zone_list_new = []
+def sample_raster(zones_fc, node, raster, con):
+                            
+    out_table = "temp_zonal_stats"
     
-    if con is None:
-        con = 1
+    arcpy.MakeFeatureLayer_management(in_features=zones_fc,
+                                      out_layer="temp_zone_lyr",
+                                      where_clause="""NODE_ID = {0}""".format(node))    
     
-    for row in zone_list:
-        arcpy.sa.ZonalStatisticsAsTable(row[0], "SAMPLE_ID", raster, out_table, "DATA", "MEAN")
-        
-        with arcpy.da.SearchCursor(out_table, ["MEAN"]) as cursor:
-            for row in cursor:            
-                zone_list_new.append(row[0] * con)
+
+    arcpy.sa.ZonalStatisticsAsTable("temp_zone_lyr", "SAMPLE_ID", raster, out_table, "DATA", "MEAN_STD")
+    
+    with arcpy.da.SearchCursor(out_table, ["SAMPLE_ID", "MEAN", "STD"]) as cursor:
+        data = [row for row in cursor]
                 
     arcpy.Delete_management(out_table)
                 
-    return zone_list_new  
-
-
+    return data  
 
 def setup_LC_data_headers(transsample_count, trans_count,
-                          canopy_data_type, stream_sample, heatsource8):
+                          canopy_data_type, stream_sample):
     """Generates a list of the landcover data file
     column header names and data types"""
 
@@ -146,12 +154,8 @@ def setup_LC_data_headers(transsample_count, trans_count,
 
     lcheaders = []
     otherheaders = []
-    # a flag indicating the model should use the heat source 8 methods 
-    # (same as 8 directions but no north)
-    if heatsource8:
-        dirs = ["T{0}".format(x) for x in range(1, 8)]
-    else:        
-        dirs = ["T{0}".format(x) for x in range(1, trans_count + 1)]
+    
+    dirs = ["T{0}".format(x) for x in range(1, trans_count + 1)]
 
     zones = range(1,int(transsample_count)+1)
 
@@ -174,153 +178,221 @@ def setup_LC_data_headers(transsample_count, trans_count,
                 else:
                     otherheaders.append("{0}_{1}_S{2}".format(t, dir, zone))    
 
-    type = ["LC"] + type
+    #type = ["LC"] + type
 
-    return lcheaders, otherheaders, type
+    return lcheaders, otherheaders
 
-def update_zones_fc(zone_list, type, zones_fc, nodes_fc,
-                       nodes, overwrite_data, proj):
+def update_zones_fc(zonesDict, type, zones_fc):
+    """Updates the zone feature class with data from the dictionary"""
     
-    """Creates/updates the output zones feature
-    class using the data from the zone list"""
+    # Build a query to retreive just the samples that needs updating
+    whereclause = """{0} IN ({1})""".format("SAMPLE_ID", ','.join(str(i) for i in zonesDict.keys()))
 
-    cursorfields = ["STREAM_ID","NODE_ID", "SAMPLE_ID", 
-                    "TRANS_AZIMUTH","TRANSECT", "SAMPLE", "LC_KEY"] + type    
+    with arcpy.da.UpdateCursor(zones_fc,["SAMPLE_ID"] + type, whereclause) as cursor:  
+        for row in cursor:
+            for f, field in enumerate(type):
+                sampleID = row[0]
+                row[f+1] = zonesDict[sampleID][f]
+                cursor.updateRow(row)
 
+def from_meters_con(inFeature):
+    """Returns the conversion factor to get from meters to the
+    spatial units of the input feature class"""
+    try:
+        con_from_m = 1 / arcpy.Describe(inFeature).SpatialReference.metersPerUnit
+    except:
+        arcpy.AddError("{0} has a coordinate system that".format(inFeature)+
+        "is not projected or not recognized. Use a projected"+
+        "coordinate system preferably"+
+        "in linear units of feet or meters.")
+        sys.exit("Coordinate system is not projected or not recognized. "+
+                 "Use a projected coordinate system, preferably in linear "+
+                 "units of feet or meters.")   
+    return con_from_m
+
+def from_z_units_to_meters_con(zUnits):
+    """Returns the converstion factor to get from
+    the input z units to meters"""
+        
+    try:
+        con_z_to_m = float(zunits)
+    except:
+        if zUnits == "Meters":
+            con_z_to_m = 1.0 
+        elif zUnits == "Feet":
+            con_z_to_m = 0.3048
+        else: con_z_to_m = None # The conversion factor will not be used
+    
+    return con_z_to_m
+
+def make_zones_fc(nodeDict, zones_fc, nodes, dirs, zones, type,
+                  transsample_distance, heatsource8, proj):
+    """This builds the zones feature class and returns a dictionary of
+    of the samples IDs as the key and a list of the node ID and LC key
+    for the values"""
+    
+    print("Making zones fc. May take awhile for big datasets")
+           
     # Check if the output exists and create if not
     if not arcpy.Exists(zones_fc):
         arcpy.CreateFeatureclass_management(os.path.dirname(zones_fc),
                                             os.path.basename(zones_fc),
-                                            "POINT","","DISABLED","DISABLED",proj)
-
+                                            "POLYGON","","DISABLED","DISABLED", proj)
+        
         # Determine Stream ID field properties
         sid_type = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].type
         sid_precision = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].precision
         sid_scale = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].scale
-        sid_length = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].length    
+        sid_length = arcpy.ListFields(nodes_fc,"STREAM_ID")[0].length
+        
+        typeDict = {"NODE_ID": "LONG",
+                    "SAMPLE_ID": "LONG",
+                    "TRANS_AZIMUTH": "DOUBLE",
+                    "TRANSECT": "SHORT",
+                    "ZONE": "SHORT",
+                    "KEY": "TEXT",}
+        
+        # Add MEAN and STD fields
+        stat_fields = ["{0}_{1}".format(t, s) for t in type for s in ["MEAN", "STD"]]
+        
+        for t in stat_fields:
+            typeDict[t] = "DOUBLE"
 
-        # Add attribute fields # TODO add dictionary of field types 
-        # so they aren't all double
-        for f in cursorfields:
-            if f == "STREAM_ID":
-                arcpy.AddField_management(zones_fc, f, sid_type,
-                                          sid_precision, sid_scale, sid_length,
+        # Add attribute fields
+        # STREAM_ID
+        arcpy.AddField_management(zones_fc, "STREAM_ID", sid_type,
+                                  sid_precision, sid_scale, sid_length,
+                                  "", "NULLABLE", "NON_REQUIRED")
+        
+        addFields = ["NODE_ID", "SAMPLE_ID", "TRANS_AZIMUTH",
+                        "TRANSECT", "ZONE", "KEY"] + stat_fields
+
+        for f in addFields:
+            arcpy.AddField_management(zones_fc, f, typeDict[f], "", "", "",
                                           "", "NULLABLE", "NON_REQUIRED")
-
-            elif f in ["LC_KEY","SAMPLE_ID"]:
-                arcpy.AddField_management(zones_fc, f, "TEXT", "", "", "",
-                                          "", "NULLABLE", "NON_REQUIRED")                
-
-            else:
-                arcpy.AddField_management(zones_fc, f, "DOUBLE", "", "", "",
-                                          "", "NULLABLE", "NON_REQUIRED")
+    else:        
+        # Check to see if all the stat attribute fields are there
+        field_names = [f.name for f in arcpy.ListFields(zones_fc)]
+        for f in stat_fields:
+            if f not in field_names:
+                arcpy.AddField_management(zones_fc, f, typeDict[f], "", "", "",
+                                              "", "NULLABLE", "NON_REQUIRED")
 
     if not overwrite_data:
-        # Build a query to retreive existing rows from the nodes 
-        # that need updating
-        whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_in_block))        
+        # Build a query to retreive existing rows
+        whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes))      
 
         # delete those rows
-        with arcpy.da.UpdateCursor(zones_fc,["NODE_ID"], whereclause) as cursor:  
+        with arcpy.da.UpdateCursor(zones_fc,["NODE_ID"], whereclause) as cursor:
             for row in cursor:
-                cursor.deleteRow()     
-
-    with arcpy.da.InsertCursor(zones_fc, ["SHAPE@"] +
-                               cursorfields) as cursor:
-        for row in zone_list:
-            cursor.insertRow(row)
-
-
-def make_zones_list(nodeDict, dirs, zones, trans_count, transsample_distance):
-    """This builds a unique long form list of information for all the
-    landcover zones. This list is used to
-    create/update the output feature class."""
+                cursor.deleteRow()
+                
+    numDirs = len(dirs)
+    numZones = len(zones)
+    zonesPerNode = numDirs * numZones
     
-    # Get a list of the nodes, sort them
-    nodes = nodeDict.keys()
-    nodes.sort()    
+    if heatsource8:
+        angleIncr = 45.0
+    else:
+        angleIncr = 360.0 / numDirs
         
-    zone_list = []
-    
-    angleIncr = 360.0 / trans_count
-    angleIncr_sub = angleIncr / 4.0
+    angleIncr_sub = angleIncr / 3.0
 
     polyArray = arcpy.Array()
     pntObj = arcpy.Point()
     
-    for nodeID in nodes:
-        origin_x = nodeDict[nodeID]["POINT_X"]
-        origin_y = nodeDict[nodeID]["POINT_Y"]
-        streamID = nodeDict[nodeID]["STREAM_ID"]
+    sampleDict = {}
     
-        for d, dir in enumerate(dirs):
-            angleStart = dir - (angleIncr / 2)
-            angle = angleStart
-            
-            for z, zone in enumerate(zones):
-                # each sample zone
+    with arcpy.da.InsertCursor(zones_fc, ["SHAPE@", "STREAM_ID"] +
+                               addFields) as cursor:    
+        for nodeID in nodes:
+            #print("making zone fc: {0:.0f}% complete".format((nodeID+1)/len(nodes) *100))
+            origin_x = nodeDict[nodeID]["POINT_X"]
+            origin_y = nodeDict[nodeID]["POINT_Y"]
+            streamID = nodeDict[nodeID]["STREAM_ID"]
+        
+            for d, dir in enumerate(dirs):
+                angleStart = dir - (angleIncr / 2)
+                angle = angleStart
                 
-                lc_key = 'LC_T{0}_S{1}'.format(d+1, z)
-                tran_num = '{:{}{}}'.format(d+1, 0, 3)
-                samp_num = '{:{}{}}'.format(zone, 0, 2)
-                sampleID = '{0}{1}{2}'.format(nodeID, tran_num, samp_num)
-            
-            
-                botDis = (z + 0) * transsample_distance * con_from_m
-                topDis = (z + 1) * transsample_distance * con_from_m
+                for z, zone in enumerate(zones):
+                    # each sample zone
+                    
+                    key = 'T{0}_S{1}'.format(d+1, zone)
+                    tran_num = '{:{}{}}'.format(d+1, 0, 3)
+                    samp_num = '{:{}{}}'.format(zone, 0, 2)
+                    sampleID = (nodeID * zonesPerNode) + (d * numZones) + zone
+                    
+                    sampleDict[sampleID] = [nodeID, key]
                 
-                #iterate through each vertex X/Y to complete the polygon
-                if zone == 1: # First veg zone that is a triangle shape
-                    for vertex in range(7):
-                        if vertex in [0]: #bottom start angle
-                            pntObj.X = (botDis * sin(radians(angleStart))) + origin_x
-                            pntObj.Y = (botDis * cos(radians(angleStart))) + origin_y
-                        if vertex in [1]: #top start angle
-                            pntObj.X = (topDis * sin(radians(angleStart))) + origin_x
-                            pntObj.Y = (topDis * cos(radians(angleStart))) + origin_y
-                        if vertex in [2,3,4,5]: # top 2-5
-                            angle = angle + angleIncr_sub
-                            pntObj.X = (topDis * sin(radians(angle))) + origin_x
-                            pntObj.Y = (topDis * cos(radians(angle))) + origin_y
-                        if vertex in [6]: #bottom end angle
-                            pntObj.X = (botDis * cos(radians(angle))) + origin_x
-                            pntObj.Y = (botDis * cos(radians(angle))) + origin_y
-                            angle = angle - (angleIncr_sub * 4)
-                        polyArray.add(pntObj)
-                if zone > 1:
-                    for vertex in range(11):
-                        if vertex in [0]: #bottom start angle
-                            pntObj.X = (botDis * sin(radians(angleStart))) + origin_x
-                            pntObj.Y = (botDis * cos(radians(angleStart))) + origin_y
-                        if vertex in [1]: #top start angle
-                            pntObj.X = (topDis * sin(radians(angleStart))) + origin_x
-                            pntObj.Y = (topDis * cos(radians(angleStart))) + origin_y
-                        if vertex in [2,3,4,5]: # top 2-5
-                            angle = angle + angleIncr_sub
-                            pntObj.X = (topDis * sin(radians(angle))) + origin_x
-                            pntObj.Y = (topDis * cos(radians(angle))) + origin_y
-                        if vertex in [6]: #bottom end angle
-                            pntObj.X = (botDis * sin(radians(angle))) + origin_x
-                            pntObj.Y = (botDis * cos(radians(angle))) + origin_y
-                        if vertex in [7,8,9,10]: # bottom 7-10
-                            angle =  angle - angleIncr_sub
-                            pntObj.X = (botDis * sin(radians(angle))) + origin_x
-                            pntObj.Y = (botDis * cos(radians(angle))) + origin_y
-                        polyArray.add(pntObj)
-                del vertex        
-                
-                # Add to the list 
-                zone_list.append([arcpy.Polygon(polyArray),
-                                  streamID, nodeID, sampleID,
-                                  dir, d+1, z, lc_key])
-                
-                polyArray.removeAll()
-         
-    return zone_list    
-      
+                    botDis = (z + 0) * transsample_distance * con_from_m
+                    topDis = (z + 1) * transsample_distance * con_from_m
+                    
+                    #iterate through each vertex X/Y to complete the polygon
+                    if zone == 1: # First veg zone that is a triangle shape
+                        for vertex in range(6):
+                            if vertex in [0]: #bottom start angle
+                                pntObj.X = (botDis * sin(radians(angleStart))) + origin_x
+                                pntObj.Y = (botDis * cos(radians(angleStart))) + origin_y
+                            if vertex in [1]: #top start angle
+                                pntObj.X = (topDis * sin(radians(angleStart))) + origin_x
+                                pntObj.Y = (topDis * cos(radians(angleStart))) + origin_y
+                            if vertex in [2,3,4]: # top 2-5
+                                angle = angle + angleIncr_sub
+                                pntObj.X = (topDis * sin(radians(angle))) + origin_x
+                                pntObj.Y = (topDis * cos(radians(angle))) + origin_y
+                            if vertex in [5]: #bottom end angle
+                                pntObj.X = (botDis * cos(radians(angle))) + origin_x
+                                pntObj.Y = (botDis * cos(radians(angle))) + origin_y
+                                angle = angle - (angleIncr_sub * 3)
+                            polyArray.add(pntObj)
+                    if zone > 1:
+                        for vertex in range(9):
+                            if vertex in [0]: #bottom start angle
+                                pntObj.X = (botDis * sin(radians(angleStart))) + origin_x
+                                pntObj.Y = (botDis * cos(radians(angleStart))) + origin_y
+                            if vertex in [1]: #top start angle
+                                pntObj.X = (topDis * sin(radians(angleStart))) + origin_x
+                                pntObj.Y = (topDis * cos(radians(angleStart))) + origin_y
+                            if vertex in [2,3,4]: # top 2-5
+                                angle = angle + angleIncr_sub
+                                pntObj.X = (topDis * sin(radians(angle))) + origin_x
+                                pntObj.Y = (topDis * cos(radians(angle))) + origin_y
+                            if vertex in [5]: #bottom end angle
+                                pntObj.X = (botDis * sin(radians(angle))) + origin_x
+                                pntObj.Y = (botDis * cos(radians(angle))) + origin_y
+                            if vertex in [6,7,8]: # bottom 7-10
+                                angle =  angle - angleIncr_sub
+                                pntObj.X = (botDis * sin(radians(angle))) + origin_x
+                                pntObj.Y = (botDis * cos(radians(angle))) + origin_y
+                            polyArray.add(pntObj)
+                    del vertex        
+                    
+                    this_zone = [arcpy.Polygon(polyArray), streamID, nodeID,
+                                 sampleID, dir, d+1, z, key]
+                    
+                    this_zone = this_zone + [-9999 for t in stat_fields]
+                    cursor.insertRow(this_zone) 
+                    
+                    polyArray.removeAll()
+    return sampleDict
+                    
+def update_nodes_fc(nodeDict, nodes_fc, addFields, node_to_query):
+    """Updates the input point feature class with data from the
+    nodes dictionary"""
+    
+    # Build a query to retreive just the nodes that needs updating
+    whereclause = """{0} IN ({1})""".format("NODE_ID", node_to_query)
 
+    with arcpy.da.UpdateCursor(nodes_fc,["NODE_ID"] + addFields, whereclause) as cursor:  
+        for row in cursor:
+            nodeID = int(row[0])
+            for f, field in enumerate(addFields):
+                row[f+1] = nodeDict[nodeID][field]
+                cursor.updateRow(row)
+                
 try:
-    print("Step 5: Sample Landcover - Star Pattern, Point Method")
+    print("Step 5: Sample Landcover - Star Pattern, Zone Method")
     
     #keeping track of time
     startTime= time.time()
@@ -362,55 +434,60 @@ try:
         sys.exit("The landcover and elevation rasters do not have the "+
                  "same projection. Please reproject your data.")    
        
-    # Setup the raster list
-    typeraster = [lc_raster, z_raster]
+    # Setup the raster dictionary
+    rasterDict = {"LC": lc_raster,
+                   "ELE": z_raster}  
+    
     if canopy_data_type == "LAI":  #Use LAI methods
-        if canopy_raster is not "#": typeraster.append(canopy_raster)
-        else: typeraster.append(None)
-        if k_raster is not "#": typeraster.append(k_raster)
-        else: typeraster.append(None)
-        if oh_raster is not "#": typeraster.append(oh_raster)
-        else: typeraster.append(None)
+        if canopy_raster is not "#":
+            rasterDict["LAI"] = canopy_raster
+            
+        if k_raster is not "#":
+            rasterDict["k"] = k_raster
+
+        if oh_raster is not "#":
+            rasterDict["OH"] = oh_raster
         
     if canopy_data_type == "CanopyCover":  #Use Canopy Cover methods
-        if canopy_raster is not "#": typeraster.append(canopy_raster)
-        else: typeraster.append(None)
-        if oh_raster is not "#": typeraster.append(oh_raster)
-        else: typeraster.append(None)   
+        if canopy_raster is not "#":
+            rasterDict["CAN"] = canopy_raster
+
+        if oh_raster is not "#":
+            rasterDict["OH"] = oh_raster
     
-    stream_sample = True
+    # There is no stream sample for zones
+    stream_sample = False
     
     # flag indicating the model should use the heat source 8 methods 
-    # (same as 8 directions but no north)
+    # same as 8 directions but no north
     if heatsource8:
         dirs = [45,90,135,180,225,270,315]
+        trans_count = 7
     else:        
         dirs = [x * 360.0 / trans_count for x in range(1,trans_count+ 1)]
 
     zones = range(1,int(transsample_count+1))
     
-    lcheaders, otherheaders, type = setup_LC_data_headers(transsample_count, trans_count,
-                                            canopy_data_type, stream_sample,
-                                            heatsource8)
+    lcheaders, otherheaders = setup_LC_data_headers(transsample_count, trans_count,
+                                            canopy_data_type, stream_sample)
     
     addFields = lcheaders + otherheaders
     
     # Get a list of existing fields
-    existingFields = []
-    for f in arcpy.ListFields(nodes_fc):
-        existingFields.append(f.name)
+    # Check to see if all the type attribute fields are there
+    existingFields = [f.name for f in arcpy.ListFields(nodes_fc)]    
         
     # Check to see if the field exists and add it if not
     for f in lcheaders:
-        if (f in existingFields) is False:
-            arcpy.AddField_management(nodes_fc, f, "TEXT", "", "", "",
+        if not (f in existingFields):
+            arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "",
                                       "", "NULLABLE", "NON_REQUIRED")    
 
     # Check to see if the field exists and add it if not
     for f in otherheaders:
-        if (f in existingFields) is False:
+        if not (f in existingFields):
             arcpy.AddField_management(nodes_fc, f, "DOUBLE", "", "", "",
-                                      "", "NULLABLE", "NON_REQUIRED")    
+                                      "", "NULLABLE", "NON_REQUIRED")   
     
     # read the node data into the node dictionary
     nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
@@ -419,15 +496,19 @@ try:
     nodes = nodeDict.keys()
     nodes.sort()
     
-    
     # build the zone list
-    zone_list = make_zone_list(nodeDict, dirs, zones, trans_count, transsample_distance)
-
-    for raster in typeraster:
-        if raster is None:
-            for i in range(0, len(zone_list)):
-                zone_list[i].append(-9999)
-        else: 
+    sampleDict = make_zones_fc(nodeDict, zones_fc, nodes, dirs, zones,
+                               rasterDict.keys(), transsample_distance,
+                               heatsource8, proj)
+    
+    stat_fields = ["{0}_{1}".format(t, s) for t in rasterDict.keys() for s in ["MEAN", "STD"] ]
+    
+    for n, nodeID in enumerate(nodes):
+        print("Processing node {0} of {1}".format(n + 1, len(nodes)))
+        
+        sampleDict2 = defaultdict(list)
+        
+        for type, raster in rasterDict.iteritems():
             if raster == z_raster:
                 con = con_z_to_m
             elif raster == lc_raster:
@@ -435,28 +516,35 @@ try:
             else:
                 con = None  
 
-            zone_list = sample_raster(nodes, zone_list, raster, con)
+            data_list = sample_raster(zones_fc, nodeID, raster, con) 
+            
+            # Update the node fc
+            if sampleID_for_code:
+                for row in data_list:
+                    key = "{0}_{1}".format(type, sampleDict[row[0]][1])
+                    nodeDict[nodeID][key] = row[0]
+                    sampleDict2[row[0]].append(row[1])
+                    sampleDict2[row[0]].append(row[2])
+            
+            else:
+                for row in data_list:
+                    key = "{0}_{1}".format(type, sampleDict[row[0]][1])
+                    nodeDict[nodeID][key] = row[1]
+                    sampleDict2[row[0]].append(row[1])
+                    sampleDict2[row[0]].append(row[2])
+            
+        # update zones fc with new sampled values       
+        update_zones_fc(sampleDict2, stat_fields, zones_fc)
 
-   
-    # Update the node fc
-    for row in zone_list:
-        for t, item, in enumerate(type):
-            lc_key = '{0}_T{1}_S{2}'.format(item, row[8], row[9])
-            nodeDict[row[5]][lc_key] = row[11 + t]
+        # Write the landcover data to the TTools point feature class 
+        update_nodes_fc(nodeDict, nodes_fc, addFields, nodeID)      
     
-    # Write the landcover data to the TTools point feature class 
-    update_nodes_fc(nodeDict, nodes_fc, addFields, nodes)    
-
-    # Build the output point feature class using the data         
-    update_zone_fc(zone_list, type, zone_fc,
-                       nodes_fc, nodes, overwrite_data, proj)
-
-    total_samples = total_samples + len(lc_point_list)
-    del zone_list
+    
+    endTime = time.time()
+    
     gc.collect()
 
-    endTime = time.time()
-
+    total_samples = trans_count * transsample_count * len(nodes)
     elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
     mspersample = timedelta(seconds=(endTime - startTime) /
                             total_samples).microseconds
