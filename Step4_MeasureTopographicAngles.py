@@ -675,8 +675,8 @@ def get_topo_angles(nodeDict, block_extent, block_samples, z_raster, azimuthdisd
     
     nodata_to_value = -9999 / con_z_to_m
     
-    x_cellsize = arcpy.Describe(z_raster).meanCellWidth
-    y_cellsize = arcpy.Describe(z_raster).meanCellHeight
+    x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
+    y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))
     
     # localize the block extent values
     block_x_min = block_extent[0]
@@ -852,8 +852,8 @@ try:
         block_size = int(con_from_m * block_size * 1000)    
 
     # Get the elevation raster cell size in units of the raster
-    x_cellsize = arcpy.Describe(z_raster).meanCellWidth
-    y_cellsize = arcpy.Describe(z_raster).meanCellHeight
+    x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
+    y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))
     
     if topo_directions == 2: # All directions
         azimuths = [45,90,135,180,225,270,315,365]

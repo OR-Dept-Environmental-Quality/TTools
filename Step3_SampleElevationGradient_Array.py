@@ -304,8 +304,8 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
     block_x_max = block[2]
     block_y_max = block[3]
     
-    x_cellsize = arcpy.Describe(z_raster).meanCellWidth
-    y_cellsize = arcpy.Describe(z_raster).meanCellHeight    
+    x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
+    y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))   
 
     # Get the coordinates extent of the input raster
     raster_x_min = float(arcpy.GetRasterProperties_management(z_raster, "LEFT").getOutput(0))
@@ -462,7 +462,7 @@ try:
         block_size = int(con_from_m * block_size * 1000)
     
     # Get the elevation raster cell size
-    cellsize = arcpy.Describe(z_raster).meanCellWidth
+    cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
     
     # calculate the buffer distance (in raster spatial units) to add to 
     # the base bounding box when extracting to an array. The buffer is 
