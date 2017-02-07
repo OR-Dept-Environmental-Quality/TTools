@@ -32,8 +32,8 @@ import gc
 import time
 import traceback
 from datetime import timedelta
-from math import radians, sin, cos
-from collections import defaultdict
+from math import radians, sin, cos, ceil
+from collections import defaultdict, OrderedDict
 import arcpy
 from arcpy import env
 
@@ -53,7 +53,7 @@ trans_count = 8
 transsample_count = 5 # does not include a sample at the stream node
 transsample_distance = 8
 heatsource8 = False
-sampleID_for_code = True  # Use the sampleID instead of height for hte landcover
+sampleID_for_code = True  # Use the sampleID instead of height for the landcover code
 lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
 lc_units = "Meters"
 canopy_data_type = "#" # OPTIONAL This is either 1. "CanopyCover", or 2."LAI"
@@ -137,7 +137,7 @@ def sample_raster(zones_fc, node, raster, con):
                 
     return data  
 
-def setup_LC_data_headers(transsample_count, trans_count,
+def setup_lcdata_headers(transsample_count, trans_count,
                           canopy_data_type, stream_sample):
     """Generates a list of the landcover data file
     column header names and data types"""
@@ -289,7 +289,7 @@ def make_zones_fc(nodeDict, zones_fc, nodes, dirs, zones, type,
                 
     numDirs = len(dirs)
     numZones = len(zones)
-    zonesPerNode = numDirs * numZones
+    zonesPerNode = (numDirs * numZones) + 1
     
     if heatsource8:
         angleIncr = 45.0
@@ -310,6 +310,9 @@ def make_zones_fc(nodeDict, zones_fc, nodes, dirs, zones, type,
             origin_x = nodeDict[nodeID]["POINT_X"]
             origin_y = nodeDict[nodeID]["POINT_Y"]
             streamID = nodeDict[nodeID]["STREAM_ID"]
+            
+            sampleID = (nodeID * zonesPerNode)
+            sampleDict[sampleID] = [nodeID, "T0_S0"]
         
             for d, dir in enumerate(dirs):
                 angleStart = dir - (angleIncr / 2)
@@ -369,7 +372,7 @@ def make_zones_fc(nodeDict, zones_fc, nodes, dirs, zones, type,
                     del vertex        
                     
                     this_zone = [arcpy.Polygon(polyArray), streamID, nodeID,
-                                 sampleID, dir, d+1, z, key]
+                                 sampleID, dir, d+1, zone, key]
                     
                     this_zone = this_zone + [-9999 for t in stat_fields]
                     cursor.insertRow(this_zone) 
@@ -434,9 +437,10 @@ try:
         sys.exit("The landcover and elevation rasters do not have the "+
                  "same projection. Please reproject your data.")    
        
-    # Setup the raster dictionary
-    rasterDict = {"LC": lc_raster,
-                   "ELE": z_raster}  
+    # Setup the raster dictionary. It is ordered because
+    # key list needs to correspond to the order of the attribute fields
+    rasterDict = OrderedDict({"LC": lc_raster,
+                              "ELE": z_raster})
     
     if canopy_data_type == "LAI":  #Use LAI methods
         if canopy_raster is not "#":
@@ -468,7 +472,7 @@ try:
 
     zones = range(1,int(transsample_count+1))
     
-    lcheaders, otherheaders = setup_LC_data_headers(transsample_count, trans_count,
+    lcheaders, otherheaders = setup_lcdata_headers(transsample_count, trans_count,
                                             canopy_data_type, stream_sample)
     
     addFields = lcheaders + otherheaders
