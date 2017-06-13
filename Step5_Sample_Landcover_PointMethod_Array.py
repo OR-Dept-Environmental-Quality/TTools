@@ -14,7 +14,7 @@
 # 2. create a list with the x/y and related info for each lc sample
 #    calculate the extent bounding box for the entire dataset
 
-# 3. create a list holding the bounding box coords for each block itteration
+# 3. create a list holding the bounding box coords for each block iteration
 
 # 4. loop through each block
     #- sample the raster for all samples in the block
@@ -52,7 +52,7 @@
 
 # Future Updates
 # -Change the node dict so the node is the primary key
-# -Build the block list based on the nodes and then build point list itterativly
+# -Build the block list based on the nodes and then build point list iteratively
 # instead of building them into one huge list. The huge list results
 # in a memory error for large areas
 # -Include stream sample in transect count (True/False)
@@ -86,7 +86,7 @@ trans_count = 8
 transsample_count = 5 # does not include a sample at the stream node
 transsample_distance = 8
 heatsource8 = False
-sampleID_for_code = True  # Use the sampleID instead of height for the landcover
+sampleID_for_code = True  # Use the sampleID as the code in the nodes_fc instead of lc_raster value 
 lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
 lc_units = "Meters"
 canopy_data_type = "#" # OPTIONAL This is either 1. "CanopyCover", or 2."LAI"
@@ -669,10 +669,16 @@ try:
             
                 lc_point_list = sample_raster(block, lc_point_list, raster, con)
         
-            # Update the node fc
-            for row in lc_point_list:
-                key = "{0}_{1}".format(type, row[10])
-                nodeDict[row[5]][key] = row[11 + t]
+            # Update the node dict
+            if (sampleID_for_code and type == "LC"):
+                for row in lc_point_list :
+                    key = "{0}_{1}".format(type, row[10])
+                    nodeDict[row[5]][key] = row[6]
+            
+            else:
+                for row in lc_point_list :
+                    key = "{0}_{1}".format(type, row[10])
+                    nodeDict[row[5]][key] = row[11 + t]
         
         # Write the landcover data to the TTools point feature class 
         update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_in_block)
