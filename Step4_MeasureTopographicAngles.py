@@ -484,10 +484,10 @@ def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
                         last_y = ((searchDistance_last * cos(radians(a))) + node_y)
                     else:
                         last_x = end_x
-                        lasy_y = end_y
+                        last_y = end_y
                         
                     if (block_x_min <= last_x <= block_x_max and
-                        block_y_min <= lasy_y <= block_y_max):
+                        block_y_min <= last_y <= block_y_max):
                         
                         last_sample = True      
             
