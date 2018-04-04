@@ -273,6 +273,10 @@ def make_zones_fc(nodeDict, zones_fc, nodes, dirs, zones, type,
     else:        
         # Check to see if all the stat attribute fields are there
         field_names = [f.name for f in arcpy.ListFields(zones_fc)]
+        
+        # Add MEAN and STD fields
+        stat_fields = ["{0}_{1}".format(t, s) for t in type for s in ["MEAN", "STD"]]
+        
         for f in stat_fields:
             if f not in field_names:
                 arcpy.AddField_management(zones_fc, f, typeDict[f], "", "", "",
