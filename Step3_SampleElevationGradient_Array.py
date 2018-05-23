@@ -387,7 +387,7 @@ def from_z_units_to_meters_con(zUnits):
     units to meters"""
         
     try:
-        con_z_to_m = float(zunits)
+        con_z_to_m = float(zUnits)
     except:
         if zUnits == "Meters":
             con_z_to_m = 1.0 
