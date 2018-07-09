@@ -381,8 +381,8 @@ def sample_raster(block, lc_point_list, raster, con):
     block_x_max = block[2]
     block_y_max = block[3]
     
-    x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
-    y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0)) 
+    x_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEX").getOutput(0))
+    y_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEY").getOutput(0)) 
 
     # Get the coordinates extent of the input raster
     raster_x_min = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
