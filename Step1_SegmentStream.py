@@ -32,7 +32,7 @@
 #     for each STREAM ID
 # 3: LONGITUDE - decimal degrees X coordinate of the node using GCS_WGS_1984 datum.
 # 4: LATITUDE - decimal degrees Y coordinate of the node using GCS_WGS_1984 datum.
-# 5. STREAM_AZMTH - stream azimuth in the direction of flow"
+# 5. ASPECT - stream aspect in the direction of flow"
 
 # Future Updates
 # eliminate arcpy and use gdal for reading/writing feature class data
@@ -161,7 +161,7 @@ def create_node_list(streamline_fc, checkDirection, z_raster):
                     stream_azimuth = stream_azimuth + 360
                 
                 # list of "NODE_ID","STREAM_ID". "STREAM_KM", "LENGTH", 
-                # "POINT_X","POINT_Y", "STREAM_AZMTH", "SHAPE@X", "SHAPE@Y"
+                # "POINT_X","POINT_Y", "ASPECT", "SHAPE@X", "SHAPE@Y"
                 nodeList.append([nodeID, row[2], 
                                  float(position * lineLength * con_to_m /1000),
                                  segment_length[i],
@@ -193,7 +193,7 @@ def create_nodes_fc(nodeList, nodes_fc, sid_field, proj):
                     "LENGTH",
                     "LONGITUDE",
                     "LATITUDE",
-                    "STREAM_AZMTH"]
+                    "ASPECT"]
     arcpy.CreateFeatureclass_management(os.path.dirname(nodes_fc),
                                         os.path.basename(nodes_fc),
                                         "POINT","","DISABLED","DISABLED",proj)
