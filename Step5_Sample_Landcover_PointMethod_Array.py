@@ -35,7 +35,7 @@
 # 7: OPTIONAL - landcover data type:
 #     1."CanopyCover", or 2."LAI" (canopy_data_type)
 # 8: OPTIONAL - canopy cover or LAI raster (canopy_raster)
-# 9: OPTIONAL - k coeffcient raster (k_raster)
+# 9: OPTIONAL - k coefficient raster (k_raster)
 # 10: OPTIONAL - overhang raster (oh_raster)
 # 11: Elevation raster (z_raster)
 # 12: Elevation raster z units (z_units)
@@ -86,7 +86,7 @@ trans_count = 8
 transsample_count = 5 # does not include a sample at the stream node
 transsample_distance = 8
 heatsource8 = False
-sampleID_for_code = True  # Use the sampleID as the code in the nodes_fc instead of lc_raster value 
+sampleID_for_code = False  # Use the sampleID as the code in the nodes_fc instead of lc_raster value
 lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
 lc_units = "Meters"
 canopy_data_type = "#" # OPTIONAL This is either 1. "CanopyCover", or 2."LAI"
