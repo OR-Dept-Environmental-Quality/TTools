@@ -1,9 +1,7 @@
 TTools 
 ======
-
 Current Version: TTools 9.0.0 (beta)
 
-================================================================================================
 ## About
 
 TTools is a collection of python scripts used in conjunction with ESRI ArcGIS 10.1+ to sample and assemble 
