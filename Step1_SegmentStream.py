@@ -26,7 +26,7 @@
 
 # The output point feature class has the following fields: 
 # 0: NODE_ID - unique node ID
-# 1: STREAM_ID"- field matching a unique polyline ID field identifed 
+# 1: STREAM_ID"- field matching a unique polyline ID field identified
 #     by the user,
 # 2: STREAM_KM - double measured from the downstream end of the stream 
 #     for each STREAM ID

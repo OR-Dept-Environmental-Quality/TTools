@@ -5,7 +5,7 @@
 
 # Sample_Landcover_PointMethod will take an input point 
 # feature (from Step 1) and sample input landcover rasters in a user 
-# specificed number of cardinal directions with point samples spaced 
+# specified number of cardinal directions with point samples spaced
 # at a user defined distance moving away from the stream.
 
 # General scripts steps include:
@@ -38,7 +38,7 @@
 # 9: OPTIONAL - k coeffcient raster (k_raster)
 # 10: OPTIONAL - overhang raster (oh_raster)
 # 11: Elevation raster (z_raster)
-# 12: Elvation raster z units (z_units) 
+# 12: Elevation raster z units (z_units)
 #      1. "Feet", 2. "Meters" 3. "Other"
 # 13: Path/name of output sample point file (lc_point_fc)
 # 14: OPTIONAL - km distance to process within each array (block_size)
@@ -96,7 +96,7 @@ oh_raster = "#" # OPTIONAL This is the overhang raster
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 z_units = "Meters"
 lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint_two"
-block_size = "#" # OPTIONAL defualt to 5
+block_size = "#" # OPTIONAL default to 5
 overwrite_data = True
 # End Fill in Data
 # ----------------------------------------------------------------------
@@ -115,7 +115,7 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     existingFields = [f.name for f in arcpy.ListFields(nodes_fc)] 
 
     # Check to see if the last field exists if yes add it. 
-    # Grabs last field becuase often the first field, emergent, is zero
+    # Grabs last field because often the first field, emergent, is zero
     if overwrite_data is False and (addFields[len(addFields)-1] in existingFields) is True:
         incursorFields.append(addFields[len(addFields)-1])
     else:
@@ -153,7 +153,7 @@ def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc,
     #print("Exporting data to land cover sample feature class")
     
     cursorfields = ["POINT_X","POINT_Y"] +["STREAM_ID","NODE_ID", "SAMPLE_ID", 
-                                           "TRANS_AZIMUTH", "TRANSECT",
+                                           "TRANS_DIR", "TRANSECT",
                                            "SAMPLE", "KEY"] + type    
     
     # Check if the output exists and create if not
@@ -172,7 +172,7 @@ def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc,
                     "POINT_Y": "DOUBLE", 
                     "NODE_ID": "LONG",
                     "SAMPLE_ID": "LONG",
-                    "TRANS_AZIMUTH": "DOUBLE",
+                    "TRANS_DIR": "DOUBLE",
                     "TRANSECT": "SHORT",
                     "SAMPLE": "SHORT",
                     "KEY": "TEXT",}
@@ -445,7 +445,7 @@ def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
     nodes dictionary"""
     #print("Updating input point feature class")
     
-    # Build a query to retreive just the nodes that needs updating
+    # Build a query to retrieve just the nodes that needs updating
     whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_to_query))
 
     with arcpy.da.UpdateCursor(nodes_fc,["NODE_ID"] + addFields, whereclause) as cursor:  
@@ -471,7 +471,7 @@ def from_meters_con(inFeature):
     return con_from_m
 
 def from_z_units_to_meters_con(zUnits):
-    """Returns the converstion factor to get from
+    """Returns the conversion factor to get from
     the input z units to meters"""
         
     try:
@@ -516,7 +516,7 @@ try:
     con_z_to_m = from_z_units_to_meters_con(z_units)
     
     # convert block size from km to meters to units of the node fc
-    # in the future block size should be estimated based on availiable memory
+    # in the future block size should be estimated based on available memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
     if block_size in ["#", ""]:
@@ -643,7 +643,7 @@ try:
     # Build the block list
     block_extents, block_nodes = create_block_list(nodes, block_size)
     
-    # Itterate through each block, calculate sample coordinates,
+    # Iterate through each block, calculate sample coordinates,
     # convert raster to array, sample the raster
     total_samples = 0
     for p, block in enumerate(block_extents):

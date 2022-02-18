@@ -52,7 +52,7 @@ searchCells = 2
 smooth_flag = True
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 z_units = "Meters"
-block_size = 5 # OPTIONAL defualt to 5
+block_size = 5 # OPTIONAL default to 5
 overwrite_data = True
 # End Fill in Data
 # ----------------------------------------------------------------------
@@ -82,7 +82,7 @@ def read_nodes_fc1(nodes_fc, overwrite_data, addFields):
         existingFields.append(f.name)
 
     # Check to see if the last field exists if yes add it. 
-    # Grabs last field becuase often the first field, emergent, is zero
+    # Grabs last field because often the first field, emergent, is zero
     if overwrite_data is False and (addFields[len(addFields)-1] in existingFields) is True:
         incursorFields.append(addFields[len(addFields)-1])
     else:
@@ -126,7 +126,7 @@ def read_nodes_fc2(nodes_fc, overwrite_data, addFields):
         existingFields.append(f.name)    
 
     # Check to see if the 1st field exists if yes add it to 
-    # the cursorfields to be retreived.
+    # the cursorfields to be retrieved.
     if overwrite_data is False and (addFields[0] in existingFields) is True:
         incursorFields.append(addFields[0])
     else:
@@ -153,7 +153,7 @@ def read_nodes_fc2(nodes_fc, overwrite_data, addFields):
         else:
             for row in Inrows:
                 # if the data is null or zero (0 = default for shapefile),
-                # it is retreived and will be overwritten.
+                # it is retrieved and will be overwritten.
                 if row[7] is None or row[7] < -9998:
                     streamID = row[0]
                     stream_km = row[1]                    
@@ -196,7 +196,7 @@ def update_nodes_fc1(nodeDict, nodes_fc, addFields, nodes_to_query):
     the nodes dictionary with node_id as the primary key"""
     #print("Updating input point feature class")
     
-    # Build a query to retreive just the nodes that needs updating
+    # Build a query to retrieve just the nodes that needs updating
     whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_to_query))
 
     with arcpy.da.UpdateCursor(nodes_fc,["NODE_ID"] + addFields, whereclause) as cursor:
@@ -223,8 +223,8 @@ def update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query):
                 cursor.updateRow(row)
 
 def create_block_list(nodeDict, nodes, buffer, block_size):
-    """Returns two lists, one containting the coordinate extent
-    for each block that will be itterativly extracted to an array
+    """Returns two lists, one containing the coordinate extent
+    for each block that will be iteratively extracted to an array
     and the other containing the stream and node IDs within each
     block extent."""
     
@@ -383,7 +383,7 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
     return z_list
 
 def from_z_units_to_meters_con(zUnits):
-    """Returns the converstion factor to get from the input z
+    """Returns the conversion factor to get from the input z
     units to meters"""
         
     try:
@@ -470,9 +470,9 @@ try:
     # the surrounding cells at each corner
     buffer = int((searchCells + 1)* cellsize)    
 
-    # Make a list of the base x/y coordinate movments 
+    # Make a list of the base x/y coordinate movements
     # from the node origin. These values will be 
-    # multipled by the cell size.
+    # multiplied by the cell size.
     # searchCells = 0 samples at the node
     # searchCells = 1 cell width around node = 9 cells
     # searchCells = 2 cell widths around node = 25 cells ...
@@ -492,7 +492,7 @@ try:
         # Build the block list
         block_extents, block_nodes = create_block_list(nodeDict, nodes, buffer, block_size)
         
-        # Itterate through each block, calculate sample coordinates,
+        # Iterate through each block, calculate sample coordinates,
         # convert raster to array, sample the raster
         total_samples = 0
         
