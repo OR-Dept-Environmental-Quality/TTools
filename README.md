@@ -15,6 +15,8 @@ ESRI ArcGIS 10.1+ w/ Spatial Analyst extension
 Python 2.7 
 Numpy 1.7+
 
+This tool is not compatible with ArcGIS Pro
+
 Previous TTools extensions for ESRI ArcView 3, ArcGIS 9, or 10.0 can be found here: http://www.oregon.gov/deq/wq/tmdls/Pages/TMDLs-Tools.aspx
 
-[1]: https://github.com/rmichie/heatsource-9
+[1]: https://github.com/DEQrmichie/heatsource-9
