@@ -1,28 +1,37 @@
-########################################################################
-# TTools
-# Step 2: Measure Channel Widths - v 0.911
-# Ryan Michie
+#!/usr/bin/python
 
-# INPUTS
-# 0: Tools point feature class (nodes_fc)
-# 1: Right Bank feature class(rb_fc)
-# 2: Left Bank feature class(lb_fc)
-# 3: True/False flag if existing data can be over written (overwrite_data)
+"""
+TTools Step 2: Measure Channel Widths
 
-# OUTPUTS
-# 0: point feature class (edit nodes_fc) with the following fields added:
-#    CHANWIDTH - distance in meters between left and right banks
-#    LEFT - distance in meters from centerline to left bank feature
-#    RIGHT - distance in meters from centerline to right bank feature
+This script will measure the channel width and distance to the closest edge on the right and left banks at each
+stream node. Output distances are in meters.
 
-# Future Updates
-# eliminate arcpy and use gdal for reading/writing feature class data
+REQUIREMENTS
+TTools steps 1 must be run before Step 3.
+ArcGIS 10.1 - 10.8.2
+Python 2.7
 
-# This version is for manual starts from within python.
-# This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
+INPUT VARIABLES
+0: nodes_fc:
+Path to the TTools point feature class.
 
-########################################################################
+1: rb_fc
+The right bank feature class. The right bank is on the right looking downstream.
 
+2: lb_fc
+The left bank feature class. The left bank is on the left looking downstream.
+
+3: overwrite_data:
+True/False flag if existing data in nodes_fc can be overwritten.
+
+OUTPUTS
+0. nodes_fc:
+New fields listed below are added into nodes_fc.
+CHANWIDTH: distance in meters between left and right banks.
+LEFT: distance in meters from the stream node to the closest edge of the left bank feature.
+RIGHT: distance in meters from the stream ode to the closest edge of the right bank feature.
+
+"""
 # Import system modules
 from __future__ import division, print_function
 import sys
@@ -35,20 +44,18 @@ from arcpy import env
 from math import ceil
 from collections import defaultdict
 
-# Parameter fields for python toolbox
-#nodes_fc = parameters[0].valueAsText
-#rb_fc = parameters[1].valueAsText
-#lb_fc = parameters[2].valueAsText
-#overwrite_data = parameters[3].valueAsText
-
 # ----------------------------------------------------------------------
-# Start Fill in Data
+# Start input variables
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 rb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
 lb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
 overwrite_data = True
-# End Fill in Data
+# End input variables
 # ----------------------------------------------------------------------
+
+# Future Updates
+# Make width measurements along a line orthogonal to the stream aspect instead of based on the closest edge.
+# eliminate arcpy and use gdal for reading/writing feature class data
 
 def nested_dict(): 
     """Build a nested dictionary"""
