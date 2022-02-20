@@ -1,46 +1,47 @@
-########################################################################
-# TTools
-# Step 1: Create Stream Nodes  version 0.953
-# Ryan Michie
+#!/usr/bin/python
 
-# This script will take an input polyline feature with unique 
-# stream IDs and generate evenly spaced points along each 
-# unique stream ID polyline at a user defined spacing measured from 
-# the downstream endpoint. The script can also check the digitized
-# direction to determine the downstream end.
+"""
+TTools Step 1: Create Stream Nodes
 
-# INPUTS
-# 0: Stream centerline polyline (streamline_fc)
-# 1: Unique StreamID field (sid_field)
-# 2: Spacing between nodes in meters (node_dx)
-# 3: Outputs a continuous stream km regardless of 
-#    unique the values in the stream ID field (cont_stream_km)
-# 3: OPTIONAL True/False flag to check if the stream was digitized in 
-#    correct direction (checkDirection)
-# 4: OPTIONAL Elevation Raster used in the check stream 
-#    direction procedure (z_raster)
-# 5: Path/Name of output node feature class (nodes_fc)
+This script will take an input polyline feature with unique stream IDs and generate evenly spaced points along each
+unique stream ID polyline at a user defined spacing measured from the downstream endpoint. The script can also check
+the digitized direction to determine the downstream end.
 
-# OUTPUTS
-# point feature class
+INPUT VARIABLES
+0: streamline_fc:
+Path to the stream centerline polyline feature class.
 
-# The output point feature class has the following fields: 
-# 0: NODE_ID - unique node ID
-# 1: STREAM_ID"- field matching a unique polyline ID field identified
-#     by the user,
-# 2: STREAM_KM - double measured from the downstream end of the stream 
-#     for each STREAM ID
-# 3: LONGITUDE - decimal degrees X coordinate of the node using GCS_WGS_1984 datum.
-# 4: LATITUDE - decimal degrees Y coordinate of the node using GCS_WGS_1984 datum.
-# 5. ASPECT - stream aspect in the direction of flow"
+1: sid_field:
+Name of the attribute field in streamline_fc holding the unique stream identifier such as the stream name or ID number.
 
-# Future Updates
-# eliminate arcpy and use gdal for reading/writing feature class data
+2: node_dx
+Spacing between nodes in meters.
 
-# This version is for manual starts from within python.
-# This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
+3: cont_stream_km
+Boolean (True/False) flag to indicate that a continuous stream km should be used for all nodes regardless of the
+unique the values in the sid_field
 
-########################################################################
+4: checkDirection
+Boolean (True/False) flag to check if the stream was digitized in correct direction. If checkDirection = True
+z_raster must be set.
+
+5: z_raster:
+Path and name of the ground elevation raster. Ignored if checkDirection = False.
+
+6: nodes_fc
+Path and name of the output to node feature class.
+
+OUTPUTS
+0. nodes_fc:
+New point feature class with the following fields:
+NODE_ID - Unique node ID.
+STREAM_ID - Field matching a unique stream identifier from the sid_field.
+STREAM_KM - Double measured from the downstream end of the stream for each STREAM ID
+LONGITUDE - Decimal degrees X coordinate of the node using GCS_WGS_1984 datum.
+LATITUDE - Decimal degrees Y coordinate of the node using GCS_WGS_1984 datum.
+ASPECT - Stream aspect in the direction of flow.
+
+"""
 
 # Import system modules
 from __future__ import division, print_function
@@ -55,8 +56,6 @@ from operator import itemgetter
 import arcpy
 from arcpy import env
 
-env.overwriteOutput = True
-
 # ----------------------------------------------------------------------
 # Start Fill in Data
 streamline_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams_major"
@@ -69,21 +68,10 @@ nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 # End Fill in Data
 # ----------------------------------------------------------------------
 
-# Parameter fields for python toolbox
-#streamline_fc = parameters[0].valueAsText
-#sid_field = parameters[1].valueAsText
-#node_dx = parameters[2].valueAsText
-#cont_stream_km = parameters[3].valueAsText
-#checkDirection = parameters[4].valueAsText
-#z_raster = = parameters[5].valueAsText
-#nodes_fc = parameters[6].valueAsText
+# Future Updates
+# eliminate arcpy and use gdal for reading/writing feature class data
 
-#streamline_fc = arcpy.GetParameterAsText(0)
-#sid_field = arcpy.GetParameterAsText(1)
-#node_dx = arcpy.GetParameterAsText(2)
-#checkDirection = arcpy.GetParameterAsText(3)
-#z_raster = arcpy.GetParameterAsText(4)
-#nodes_fc = arcpy.GetParameterAsText(5)
+env.overwriteOutput = True
 
 def create_node_list(streamline_fc, checkDirection, z_raster):
     """Reads an input stream centerline file and returns the NODE ID,
@@ -132,7 +120,7 @@ def create_node_list(streamline_fc, checkDirection, z_raster):
             mid_distance = node_dx * con_from_m / lineLength
             if mid_distance > 1:
                 # this situation occurs when the stream < node_dx.
-                # The azimith is calculated for the entire stream line.
+                # The azimuth is calculated for the entire stream line.
                 mid_distance = 1
                 
             i = 0
@@ -293,13 +281,13 @@ try:
                  "{0}\n".format(nodes_fc) +
                  "Please rename your output.")
     
-    # Get the spatial projecton of the input stream lines
+    # Get the spatial projection of the input stream lines
     proj = arcpy.Describe(streamline_fc).SpatialReference    
     
     if checkDirection is True:
         proj_ele = arcpy.Describe(z_raster).spatialReference
     
-        # Check to make sure the  elevatiohn raster and input 
+        # Check to make sure the  elevation raster and input
         # streams are in the same projection.
         if proj.name != proj_ele.name:
             arcpy.AddError("{0} and {1} do not ".format(nodes_fc,z_raster)+
