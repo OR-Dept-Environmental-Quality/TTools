@@ -1,12 +1,135 @@
-########################################################################
-# TTools
-# Step 5: Sample Landcover - Star Pattern, Point Method v 0.997
-# Ryan Michie
+#!/usr/bin/python
 
-# Sample_Landcover_PointMethod will take an input point 
-# feature (from Step 1) and sample input landcover rasters in a user 
-# specified number of cardinal directions with point samples spaced
-# at a user defined distance moving away from the stream.
+"""
+TTools Step 5: Sample Landcover - Star Pattern
+
+The star pattern sampling method will take an input point feature (from Step 1) and sample input landcover rasters
+along transects in any number of azimuth directions oriented outward from the stream node. The numer of transects,
+sample points along each transect, and the distance between samples is user defined. The measured distance along each
+transect starts at the stream node.
+
+The star pattern sampling method can be used to develop landcover inputs for Heat Source 7 - 9.
+
+REQUIREMENTS
+TTools steps 1 - 3 must be run before Step 5.
+ArcGIS 10.1 - 10.8.2
+Python 2.7
+
+INPUT VARIABLES
+0: nodes_fc:
+Path to the TTools point feature class.
+
+1: trans_count:
+Number of transects per node. The degrees of separation between each transect is equal to 360 / trans_count. If
+trans_count = 8, the heading of the first transect is 45 degrees (Northeast), the second transect is 90 degrees
+(West), and the eighth is 360 degrees (North). Transects are oriented clockwise from north. trans_count is ignored if
+heatsource8 = True.
+
+2: transsample_count:
+Number of samples per transect. This number DOES NOT include the sample at the stream node.
+
+3: transsample_distance:
+The distance between transect samples measured in meters.
+
+4: zone_sample:
+Boolean (True/False) flag to indicate if the sample should represent a zone and be centered relative to
+the transsample_distance as measured from the stream node. If this is True the distance from the stream
+node to the sample location along each transect is equal to the transsample_distance * (sample number - 0.5).
+This should be True if using heat source 7, heat source 8.0.1 - 8.0.5, or heat source 8.0.7 -  8.0.8 when the model is
+configured to use the zone method. This should be False if using heat source 9 or when using heat source 8.0.7 -  8.0.8
+and the model is configured to use the point method.
+
+5. heatsource8:
+Boolean (True/False) flag to indicate if the star pattern with 7 transects should be used. Heat source
+version 7 and 8 use 7 transects around each stream node in the following directions: Northeast, East, Southeast, South,
+Southwest, West, Northwest.
+
+6: sampleID_for_code
+Boolean (True/False) flag to indicate if the sample id should be used as the landcover value. If True the lc_raster
+will be ignored and only the z_raster will be sampled. Generally this should be set to False.
+
+7: lc_raster:
+Path and name of the land cover code, height, or elevation raster.
+
+8: lc_units:
+z units of the lc_raster (aka units of height or elevation). Use "Feet", "Meters", or "None" if the lc_raster values are
+codes and do not represent elevation or height units.
+
+9: canopy_data:
+The input canopy data type being sampled in canopy_raster. Can be one of "CanopyCover", "LAI", or "None" if not sampling
+a canopy raster. If canopy_data = None, the variables canopy_raster, k_raster, and oh_raster are ignored.
+
+10: canopy_raster
+Path and name of the canopy or LAI raster. Ignored if canopy_data = "None".
+
+11: k_raster
+Path and name of the k coefficient raster. There must be a k_raster if canopy_data = "LAI". Ignored if
+canopy_data = "None".
+
+12: oh_raster
+Path and name of the vegetation overhang raster. Ignored if canopy_data = "None".
+
+13: z_raster:
+Path and name of the ground elevation raster.
+
+14: z_units:
+z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is not in feet or meters the elevation
+values must be converted.
+
+15: lc_point_fc:
+Path and name of output sample point feature file.
+
+16: block_size:
+The x and y size in kilometers for each raster block pulled into an array. Start with 5 if you aren't sure and reduce
+if there is an error. To increase processing speed rasters are subdivided iteratively into smaller blocks and pulled
+into arrays for processing. Very large block sizes may use a lot of memory and result in an error.
+
+17: overwrite_data:
+True/False flag if existing data in nodes_fc and lc_point_fc can be overwritten.
+
+OUTPUTS
+0. nodes_fc:
+New fields are added into nodes_fc with the Landcover and elevation values for each transect sample
+
+1. lc_point_fc:
+New point feature class created with a point at each x/y sample and the sample raster values
+
+"""
+# Import system modules
+from __future__ import division, print_function
+import sys
+import os
+import gc
+import time
+import traceback
+from datetime import timedelta
+from math import radians, sin, cos, ceil
+from collections import defaultdict, OrderedDict
+import arcpy
+from arcpy import env
+
+# ----------------------------------------------------------------------
+# Start input variables
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+trans_count = 8 
+transsample_count = 5
+transsample_distance = 8
+zone_sample = False
+heatsource8 = False
+sampleID_for_code = False
+lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
+lc_units = "Meters"
+canopy_data = None
+canopy_raster = None
+k_raster = None
+oh_raster = None
+z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_units = "Meters"
+lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint_two"
+block_size = 5
+overwrite_data = True
+# End input variables
+# ----------------------------------------------------------------------
 
 # General scripts steps include:
 # 1. open nodes fc. iterate and read info from node fc into a dict
@@ -23,33 +146,6 @@
     #- update the lc sample fc
     #- continue to the next block
 
-# INPUTS
-# 0: TTools point feature class (nodes_fc)
-# 1: Number of transects per node (trans_count)
-# 2: Number of samples per transect (transsample_count)
-# 3: The distance between transect samples (transsample_distance)
-# 4: True/False flag if using heatsource 8 methods (heatsource8)
-# 5: Land cover code or height raster (lc_raster)
-# 6: input (optional) landcover height z units 
-#     1. "Feet", 2. "Meters" 3. "None" Float (lc_units)
-# 7: OPTIONAL - landcover data type:
-#     1."CanopyCover", or 2."LAI" (canopy_data_type)
-# 8: OPTIONAL - canopy cover or LAI raster (canopy_raster)
-# 9: OPTIONAL - k coefficient raster (k_raster)
-# 10: OPTIONAL - overhang raster (oh_raster)
-# 11: Elevation raster (z_raster)
-# 12: Elevation raster z units (z_units)
-#      1. "Feet", 2. "Meters" 3. "Other"
-# 13: Path/name of output sample point file (lc_point_fc)
-# 14: OPTIONAL - km distance to process within each array (block_size)
-# 15: True/False flag if existing data can be over written (overwrite_data)
-
-# OUTPUTS
-# 0. point feature class (edit nodes_fc) - added fields with 
-#     Landcover and elevation data for each azimuth direction at each node
-# 1. point feature class (new) - point at each x/y sample and 
-#     the sample raster values
-
 # Future Updates
 # -Change the node dict so the node is the primary key
 # -Build the block list based on the nodes and then build point list iteratively
@@ -58,48 +154,7 @@
 # -Include stream sample in transect count (True/False)
 # -Eliminate arcpy and use gdal for reading/writing feature class data
 
-# This version is for manual starts from within python.
-# This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
-
-########################################################################
-
-# Import system modules
-from __future__ import division, print_function
-import sys
-import os
-import gc
-import time
-import traceback
-from datetime import timedelta
-from math import radians, sin, cos, ceil, sqrt
-from collections import defaultdict, OrderedDict
-import numpy
-import arcpy
-from arcpy import env
-
 env.overwriteOutput = True
-
-# ----------------------------------------------------------------------
-# Start Fill in Data
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
-trans_count = 8 
-transsample_count = 5 # does not include a sample at the stream node
-transsample_distance = 8
-heatsource8 = False
-sampleID_for_code = False  # Use the sampleID as the code in the nodes_fc instead of lc_raster value
-lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
-lc_units = "Meters"
-canopy_data_type = "#" # OPTIONAL This is either 1. "CanopyCover", or 2."LAI"
-canopy_raster = "#" # OPTIONAL This is either canopy cover or a LAI raster
-k_raster = "#" # OPTIONAL This is the k value for LAI
-oh_raster = "#" # OPTIONAL This is the overhang raster
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
-z_units = "Meters"
-lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint_two"
-block_size = "#" # OPTIONAL default to 5
-overwrite_data = True
-# End Fill in Data
-# ----------------------------------------------------------------------
 
 def nested_dict(): 
     """Build a nested dictionary"""
@@ -191,7 +246,7 @@ def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc,
                                           "", "", "", "NULLABLE", "NON_REQUIRED")                 
     
     if not overwrite_data:
-        # Build a query to retreive existing rows from the nodes 
+        # Build a query to retrieve existing rows from the nodes
         # that need updating
         whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_in_block))        
         
@@ -205,19 +260,18 @@ def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc,
         for row in lc_point_list:
             cursor.insertRow(row)
 
-def setup_lcdata_headers(transsample_count, trans_count,
-                          canopy_data_type, stream_sample):
+def setup_lcdata_headers(transsample_count, trans_count, canopy_data):
     """Generates a list of the landcover data file
     column header names and data types"""
     
     type = ["ELE"]
      
     #Use LAI methods   
-    if canopy_data_type == "LAI":
+    if canopy_data == "LAI":
         type = type + ["LAI","k","OH"]
     
     #Use Canopy Cover methods    
-    if canopy_data_type == "CanopyCover":  
+    if canopy_data == "CanopyCover":
         type = type + ["CAN","OH"]
     
     lcheaders = []
@@ -231,7 +285,7 @@ def setup_lcdata_headers(transsample_count, trans_count,
     
     for d, dir in enumerate(dirs):
         for z, zone in enumerate(zones):
-            if stream_sample and d==0 and z==0:
+            if d==0 and z==0:
                 lcheaders.append("LC_T0_S0") # add emergent
                 lcheaders.append("LC_{0}_S{1}".format(dir, zone))
             else:
@@ -240,14 +294,12 @@ def setup_lcdata_headers(transsample_count, trans_count,
     for t in type:
         for d, dir in enumerate(dirs):
             for z, zone in enumerate(zones):
-                if stream_sample and t !="ELE" and d==0 and z==0:
+                if t !="ELE" and d==0 and z==0:
                     otherheaders.append(t+"_T0_S0") # add emergent
                     otherheaders.append("{0}_{1}_S{2}".format(t, dir, zone))
                 else:
                     otherheaders.append("{0}_{1}_S{2}".format(t, dir, zone))    
-                    
-    #type = ["LC"] + type
-    
+
     return lcheaders, otherheaders
 
 def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
@@ -257,7 +309,7 @@ def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_ce
     xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y 
     return xy
 
-def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_distance):
+def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_distance, zone_sample):
     """This builds a unique long form list of information for all the
     landcover samples in the block. This list is used to
     create/update the output feature class."""
@@ -265,13 +317,17 @@ def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_dist
     lc_point_list = []
     numDirs = len(dirs)
     numZones = len(zones)
-    zonesPerNode = (numDirs * numZones) + 1  
+    zonesPerNode = (numDirs * numZones) + 1
+
+    if zone_sample:
+        adjust = 0.5
+    else:
+        adjust = 0.0
 
     for nodeID in nodes_in_block:
         origin_x = nodeDict[nodeID]["POINT_X"]
         origin_y = nodeDict[nodeID]["POINT_Y"]
         streamID = nodeDict[nodeID]["STREAM_ID"]
-        #sampleID = '{0}{1}{2}'.format(nodeID, '000', '00')
         sampleID = nodeID * zonesPerNode
         
         # This is the emergent/stream sample
@@ -283,9 +339,9 @@ def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_dist
             for zone in zones:
                 # Calculate the x and y coordinate of the 
                 # landcover sample location
-                pt_x = (zone * transsample_distance * con_from_m *
+                pt_x = ((zone - adjust) * transsample_distance * con_from_m *
                         sin(radians(dir))) + origin_x
-                pt_y = (zone * transsample_distance * con_from_m *
+                pt_y = ((zone - adjust) * transsample_distance * con_from_m *
                         cos(radians(dir))) + origin_y
                 
                 key = 'T{0}_S{1}'.format(d+1, zone)
@@ -301,8 +357,8 @@ def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_dist
     return lc_point_list
 
 def create_block_list(nodes, block_size):
-    """Returns two lists, one containting the coordinate extent
-    for each block that will be itterativly extracted to an array
+    """Returns two lists, one containing the coordinate extent
+    for each block that will be iteratively extracted to an array
     and the other containing node IDs within each block extent."""
     
     print("Calculating block extents")    
@@ -443,8 +499,7 @@ def sample_raster(block, lc_point_list, raster, con):
 def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
     """Updates the input point feature class with data from the
     nodes dictionary"""
-    #print("Updating input point feature class")
-    
+
     # Build a query to retrieve just the nodes that needs updating
     whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_to_query))
 
@@ -519,7 +574,7 @@ try:
     # in the future block size should be estimated based on available memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
-    if block_size in ["#", ""]:
+    if block_size in ["#", "", None]:
         block_size = int(con_from_m * 5000)
     else:
         block_size = int(con_from_m * block_size * 1000)
@@ -539,59 +594,25 @@ try:
                        "Please reproject your data.")
         sys.exit("The landcover and elevation rasters do not have the "+
                  "same projection. Please reproject your data.")    
-       
-    # Setup the raster list
-    #typeraster = [lc_raster, z_raster]
-    #if canopy_data_type == "LAI":  #Use LAI methods
-        #if canopy_raster is not "#": typeraster.append(canopy_raster)
-        #else: typeraster.append(None)
-        #if k_raster is not "#": typeraster.append(k_raster)
-        #else: typeraster.append(None)
-        #if oh_raster is not "#": typeraster.append(oh_raster)
-        #else: typeraster.append(None)
-        
-    #if canopy_data_type == "CanopyCover":  #Use Canopy Cover methods
-        #if canopy_raster is not "#": typeraster.append(canopy_raster)
-        #else: typeraster.append(None)
-        #if oh_raster is not "#": typeraster.append(oh_raster)
-        #else: typeraster.append(None)   
-    
+
     # Setup the raster dictionary. It is ordered because
     # key list needs to correspond to the order of the attribute fields
     rasterDict = OrderedDict({"LC": lc_raster,
                               "ELE": z_raster})
+    if sampleID_for_code:
+        rasterDict["LC"] = None
 
-    if canopy_data_type == "LAI":  #Use LAI methods
-        if canopy_raster is not "#":
-            rasterDict["LAI"] = canopy_raster
-        else:
-            rasterDict["LAI"] = None
+    if canopy_data == "LAI":
+        # Use LAI methods
+        rasterDict["LAI"] = canopy_raster
+        rasterDict["k"] = k_raster
+        rasterDict["OH"] = oh_raster
 
-        if k_raster is not "#":
-            rasterDict["k"] = k_raster
-        else:
-            rasterDict["k"]  = None
-            
-        if oh_raster is not "#":
-            rasterDict["OH"] = oh_raster
-        else:
-            rasterDict["OH"] = None    
-        
+    if canopy_data == "CanopyCover":
+        # Use Canopy Cover methods
+        rasterDict["CAN"] = canopy_raster
+        rasterDict["OH"] = oh_raster
 
-    if canopy_data_type == "CanopyCover":  #Use Canopy Cover methods
-        if canopy_raster is not "#":
-            rasterDict["CAN"] = canopy_raster
-        else:
-            rasterDict["CAN"]  = None
-        
-        if oh_raster is not "#":
-            rasterDict["OH"] = oh_raster
-        else:
-            rasterDict["OH"] = None    
-        
-
-
-    
     # flag indicating the model should use the heat source 8 methods 
     # (same as 8 directions but no north)
     if heatsource8:
@@ -601,20 +622,8 @@ try:
         dirs = [x * 360.0 / trans_count for x in range(1,trans_count+ 1)]
 
     zones = range(1,int(transsample_count+1))
-    
-    # TODO
-    stream_sample = True
-    # This is a future function that may replace the emergent methods.
-    # If True there is a regular landcover sample at the stream node
-    # for each azimuth direction vs a single emergent sample at the 
-    # stream node.
-    #if stream_sample == "TRUE":
-        #zone = range(0,int(transsample_count))
-    #else:
-        #zone = range(1,int(transsample_count+1))
 
-    lcheaders, otherheaders = setup_lcdata_headers(transsample_count, trans_count,
-                                            canopy_data_type, stream_sample)
+    lcheaders, otherheaders = setup_lcdata_headers(transsample_count, trans_count, canopy_data)
     
     addFields = lcheaders + otherheaders
     
