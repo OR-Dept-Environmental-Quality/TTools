@@ -18,13 +18,13 @@ TTools steps 1 - 3 must be run before Step 5.
 ArcGIS 10.1 - 10.8.2
 Python 2.7
 
-ARGUMENTS
+INPUT VARIABLES
 0: nodes_fc:
 path to the TTools point feature class.
 
 1: start_bank:
 boolean (True/False) to indicate if the transect should start at the stream bank. If False the transect will start at
-the stream node.
+the stream node. Normally set to True.
 
 2: transsample_count:
 Number of samples per transect. The number DOES NOT include the sample at the stream node.
@@ -32,17 +32,11 @@ Number of samples per transect. The number DOES NOT include the sample at the st
 3: transsample_distance:
 The distance between transect samples (meters).
 
-4: centered_sample:
-Boolean (True/False) flag to indicate if the sample should be centered in the middle of each transect. When True an
-additional offset equal to 0.5 * transsample_distance is applied to adjust where the sample occurs relative to where
-the transect is measured from. The result is the sample is centered over the length of the transsample distance.
-This should be True if using heat source 6.
-
 5: lc_raster:
 Path and name of the land cover code, height, or elevation raster.
 
 6: lc_units:
-z units of the lc_raster (aka units of height or elevation). Use "Feet", "Meters", or "None" if the lc_raster values are
+z units of the lc_raster (aka units of height or elevation). Use "Feet", "Meters", or None if the lc_raster values are
 codes and do not represent elevation or height units.
 
 7: z_raster:
@@ -63,6 +57,13 @@ into arrays for processing. Very large block sizes may use a lot of memory and r
 11: overwrite_data:
 True/False flag if existing data in nodes_fc and lc_point_fc can be overwritten.
 
+OUTPUTS
+0. nodes_fc:
+New fields are added into nodes_fc with the Landcover and elevation values for each transect sample
+
+1. lc_point_fc:
+New point feature class created with a point at each x/y sample and the sample raster values
+
 """
 # Import system modules
 from __future__ import division, print_function
@@ -79,16 +80,15 @@ from arcpy import env
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"C:\workspace\Sandy_2016\Bull_Run_stream_nodes.shp"
+nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 start_bank = True
 transsample_count = 9
 transsample_distance = 8
-centered_sample = True
-lc_raster = r"C:\workspace\Sandy_2016\dem10\sandy_dem10"
-lc_units = "#"
-z_raster = r"C:\workspace\Sandy_2016\dem10\sandy_dem10"
-z_units = "Feet"
-lc_point_fc = r"C:\workspace\Sandy_2016\Bull_Run_LC_samples.shp"
+lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
+lc_units = "Meters"
+z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_units = "Meters"
+lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_LC_samples"
 block_size = 5
 overwrite_data = True
 # End input variables
@@ -228,8 +228,7 @@ def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc,
             cursor.insertRow(row)
 
 def setup_lcdata_headers(transsample_count):
-    """Generates a list of the landcover data file
-    column header names and data types"""
+    """Generates a list of the landcover data file column header names and data types"""
     
     type = ["ELE"]
 
@@ -294,10 +293,6 @@ def create_lc_point_list(nodeDict, nodes_in_block, transsample_count, transsampl
         else:
             offset_l = 0
             offset_r = 0
-
-        if centered_sample:
-            offset_l = offset_l + (0.5 * transsample_distance)
-            offset_r = offset_r + (0.5 * transsample_distance)
 
         # calculate right and left transect directions in degrees
         dir_left = aspect - 90
@@ -485,8 +480,7 @@ def sample_raster(block, lc_point_list, raster, con):
 def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
     """Updates the input point feature class with data from the
     nodes dictionary"""
-    #print("Updating input point feature class")
-    
+
     # Build a query to retrieve just the nodes that needs updating
     whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_to_query))
 
@@ -561,7 +555,7 @@ try:
     # in the future block size should be estimated based on availiable memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
-    if block_size in ["#", ""]:
+    if block_size in ["#", "", None]:
         block_size = int(con_from_m * 5000)
     else:
         block_size = int(con_from_m * block_size * 1000)
@@ -587,7 +581,7 @@ try:
     rasterDict = OrderedDict({"LC": lc_raster,
                               "ELE": z_raster})
 
-    lcheaders, otherheaders = setup_lcdata_headers(transsample_count, canopy_data_type)
+    lcheaders, otherheaders = setup_lcdata_headers(transsample_count)
     
     addFields = lcheaders + otherheaders
     
