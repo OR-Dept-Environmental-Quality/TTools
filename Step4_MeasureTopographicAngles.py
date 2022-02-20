@@ -1,44 +1,62 @@
-########################################################################
-# TTools
-# Step 4: Measure Topographic Angles - v 0.98
-# Ryan Michie
+#!/usr/bin/python
 
-# Measure_Topographic_Angles will take an input point feature
-# (from Step 1) and calculate the maximum topographic elevation
-# and the the slope angle from each node in different directions.
+"""
+TTools Step 4: Measure Topographic Shade Angles
 
-# INPUTS
-# 0: Input TTools point feature class(nodes_fc)
-# 1: Input the integer corresponding to the specific azimuth directions to sample (ie. 1, 2, or 3)
-#    (topo_directions)
-#    1. Heat Source 5-6: [W,S,E]
-#    2. Heat Source 7 +: [NE,E,SE,S,SW,W,NW,N]
-#    3. CE-QUAL-W2: [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
-# 2: input the maximum km distance to search (searchDistance_max_km)
-# 3: input elevation raster (z_raster)
-# 4: input elevation raster z units (z_units)
-#     "Feet", "Meters", or "Other"
-# 5: output sample point file name/path (topo_fc)
-# 6: input flag if existing data can be over
-#     written (overwrite_data) True or False
+This script will take an input point feature (from Step 1) and calculate the maximum topographic 
+shade angle for each stream node in different directions.
+
+REQUIREMENTS
+TTools steps 1 - 3 must be run before Step 4.
+ArcGIS 10.1 - 10.8.2
+Python 2.7
+
+INPUT VARIABLES
+0: nodes_fc:
+Path to the TTools point feature class.
+
+1: topo_directions
+An integer value corresponding to the specific list of azimuth directions to sample (e.g. topo_directions = 1).
+Options listed below.
+
+1. Heat Source or Washington Department of Ecology's Shade model: [270, 180, 90]
+2. All cardinal and intercardinal directions: [45, 90, 135, 180, 225, 270, 315, 360]
+3. CE-QUAL-W2: [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
+
+For heat source or Washington Department of Ecology's Shade model use topo_directions = [270, 180, 90]
+For CE-QUAL-W2 use topo_directions = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
+
+2: searchDistance_max_km
+The maximum distance in kilometers to search for the largest topographic shade angle.
+
+3: z_raster:
+Path and name of the ground elevation raster.
+
+4: z_units:
+z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is not in feet or meters the elevation
+values must be converted.
+
+5: topo_fc:
+Path and name of output topographic point feature. This feature identifies the location on the z_raster producing
+the largest topographic shade angle for each node and sample direction.
+
+6: block_size:
+The x and y size in kilometers for the z_raster blocks pulled into an array. Start with 5 if you aren't sure and reduce
+if there is an error. To increase processing the z_raster is subdivided iteratively into smaller blocks and pulled
+into arrays for processing. Very large block sizes may use a lot of memory and result in an error.
+
+7: overwrite_data:
+True/False flag if existing data in nodes_fc and topo_fc can be overwritten.
 
 # OUTPUTS
-# 0. point feature class (edit nodes_fc) - Added fields with topographic
-#     shade angles for each direction at each node
-# 1. point feature class (new) - point for each x/y location
-#     of the maximum elevation.
+0. nodes_fc:
+New fields are added into nodes_fc with the maximum topographic shade angles for each direction at each node.
 
-# Future Updates
-# find the bug that generates off array samples (see s. willamette)
-# update fc after each topo line sample so data isn't lost if the
-# script crashes
-# eliminate arcpy and use gdal for reading/writing feature class data
+1. topo_fc: - point for each x/y location of the maximum elevation.
+New point feature class created with a point at each x/y location that produces the largest topographic shade angle
+for each node and sample direction.
 
-# This version is for manual starts from within python.
-# This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
-
-########################################################################
-
+"""
 # Import system modules
 from __future__ import division, print_function
 import sys
@@ -54,31 +72,29 @@ from collections import defaultdict
 import numpy as np
 
 # ----------------------------------------------------------------------
-# Start Fill in Data
+# Start input variables
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 topo_directions = 1
 searchDistance_max_km = 10
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 z_units = "Meters"
 topo_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\topo_samples"
-block_size = "#" # OPTIONAL defualt to 5
+block_size = 5
 overwrite_data = True
-# End Fill in Data
+# End input variables
+# ----------------------------------------------------------------------
 
-# Used for debugging. Currently turned off. 
+# Future Updates
+# Fix the bug that incrementally mis-measures the distance across a raster cell for topo directions that aren't 45 degree
+# increments. Usually for long distances the sample is about one cell off and does not appear to impact results very
+# much if at all.
+# update fc after each topo line sample so data isn't lost if the script crashes
+# eliminate arcpy and use gdal for reading/writing feature class data
+
+# The below are used for debugging. Currently, turned off.
 topo_line_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\topo_line"
 block_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\blocks"
 plot_dir = r"D:\Projects\TTools_9\plots"
-# ----------------------------------------------------------------------
-
-# Parameter fields for python toolbox
-# nodes_fc = parameters[0].valueAsText
-# topo_directions = parameters[1].valueAsText # Needs to be a long
-# searchDistance_max_km = parameters[2].valueAsText
-# z_raster = parameters[3].valueAsText
-# z_units = parameters[4].valueAsText
-# topo_fc = parameters[5].valueAsText
-# overwrite_data = parameters[6].valueAsText True/False
 
 def nested_dict():
     """Build a nested dictionary"""
