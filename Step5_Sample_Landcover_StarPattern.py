@@ -125,7 +125,7 @@ k_raster = None
 oh_raster = None
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 z_units = "Meters"
-lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\LC_samplepoint_two"
+lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_LC_samples"
 block_size = 5
 overwrite_data = True
 # End input variables
