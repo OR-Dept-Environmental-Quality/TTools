@@ -1,37 +1,48 @@
-########################################################################
-# TTools
-# Step 3: Sample Stream Elevations/ Gradient - v 0.97
-# Ryan Michie
+#!/usr/bin/python
 
-# Sample_ElevationsGradient will take an input point feature 
-# (from Step 1) and sample the input raster elevation to find the 
-# lowest elevation in a user defined search radius and calculate the 
-# gradient for each node in the downstream direction.
+"""
+TTools Step 3: Sample Elevation and Gradient
 
-# INPUTS
-# 0: Input TTools point feature class (nodes_fc)
-# 1: input the number of cells to search around the node 
-#     for the lowest elevation (searchCells)
-# 2: input flag for smoothing if gradient is zero 
-#     or negative (smooth_flag) 1. True, 2. False
-# 3: input elevation raster (z_raster)
-# 4: input elevation raster z units (z_units) 1. "Feet", 2. "Meters"
-# 5: OPTIONAL - km distance to process within each array (block_size)
-# 6: input flag if existing data can 
-#     be over written (overwrite_data) 1. True, 2. False
+This script will take an input point feature (from Step 1) and sample the input raster elevation to find the
+lowest elevation in a user defined search radius and calculate the gradient for each node in the downstream direction.
 
-# OUTPUTS
-# 0. point feature class (edit nodes_fc) - Added fields 
-#     with ELEVATION and GRADIENT for node
+REQUIREMENTS
+TTools steps 1 must be run before Step 3.
+ArcGIS 10.1 - 10.8.2
+Python 2.7
 
-# Future Updates
-# eliminate arcpy and use gdal for reading/writing feature class data
+INPUT VARIABLES
+0: nodes_fc:
+Path to the TTools point feature class.
 
-# This version is for manual starts from within python.
-# This script requires Python 2.6 and ArcGIS 10.1 or higher to run.
+1: searchCells
+The number of cells to search around the node for the lowest elevation.
 
-########################################################################
+2: smooth_flag
+Boolean (True/False) flag to indicate if smoothing should occur when the gradient is <= 0. When gradients are <= 0
+the algorithm moves downstream until it a positive gradient is found and then recalculate the gradient over the longer
+distance and applies the resulting value to all nodes over that distance.
 
+3: z_raster:
+Path and name of the ground elevation raster.
+
+4: z_units:
+z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is not in feet or meters the elevation
+values must be converted.
+
+6: block_size:
+The x and y size in kilometers for the z_raster blocks pulled into an array. Start with 5 if you aren't sure and reduce
+if there is an error. To increase processing the z_raster is subdivided iteratively into smaller blocks and pulled
+into arrays for processing. Very large block sizes may use a lot of memory and result in an error.
+
+7: overwrite_data:
+True/False flag if existing data in nodes_fc can be overwritten.
+
+OUTPUTS
+0. nodes_fc:
+New fields ELEVATION and GRADIENT are added into nodes_fc.
+
+"""
 # Import system modules
 from __future__ import division, print_function
 import sys
@@ -46,25 +57,19 @@ from math import ceil
 from collections import defaultdict
 
 # ----------------------------------------------------------------------
-# Start Fill in Data
+# Start input variables
 nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
 searchCells = 2
 smooth_flag = True
 z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
 z_units = "Meters"
-block_size = 5 # OPTIONAL default to 5
+block_size = 5
 overwrite_data = True
-# End Fill in Data
+# End input variables
 # ----------------------------------------------------------------------
 
-# Parameter fields for python toolbox
-#nodes_fc = parameters[0].valueAsText
-#searchCells = parameters[1].valueAsText # Needs to be a int
-#smooth_flag = parameters[2].valueAsText # Needs to be a int
-#z_raster = parameters[3].valueAsText
-#z_units = parameters[4].valueAsText
-#block_size =  parameters[5].valueAsText
-#overwrite_data = parameters[6].valueAsText
+# Future Updates
+# eliminate arcpy and use gdal for reading/writing feature class data
 
 def nested_dict(): 
     """Build a nested dictionary"""
