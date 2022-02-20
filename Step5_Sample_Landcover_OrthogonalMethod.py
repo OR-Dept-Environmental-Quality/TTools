@@ -39,17 +39,17 @@ the transect is measured from. The result is the sample is centered over the len
 This should be True if using heat source 6.
 
 5: lc_raster:
-Path to the land cover code or height raster.
+Path and name of the land cover code, height, or elevation raster.
 
 6: lc_units:
-z units (aka units of height or elevation) of the lc_raster. Use "Feet", "Meters", or "None" if the lc_raster values are
+z units of the lc_raster (aka units of height or elevation). Use "Feet", "Meters", or "None" if the lc_raster values are
 codes and do not represent elevation or height units.
 
 7: z_raster:
 Path and name of the ground elevation raster.
 
 8: z_units:
-z_raster elevation units. Either "Feet" or "Meters". If the z unit is not in feet or meters the elevation values
+z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is not in feet or meters the elevation values
 must be converted.
 
 9: lc_point_fc:
@@ -61,7 +61,7 @@ if there is an error. To increase processing speed rasters are subdivided iterat
 into arrays for processing. Very large block sizes may use a lot of memory and result in an error.
 
 11: overwrite_data:
-True/False flag if existing data can be overwritten.
+True/False flag if existing data in nodes_fc and lc_point_fc can be overwritten.
 
 """
 # Import system modules
@@ -76,8 +76,6 @@ from math import radians, sin, cos, ceil
 from collections import defaultdict, OrderedDict
 import arcpy
 from arcpy import env
-
-env.overwriteOutput = True
 
 # ----------------------------------------------------------------------
 # Start input variables
@@ -96,7 +94,7 @@ overwrite_data = True
 # End input variables
 # ----------------------------------------------------------------------
 
-# General scripts steps include:
+# General script steps include:
 # 1. open nodes fc. iterate and read info from node fc into a dict
 
 # 2. create a list with the x/y and related info for each lc sample
@@ -113,14 +111,13 @@ overwrite_data = True
 
 # Future Updates
 # -Change the node dict so the node is the primary key
-# -Build the block list based on the nodes and then build point list iteratively
-# instead of building them into one huge list. The huge list results
-# in a memory error for large areas
+# -Build the block list based on the nodes and then build point list iteratively instead of building them into
+#   one huge list. The huge list results in a memory error for large areas
 # -Eliminate arcpy and use gdal for reading/writing feature class data
 
-# This version is for manual starts from within python.
+env.overwriteOutput = True
 
-def nested_dict(): 
+def nested_dict():
     """Build a nested dictionary"""
     return defaultdict(nested_dict)
 
