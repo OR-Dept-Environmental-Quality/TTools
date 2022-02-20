@@ -23,9 +23,6 @@ Options listed below.
 2. All cardinal and intercardinal directions: [45, 90, 135, 180, 225, 270, 315, 360]
 3. CE-QUAL-W2: [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
 
-For heat source or Washington Department of Ecology's Shade model use topo_directions = [270, 180, 90]
-For CE-QUAL-W2 use topo_directions = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
-
 2: searchDistance_max_km
 The maximum distance in kilometers to search for the largest topographic shade angle.
 
