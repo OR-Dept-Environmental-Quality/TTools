@@ -662,7 +662,7 @@ try:
         
         # build the landcover sample list
         lc_point_list = create_lc_point_list(nodeDict, nodes_in_block,
-                                            dirs, zones, transsample_distance)
+                                            dirs, zones, transsample_distance, zone_sample)
         
         for t, (type, raster) in enumerate(rasterDict.iteritems()):
             if raster is None:
