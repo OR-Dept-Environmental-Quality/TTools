@@ -33,7 +33,6 @@ RIGHT: distance in meters from the stream ode to the closest edge of the right b
 
 """
 # Import system modules
-from __future__ import division, print_function
 import sys
 import gc
 import time
@@ -46,9 +45,9 @@ from collections import defaultdict
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
-rb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
-lb_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_streams"
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
+rb_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_thalweg"
+lb_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_thalweg"
 overwrite_data = True
 # End input variables
 # ----------------------------------------------------------------------
@@ -244,9 +243,9 @@ try:
             nodeDict[streamID][nodeID]["CHANWIDTH"] = (lb_distance + rb_distance) * con_to_m
             nodeDict[streamID][nodeID]["LEFT"] = lb_distance * con_to_m
             nodeDict[streamID][nodeID]["RIGHT"] = rb_distance * con_to_m
-
+            
     update_nodes_fc(nodeDict, nodes_fc, addFields)
-
+    
     gc.collect()
 
     endTime = time.time()

@@ -66,7 +66,6 @@ New point feature class created with a point at each x/y sample and the sample r
 
 """
 # Import system modules
-from __future__ import division, print_function
 import sys
 import os
 import gc
@@ -80,15 +79,15 @@ from arcpy import env
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_trans_py39"
 start_bank = True
 transsample_count = 9
 transsample_distance = 8
-lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
+lc_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_vght_m_mosaic"
 lc_units = "Meters"
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
 z_units = "Meters"
-lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_LC_samples"
+lc_point_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_LC_orth_samples"
 block_size = 5
 overwrite_data = True
 # End input variables
@@ -552,7 +551,7 @@ try:
     con_z_to_m = from_z_units_to_meters_con(z_units)
     
     # convert block size from km to meters to units of the node fc
-    # in the future block size should be estimated based on availiable memory
+    # in the future block size should be estimated based on available memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
     if block_size in ["#", "", None]:
@@ -604,8 +603,8 @@ try:
     nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
     
     # Get a list of the nodes, sort them
-    nodes = nodeDict.keys()
-    nodes.sort()    
+    nodes = list(nodeDict.keys())
+    nodes.sort()
    
     # Build the block list
     block_extents, block_nodes = create_block_list(nodes, block_size)
@@ -621,7 +620,7 @@ try:
         # build the landcover sample list
         lc_point_list = create_lc_point_list(nodeDict, nodes_in_block, transsample_count, transsample_distance, start_bank)
         
-        for t, (type, raster) in enumerate(rasterDict.iteritems()):
+        for t, (type, raster) in enumerate(rasterDict.items()):
             if raster is None:
                 for i in range(0, len(lc_point_list)):
                     lc_point_list[i].append(-9999)
@@ -644,7 +643,7 @@ try:
         update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_in_block)
         
         # Build the output point feature class using the data         
-        update_lc_point_fc(lc_point_list, rasterDict.keys(), lc_point_fc,
+        update_lc_point_fc(lc_point_list, list(rasterDict.keys()), lc_point_fc,
                            nodes_fc, nodes_in_block, overwrite_data, proj)
     
         total_samples = total_samples + len(lc_point_list)
@@ -653,7 +652,7 @@ try:
     
     endTime = time.time()
     
-    elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
+    elapsedmin = ceil(((endTime - startTime) / 60)* 10)/10
     mspersample = timedelta(seconds=(endTime - startTime) /
                             total_samples).microseconds
     print("Process Complete in {0} minutes. {1} microseconds per sample".format(elapsedmin, mspersample))

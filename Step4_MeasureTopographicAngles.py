@@ -55,7 +55,6 @@ for each node and sample direction.
 
 """
 # Import system modules
-from __future__ import division, print_function
 import sys
 import os
 import gc
@@ -70,12 +69,12 @@ import numpy as np
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
 topo_directions = 1
-searchDistance_max_km = 10
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+searchDistance_max_km = 5
+z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
 z_units = "Meters"
-topo_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\topo_samples"
+topo_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\topo_samples"
 block_size = 5
 overwrite_data = True
 # End input variables
@@ -407,7 +406,7 @@ def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
     blockDict = nested_dict()
 
     # Get a list of the nodes, sort them
-    nodes = nodeDict.keys()
+    nodes = list(nodeDict.keys())
     nodes.sort()
 
     topo_list = []
@@ -475,7 +474,7 @@ def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
                               (block_x_min, block_y_max))
             # --------------------------------------------------------
 
-            # Now start itterating through the topo list to evaluate
+            # Now start iterating through the topo list to evaluate
             # if any part of the topo line is in the block extent
             for nodeID, streamID, a, z_node, node_x, node_y, end_x, end_y in topo_list:
 
@@ -872,7 +871,7 @@ try:
     searchDistance_max = int(con_from_m * searchDistance_max_m)
 
     # convert block size from km to meters to units of the node fc
-    # in the future block size should be estimated based on availiable memory
+    # in the future block size should be estimated based on available memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
     if block_size in ["#", ""]:
@@ -943,7 +942,7 @@ try:
 
     # Iterate through each block
     total_samples = 0
-    blockIDs = blockDict.keys()
+    blockIDs = list(blockDict.keys())
     blockIDs.sort()
 
     for p, blockID in enumerate(blockIDs):

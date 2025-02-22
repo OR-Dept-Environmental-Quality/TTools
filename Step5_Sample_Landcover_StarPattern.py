@@ -96,7 +96,6 @@ New point feature class created with a point at each x/y sample and the sample r
 
 """
 # Import system modules
-from __future__ import division, print_function
 import sys
 import os
 import gc
@@ -110,24 +109,26 @@ from arcpy import env
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
-trans_count = 8 
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
+trans_count = 8
 transsample_count = 5
 transsample_distance = 8
 zone_sample = False
 heatsource8 = False
 sampleID_for_code = False
-lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
+lc_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_vght_m_mosaic"
 lc_units = "Meters"
 canopy_data = None
 canopy_raster = None
 k_raster = None
 oh_raster = None
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
 z_units = "Meters"
-lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_LC_samples"
+lc_point_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_LC_samples"
 block_size = 5
 overwrite_data = True
+correctTTools = False
+
 # End input variables
 # ----------------------------------------------------------------------
 
@@ -182,7 +183,7 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     with arcpy.da.SearchCursor(nodes_fc, incursorFields,"",proj) as Inrows:
         if overwrite_data:
             for row in Inrows:
-                nodeDict[row[0]]["STREAM_ID"] = row[1] 
+                nodeDict[row[0]]["STREAM_ID"] = row[1]
                 nodeDict[row[0]]["STREAM_KM"] = row[2] 
                 nodeDict[row[0]]["POINT_X"] = row[3]
                 nodeDict[row[0]]["POINT_Y"] = row[4]
@@ -190,7 +191,7 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
             for row in Inrows:
                 # Is the data null or zero, if yes grab it.
                 if row[5] is None or row[5] == 0 or row[5] < -9998:
-                    nodeDict[row[0]]["STREAM_ID"] = row[1] 
+                    nodeDict[row[0]]["STREAM_ID"] = row[1]
                     nodeDict[row[0]]["STREAM_KM"] = row[2] 
                     nodeDict[row[0]]["POINT_X"] = row[3]
                     nodeDict[row[0]]["POINT_Y"] = row[4]
@@ -205,11 +206,10 @@ def update_lc_point_fc(lc_point_list, type, lc_point_fc, nodes_fc,
                        nodes_in_block, overwrite_data, proj):
     """Creates/updates the output landcover sample point feature
     class using the data from the landcover point list"""
-    #print("Exporting data to land cover sample feature class")
-    
-    cursorfields = ["POINT_X","POINT_Y"] +["STREAM_ID","NODE_ID", "SAMPLE_ID", 
-                                           "TRANS_DIR", "TRANSECT",
-                                           "SAMPLE", "KEY"] + type    
+
+    cursorfields = ["POINT_X","POINT_Y"] + ["STREAM_ID","NODE_ID", "SAMPLE_ID",
+                                            "TRANS_DIR", "TRANSECT",
+                                            "SAMPLE", "KEY"] + type
     
     # Check if the output exists and create if not
     if not arcpy.Exists(lc_point_fc):
@@ -308,6 +308,13 @@ def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_ce
     xy.append(int((easting - block_x_min) / x_cellsize))  # col, x
     xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y 
     return xy
+
+# def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
+#     """Converts x/y coordinates to col and row of the array, correcting for off-by-one row shift"""
+#     col = int((easting - block_x_min) / x_cellsize)  # col, x
+#     row = int((block_y_max - northing) / y_cellsize) + 1  # row, y (shift downward)
+#     return [col, row]
+
 
 def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_distance, zone_sample):
     """This builds a unique long form list of information for all the
@@ -544,6 +551,7 @@ def from_z_units_to_meters_con(zUnits):
 gc.enable()
 
 try:
+    
     print("Step 5: Sample Landcover - Star Pattern, Point Method")
     
     #keeping track of time
@@ -646,8 +654,8 @@ try:
     nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
     
     # Get a list of the nodes, sort them
-    nodes = nodeDict.keys()
-    nodes.sort()    
+    nodes = list(nodeDict.keys())
+    nodes.sort()
    
     # Build the block list
     block_extents, block_nodes = create_block_list(nodes, block_size)
@@ -664,7 +672,7 @@ try:
         lc_point_list = create_lc_point_list(nodeDict, nodes_in_block,
                                             dirs, zones, transsample_distance, zone_sample)
         
-        for t, (type, raster) in enumerate(rasterDict.iteritems()):
+        for t, (type, raster) in enumerate(rasterDict.items()):
             if raster is None:
                 for i in range(0, len(lc_point_list)):
                     lc_point_list[i].append(-9999)
@@ -693,16 +701,16 @@ try:
         update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_in_block)
         
         # Build the output point feature class using the data         
-        update_lc_point_fc(lc_point_list, rasterDict.keys(), lc_point_fc,
-                           nodes_fc, nodes_in_block, overwrite_data, proj)
+        update_lc_point_fc(lc_point_list=lc_point_list, type=list(rasterDict.keys()), lc_point_fc=lc_point_fc,
+                           nodes_fc=nodes_fc, nodes_in_block=nodes_in_block, overwrite_data=overwrite_data, proj=proj)
     
         total_samples = total_samples + len(lc_point_list)
         del lc_point_list
         gc.collect()
-    
+   
     endTime = time.time()
     
-    elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
+    elapsedmin = ceil(((endTime - startTime) / 60)* 10)/10
     mspersample = timedelta(seconds=(endTime - startTime) /
                             total_samples).microseconds
     print("Process Complete in {0} minutes. {1} microseconds per sample".format(elapsedmin, mspersample))

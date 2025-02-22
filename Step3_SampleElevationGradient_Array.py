@@ -44,7 +44,6 @@ New fields ELEVATION and GRADIENT are added into nodes_fc.
 
 """
 # Import system modules
-from __future__ import division, print_function
 import sys
 import gc
 import time
@@ -58,10 +57,10 @@ from collections import defaultdict
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
 searchCells = 2
 smooth_flag = True
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
 z_units = "Meters"
 block_size = 5
 overwrite_data = True
@@ -458,7 +457,7 @@ try:
     con_from_m = from_meters_con(nodes_fc)
     
     # convert block size from km to meters to units of the node fc
-    # in the future block size should be estimated based on availiable memory
+    # in the future block size should be estimated based on available memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
     if block_size in ["#", ""]:
@@ -490,7 +489,7 @@ try:
     if len(nodeDict) != 0:
         
         # Get a list of the nodes, sort them
-        nodes = nodeDict.keys()
+        nodes = list(nodeDict.keys())
         nodes.sort()
         n_nodes = len(nodes)
         
@@ -525,7 +524,7 @@ try:
         
     else:
         print("The elevation field checked in the input point feature class " +
-              "have existing data. Andvancing to gradient processing")
+              "have existing data. Advancing to gradient processing")
     del(nodeDict)
     
     # Start on gradients
@@ -538,8 +537,8 @@ try:
     for n, streamID in enumerate(nodeDict):
         print("Calculating gradients stream {0} of {1}".format(n + 1, len(nodeDict)))
             
-        stream_kms = nodeDict[streamID].keys()
-        stream_kms.sort(reverse=True)        
+        stream_kms = list(nodeDict[streamID].keys())
+        stream_kms.sort(reverse=True)
     
         z_list = [nodeDict[streamID][km]["ELEVATION"] for km in stream_kms]
         len_list = [nodeDict[streamID][km]["LENGTH"] for km in stream_kms]
