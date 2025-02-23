@@ -134,7 +134,51 @@ def calc_channel_width(node_geom, bank_geom, aspect, line_dis, proj_nodes):
     pt1 = node_geom.pointFromAngleAndDistance(aspect, line_dis, "PLANAR")
     line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
     pt2 = line.intersect(bank_geom, 1)
-    to_bank_distance = node_geom.distanceTo(pt2)
+
+   # allows us to rotate the line without touching the original aspect
+    aspect_attempt = aspect
+
+   # helps us choose which distance to return at the end of the function
+    aspect_switch = False
+
+    # if there's no intersection enter this loop
+    if not pt2.centroid:
+
+        # turn on the rotation switch to return the correct distance
+        aspect_switch = True
+
+        # generated line never intersected the right bank or left bank
+        while not pt2.centroid:
+            # ...first we try decrementing and getting that distance
+            aspect_attempt = aspect_attempt - 1
+            if aspect_attempt < 0:
+                aspect_attempt = aspect_attempt + 360
+            pt1 = node_geom.pointFromAngleAndDistance(aspect_attempt, line_dis, "PLANAR")
+            line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
+            pt2 = line.intersect(bank_geom, 1)
+        to_bank_distance_1 = node_geom.distanceTo(pt2)
+        del pt2
+        pt1 = node_geom.pointFromAngleAndDistance(aspect, line_dis, "PLANAR")
+        line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
+        pt2 = line.intersect(bank_geom, 1)
+        aspect_attempt = aspect
+        while not pt2.centroid:
+            # reset and try incrementing the angle (moving clockwise)
+            aspect_attempt = aspect_attempt + 1
+            if aspect_attempt < 360:
+                aspect_attempt = aspect_attempt - 360
+            pt1 = node_geom.pointFromAngleAndDistance(aspect_attempt, line_dis, "PLANAR")
+            line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
+            pt2 = line.intersect(bank_geom, 1)
+        to_bank_distance_2 = node_geom.distanceTo(pt2)
+
+    if not aspect_switch:
+        # if we didn't have to rotate and increment the aspect, just report out the distance
+        to_bank_distance = node_geom.distanceTo(pt2)
+    else:
+        # if we had to rotate, compare the two distances and take the lesser
+        to_bank_distance = min(to_bank_distance_1,
+                               to_bank_distance_2)
 
     return (to_bank_distance)
 
