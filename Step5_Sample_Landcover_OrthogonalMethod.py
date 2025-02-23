@@ -259,10 +259,9 @@ def setup_lcdata_headers(transsample_count):
 
 def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
     """converts x/y coordinates to col and row of the array"""
-    xy = []
-    xy.append(int((easting - block_x_min) / x_cellsize))  # col, x
-    xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y 
-    return xy
+    col_x = int((easting - block_x_min) / x_cellsize)  # col, x
+    row_y = int((block_y_max - northing) / y_cellsize)  # row, y
+    return [col_x, row_y]
 
 def create_lc_point_list(nodeDict, nodes_in_block, transsample_count, transsample_distance, start_bank):
     """This builds a unique long form list of information for all the
@@ -552,7 +551,7 @@ try:
     con_z_to_m = from_z_units_to_meters_con(z_units)
     
     # convert block size from km to meters to units of the node fc
-    # in the future block size should be estimated based on availiable memory
+    # in the future block size should be estimated based on available memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
     if block_size in ["#", "", None]:

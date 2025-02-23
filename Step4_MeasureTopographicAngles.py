@@ -342,11 +342,9 @@ def build_search_array(searchDistance_min, searchDistance_max, cellsize, use_ski
 
 def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
     """converts x/y coordinates to col and row of the array"""
-    xy = []
-    xy.append(int((easting - block_x_min) / x_cellsize))  # col, x
-    xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y
-    return xy
-
+    col_x = int((easting - block_x_min) / x_cellsize)  # col, x
+    row_y = int((block_y_max - northing) / y_cellsize)  # row, y
+    return [col_x, row_y]
 
 def plot_it(pts1, pts2, nodeID, a, b, b0, plot_dir):
     """plots the block and topo line"""
@@ -475,7 +473,7 @@ def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
                               (block_x_min, block_y_max))
             # --------------------------------------------------------
 
-            # Now start itterating through the topo list to evaluate
+            # Now start iterating through the topo list to evaluate
             # if any part of the topo line is in the block extent
             for nodeID, streamID, a, z_node, node_x, node_y, end_x, end_y in topo_list:
 
@@ -872,7 +870,7 @@ try:
     searchDistance_max = int(con_from_m * searchDistance_max_m)
 
     # convert block size from km to meters to units of the node fc
-    # in the future block size should be estimated based on availiable memory
+    # in the future block size should be estimated based on available memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
     if block_size in ["#", ""]:
