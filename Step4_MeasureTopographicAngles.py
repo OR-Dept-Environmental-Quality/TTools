@@ -341,10 +341,9 @@ def build_search_array(searchDistance_min, searchDistance_max, cellsize, use_ski
 
 def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
     """converts x/y coordinates to col and row of the array"""
-    xy = []
-    xy.append(int((easting - block_x_min) / x_cellsize))  # col, x
-    xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y
-    return xy
+    col_x = int((easting - block_x_min) / x_cellsize)  # col, x
+    row_y = int((block_y_max - northing) / y_cellsize)  # row, y
+    return [col_x, row_y]
 
 
 def plot_it(pts1, pts2, nodeID, a, b, b0, plot_dir):

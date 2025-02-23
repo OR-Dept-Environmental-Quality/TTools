@@ -79,7 +79,7 @@ from arcpy import env
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_trans_py39"
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
 start_bank = True
 transsample_count = 9
 transsample_distance = 8
@@ -258,10 +258,9 @@ def setup_lcdata_headers(transsample_count):
 
 def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
     """converts x/y coordinates to col and row of the array"""
-    xy = []
-    xy.append(int((easting - block_x_min) / x_cellsize))  # col, x
-    xy.append(int((northing - block_y_max) / y_cellsize * -1))  # row, y 
-    return xy
+    col_x = int((easting - block_x_min) / x_cellsize)  # col, x
+    row_y = int((block_y_max - northing) / y_cellsize)  # row, y
+    return [col_x, row_y]
 
 def create_lc_point_list(nodeDict, nodes_in_block, transsample_count, transsample_distance, start_bank):
     """This builds a unique long form list of information for all the
