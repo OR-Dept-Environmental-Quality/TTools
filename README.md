@@ -9,8 +9,8 @@ stream channel and land cover geospatial data for input into the [Heat Source][1
 of Ecology's [Shade][2] model, or the shade input file for [CE-QUAL-W2][3].
 
 Requires
-ESRI ArcGIS Pro 3.x w/ Spatial Analyst extension
-Python 3.9 
+ESRI ArcGIS Pro w/ Spatial Analyst extension
+Python 3.7+
 Numpy 1.24+
 
 Previous TTools extensions for ESRI ArcView 3, ArcGIS 9 - 10.8 can be found here: http://www.oregon.gov/deq/wq/tmdls/Pages/TMDLs-Tools.aspx

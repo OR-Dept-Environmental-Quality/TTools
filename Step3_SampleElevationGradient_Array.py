@@ -8,8 +8,8 @@ lowest elevation in a user defined search radius and calculate the gradient for 
 
 REQUIREMENTS
 TTools steps 1 must be run before Step 3.
-ArcGIS 10.1 - 10.8.2
-Python 2.7
+ESRI ArcGIS Pro
+Python 3.7+
 
 INPUT VARIABLES
 0: nodes_fc:

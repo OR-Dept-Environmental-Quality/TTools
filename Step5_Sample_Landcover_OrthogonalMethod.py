@@ -15,8 +15,8 @@ Washington Department of Ecology's Shade model, and the shade file for CE-QUAL-W
 
 REQUIREMENTS
 TTools steps 1 - 3 must be run before Step 5.
-ArcGIS 10.1 - 10.8.2
-Python 2.7
+ESRI ArcGIS Pro w/ Spatial Analyst extension
+Python 3.7+
 
 INPUT VARIABLES
 0: nodes_fc:

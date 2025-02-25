@@ -7,6 +7,10 @@ This script will take an input polyline feature with unique stream IDs and gener
 unique stream ID polyline at a user defined spacing measured from the downstream endpoint. The script can also check
 the digitized direction to determine the downstream end.
 
+REQUIREMENTS
+ESRI ArcPro
+Python 3.7+
+
 INPUT VARIABLES
 0: streamline_fc:
 Path to the stream centerline polyline feature class.

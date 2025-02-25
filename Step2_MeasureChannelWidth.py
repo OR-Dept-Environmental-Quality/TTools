@@ -7,9 +7,9 @@ This script will measure the channel width and distance to the closest edge on t
 stream node. Output distances are in meters.
 
 REQUIREMENTS
-TTools steps 1 must be run before Step 3.
-ArcGIS 10.1 - 10.8.2
-Python 2.7
+TTools steps 1 must be run before Step 2.
+ESRI ArcPro
+Python 3.7+
 
 INPUT VARIABLES
 0: nodes_fc:
