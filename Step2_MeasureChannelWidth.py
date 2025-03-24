@@ -3,8 +3,9 @@
 """
 TTools Step 2: Measure Channel Widths
 
-This script will measure the channel width and distance to the closest edge on the right and left banks at each
-stream node. Output distances are in meters.
+This script will measure the channel width and distance to the right and left banks 90 degrees perpendicular
+to the stream aspect at each stream node. If there isn't a channel bank polyline 90 degrees perpendicular to the stream
+aspect, the script will return the distance to the nearest edge. Output distances are in meters.
 
 REQUIREMENTS
 TTools steps 1 must be run before Step 2.
@@ -28,9 +29,10 @@ OUTPUTS
 0. nodes_fc:
 New fields listed below are added into nodes_fc.
 CHANWIDTH: distance in meters between left and right banks.
-LEFT: distance in meters from the stream node to the closest edge of the left bank feature.
-RIGHT: distance in meters from the stream ode to the closest edge of the right bank feature.
-
+LEFT: distance in meters from the stream node to the closest edge of the left bank feature 90 degrees
+perpendicular to teh stream aspect.
+RIGHT: distance in meters from the stream ode to the closest edge of the right bank feature 90 degrees
+perpendicular to teh stream aspect.
 """
 # Import system modules
 import sys
@@ -46,8 +48,8 @@ from collections import defaultdict
 # ----------------------------------------------------------------------
 # Start input variables
 nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
-rb_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_thalweg"
-lb_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_thalweg"
+rb_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_rightbank"
+lb_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_leftbank"
 overwrite_data = True
 # End input variables
 # ----------------------------------------------------------------------
@@ -135,50 +137,13 @@ def calc_channel_width(node_geom, bank_geom, aspect, line_dis, proj_nodes):
     line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
     pt2 = line.intersect(bank_geom, 1)
 
-   # allows us to rotate the line without touching the original aspect
-    aspect_attempt = aspect
-
-   # helps us choose which distance to return at the end of the function
-    aspect_switch = False
-
-    # if there's no intersection enter this loop
-    if not pt2.centroid:
-
-        # turn on the rotation switch to return the correct distance
-        aspect_switch = True
-
-        # generated line never intersected the right bank or left bank
-        while not pt2.centroid:
-            # ...first we try decrementing and getting that distance
-            aspect_attempt = aspect_attempt - 1
-            if aspect_attempt < 0:
-                aspect_attempt = aspect_attempt + 360
-            pt1 = node_geom.pointFromAngleAndDistance(aspect_attempt, line_dis, "PLANAR")
-            line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
-            pt2 = line.intersect(bank_geom, 1)
-        to_bank_distance_1 = node_geom.distanceTo(pt2)
-        del pt2
-        pt1 = node_geom.pointFromAngleAndDistance(aspect, line_dis, "PLANAR")
-        line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
-        pt2 = line.intersect(bank_geom, 1)
-        aspect_attempt = aspect
-        while not pt2.centroid:
-            # reset and try incrementing the angle (moving clockwise)
-            aspect_attempt = aspect_attempt + 1
-            if aspect_attempt < 360:
-                aspect_attempt = aspect_attempt - 360
-            pt1 = node_geom.pointFromAngleAndDistance(aspect_attempt, line_dis, "PLANAR")
-            line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
-            pt2 = line.intersect(bank_geom, 1)
-        to_bank_distance_2 = node_geom.distanceTo(pt2)
-
-    if not aspect_switch:
-        # if we didn't have to rotate and increment the aspect, just report out the distance
+    if pt2.centroid:
         to_bank_distance = node_geom.distanceTo(pt2)
     else:
-        # if we had to rotate, compare the two distances and take the lesser
-        to_bank_distance = min(to_bank_distance_1,
-                               to_bank_distance_2)
+        # No intersection = no bank 90 deg from aspect
+        # Find the minimum distance to bank, regardless of the angle
+        near_distance = bank_geom.queryPointAndDistance(node_geom.centroid)
+        to_bank_distance = near_distance[2]
 
     return (to_bank_distance)
 
@@ -283,6 +248,14 @@ try:
 
             lb_distance = calc_channel_width(node_geom, lb_geom, dir_lb, out_dis, proj_nodes)
             rb_distance = calc_channel_width(node_geom, rb_geom, dir_rb, out_dis, proj_nodes)
+
+            if lb_distance is None:
+                print(f"Warning: There is not a left bank polyline 90 degrees perpendicular to the aspect at Node ID {nodeID}.")
+                lb_distance = 0.0
+
+            if rb_distance is None:
+                print(f"Warning: There is not a right bank polyline 90 degrees perpendicular to the aspect at Node ID {nodeID}.")
+                rb_distance = 0.0
 
             nodeDict[streamID][nodeID]["CHANWIDTH"] = (lb_distance + rb_distance) * con_to_m
             nodeDict[streamID][nodeID]["LEFT"] = lb_distance * con_to_m
