@@ -8,8 +8,8 @@ shade angle for each stream node in different directions.
 
 REQUIREMENTS
 TTools steps 1 - 3 must be run before Step 4.
-ArcGIS 10.1 - 10.8.2
-Python 2.7
+ESRI ArcGIS Pro w/ Spatial Analyst extension
+Python 3.7+
 
 INPUT VARIABLES
 0: nodes_fc:
@@ -55,7 +55,6 @@ for each node and sample direction.
 
 """
 # Import system modules
-from __future__ import division, print_function
 import sys
 import os
 import gc
@@ -70,12 +69,12 @@ import numpy as np
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
 topo_directions = 1
 searchDistance_max_km = 10
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
 z_units = "Meters"
-topo_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\topo_samples"
+topo_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\topo_samples"
 block_size = 5
 overwrite_data = True
 # End input variables
@@ -86,9 +85,9 @@ overwrite_data = True
 # eliminate arcpy and use gdal for reading/writing feature class data
 
 # The below are used for debugging. Currently, turned off.
-topo_line_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\topo_line"
-block_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\blocks"
-plot_dir = r"D:\Projects\TTools_9\plots"
+topo_line_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\topo_line"
+block_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\blocks"
+plot_dir = r"C:\workspace\ttools_tests\TTools_py39\plots"
 
 def nested_dict():
     """Build a nested dictionary"""
@@ -341,6 +340,7 @@ def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_ce
     """converts x/y coordinates to col and row of the array"""
     col_x = int(((easting - block_x_min) - ((easting - block_x_min) % x_cellsize)) / x_cellsize)
     row_y = int(((block_y_max - northing) - ((block_y_max - northing) % y_cellsize)) / y_cellsize)
+
     return [col_x, row_y]
 
 def plot_it(pts1, pts2, nodeID, a, b, b0, plot_dir):
@@ -402,7 +402,7 @@ def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
     blockDict = nested_dict()
 
     # Get a list of the nodes, sort them
-    nodes = nodeDict.keys()
+    nodes = list(nodeDict.keys())
     nodes.sort()
 
     topo_list = []
@@ -723,9 +723,9 @@ def get_topo_angles(nodeDict, block_extent, block_samples, z_raster, azimuthdisd
     block_x_max_corner = block_x_max + ((raster_x_max - block_x_max) % x_cellsize)
     block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
 
-    # calculate the number of cols/rows from the lower left
-    ncols = max([int((block_x_max_corner - block_x_min_corner) / x_cellsize), 1])
-    nrows = max([int((block_y_max_corner - block_y_min_corner) / y_cellsize), 1])
+    # calculate the number of cols/ros from the lower left
+    ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
+    nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
 
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
@@ -928,7 +928,7 @@ try:
 
     # Iterate through each block
     total_samples = 0
-    blockIDs = blockDict.keys()
+    blockIDs = list(blockDict.keys())
     blockIDs.sort()
 
     for p, blockID in enumerate(blockIDs):

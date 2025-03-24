@@ -8,8 +8,8 @@ lowest elevation in a user defined search radius and calculate the gradient for 
 
 REQUIREMENTS
 TTools steps 1 must be run before Step 3.
-ArcGIS 10.1 - 10.8.2
-Python 2.7
+ESRI ArcGIS Pro
+Python 3.7+
 
 INPUT VARIABLES
 0: nodes_fc:
@@ -44,7 +44,6 @@ New fields ELEVATION and GRADIENT are added into nodes_fc.
 
 """
 # Import system modules
-from __future__ import division, print_function
 import sys
 import gc
 import time
@@ -58,10 +57,10 @@ from collections import defaultdict
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
 searchCells = 2
 smooth_flag = True
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
 z_units = "Meters"
 block_size = 5
 overwrite_data = True
@@ -327,8 +326,8 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
     block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
     
     # calculate the number of cols/rows from the lower left
-    ncols = max([int((block_x_max_corner - block_x_min_corner) / x_cellsize), 1])
-    nrows = max([int((block_y_max_corner - block_y_min_corner) / y_cellsize), 1])
+    ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
+    nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
     
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
@@ -344,7 +343,6 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
         raster_array = raster_array * con_z_to_m
     
     z_list = []
-    z_node = []
     if raster_array.max() > -9999:
         # There is at least one pixel of data
         for node in nodes_in_block:
@@ -447,7 +445,7 @@ try:
     con_from_m = from_meters_con(nodes_fc)
     
     # convert block size from km to meters to units of the node fc
-    # in the future block size should be estimated based on availiable memory
+    # in the future block size should be estimated based on available memory
     # memorysize = datatypeinbytes*nobands*block_size^2
     # block_size = int(sqrt(memorysize/datatypeinbytes*nobands))
     if block_size in ["#", ""]:
@@ -479,7 +477,7 @@ try:
     if len(nodeDict) != 0:
         
         # Get a list of the nodes, sort them
-        nodes = nodeDict.keys()
+        nodes = list(nodeDict.keys())
         nodes.sort()
         n_nodes = len(nodes)
         
@@ -527,8 +525,8 @@ try:
     for n, streamID in enumerate(nodeDict):
         print("Calculating gradients stream {0} of {1}".format(n + 1, len(nodeDict)))
             
-        stream_kms = nodeDict[streamID].keys()
-        stream_kms.sort(reverse=True)        
+        stream_kms = list(nodeDict[streamID].keys())
+        stream_kms.sort(reverse=True)
     
         z_list = [nodeDict[streamID][km]["ELEVATION"] for km in stream_kms]
         len_list = [nodeDict[streamID][km]["LENGTH"] for km in stream_kms]

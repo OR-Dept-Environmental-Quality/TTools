@@ -15,8 +15,8 @@ Washington Department of Ecology's Shade model, and the shade file for CE-QUAL-W
 
 REQUIREMENTS
 TTools steps 1 - 3 must be run before Step 5.
-ArcGIS 10.1 - 10.8.2
-Python 2.7
+ESRI ArcGIS Pro w/ Spatial Analyst extension
+Python 3.7+
 
 INPUT VARIABLES
 0: nodes_fc:
@@ -66,7 +66,6 @@ New point feature class created with a point at each x/y sample and the sample r
 
 """
 # Import system modules
-from __future__ import division, print_function
 import sys
 import os
 import gc
@@ -80,15 +79,15 @@ from arcpy import env
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_stream_nodes"
+nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
 start_bank = True
 transsample_count = 9
 transsample_distance = 8
-lc_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_vght_m_mosaic"
+lc_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_vght_m_mosaic"
 lc_units = "Meters"
-z_raster = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_be_m_mosaic"
+z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
 z_units = "Meters"
-lc_point_fc = r"D:\Projects\TTools_9\JohnsonCreek.gdb\jc_LC_samples"
+lc_point_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_LC_orthog_samples"
 block_size = 5
 overwrite_data = True
 # End input variables
@@ -261,6 +260,7 @@ def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_ce
     """converts x/y coordinates to col and row of the array"""
     col_x = int(((easting - block_x_min) - ((easting - block_x_min) % x_cellsize)) / x_cellsize)
     row_y = int(((block_y_max - northing) - ((block_y_max - northing) % y_cellsize)) / y_cellsize)
+    
     return [col_x, row_y]
 
 def create_lc_point_list(nodeDict, nodes_in_block, transsample_count, transsample_distance, start_bank):
@@ -434,10 +434,10 @@ def sample_raster(block, lc_point_list, raster, con):
     block_y_min_corner = block_y_min - ((block_y_min - raster_y_min) % y_cellsize)
     block_x_max_corner = block_x_max + ((raster_x_max - block_x_max) % x_cellsize)
     block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
-
+    
     # calculate the number of cols/rows from the lower left
-    ncols = max([int((block_x_max_corner - block_x_min_corner) / x_cellsize), 1])
-    nrows = max([int((block_y_max_corner - block_y_min_corner) / y_cellsize), 1])
+    ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
+    nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
     
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
@@ -593,8 +593,8 @@ try:
     nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
     
     # Get a list of the nodes, sort them
-    nodes = nodeDict.keys()
-    nodes.sort()    
+    nodes = list(nodeDict.keys())
+    nodes.sort()
    
     # Build the block list
     block_extents, block_nodes = create_block_list(nodes, block_size)
@@ -610,7 +610,7 @@ try:
         # build the landcover sample list
         lc_point_list = create_lc_point_list(nodeDict, nodes_in_block, transsample_count, transsample_distance, start_bank)
         
-        for t, (type, raster) in enumerate(rasterDict.iteritems()):
+        for t, (type, raster) in enumerate(rasterDict.items()):
             if raster is None:
                 for i in range(0, len(lc_point_list)):
                     lc_point_list[i].append(-9999)
@@ -633,7 +633,7 @@ try:
         update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_in_block)
         
         # Build the output point feature class using the data         
-        update_lc_point_fc(lc_point_list, rasterDict.keys(), lc_point_fc,
+        update_lc_point_fc(lc_point_list, list(rasterDict.keys()), lc_point_fc,
                            nodes_fc, nodes_in_block, overwrite_data, proj)
     
         total_samples = total_samples + len(lc_point_list)
@@ -642,7 +642,7 @@ try:
     
     endTime = time.time()
     
-    elapsedmin= ceil(((endTime - startTime) / 60)* 10)/10
+    elapsedmin = ceil(((endTime - startTime) / 60)* 10)/10
     mspersample = timedelta(seconds=(endTime - startTime) /
                             total_samples).microseconds
     print("Process Complete in {0} minutes. {1} microseconds per sample".format(elapsedmin, mspersample))
