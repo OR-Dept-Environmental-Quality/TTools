@@ -82,9 +82,6 @@ overwrite_data = True
 # ----------------------------------------------------------------------
 
 # Future Updates
-# Fix the bug that incrementally mis-measures the distance across a raster cell for topo directions that aren't 45 degree
-# increments. Usually for long distances the sample is about one cell off and does not appear to impact results very
-# much if at all.
 # update fc after each topo line sample so data isn't lost if the script crashes
 # eliminate arcpy and use gdal for reading/writing feature class data
 
@@ -342,8 +339,8 @@ def build_search_array(searchDistance_min, searchDistance_max, cellsize, use_ski
 
 def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
     """converts x/y coordinates to col and row of the array"""
-    col_x = int((easting - block_x_min) / x_cellsize)  # col, x
-    row_y = int((block_y_max - northing) / y_cellsize)  # row, y
+    col_x = int(((easting - block_x_min) - ((easting - block_x_min) % x_cellsize)) / x_cellsize)
+    row_y = int(((block_y_max - northing) - ((block_y_max - northing) % y_cellsize)) / y_cellsize)
     return [col_x, row_y]
 
 def plot_it(pts1, pts2, nodeID, a, b, b0, plot_dir):
@@ -717,32 +714,22 @@ def get_topo_angles(nodeDict, block_extent, block_samples, z_raster, azimuthdisd
     raster_x_max = float(arcpy.GetRasterProperties_management(z_raster, "RIGHT").getOutput(0))
     raster_y_max = float(arcpy.GetRasterProperties_management(z_raster, "TOP").getOutput(0))
 
-    # Calculate the X and Y offset from the upper left node
-    # coordinates bounding box
-    x_minoffset = (block_x_min - raster_x_min) % x_cellsize
-    y_minoffset = (block_y_min - raster_y_min) % y_cellsize
-    x_maxoffset = (raster_x_max - block_x_max) % x_cellsize
-    y_maxoffset = (raster_y_max - block_y_max) % y_cellsize
-
-    # adjust so the coordinates are at the raster cell corners
-    block_x_min = block_x_min - x_minoffset
-    block_y_min = block_y_min - y_minoffset
-    block_x_max = block_x_max + x_maxoffset
-    block_y_max = block_y_max + y_maxoffset
-
-    # Get the lower left cell center coordinate. This is for ESRI's
-    # RastertoNumpyArray function which defaults to the adjacent
+    # Calculate the block x and y offset from the raster and adjust
+    # the block coordinates so they are at the raster cell corners.
+    # This is for ESRI's RastertoNumpyArray function which defaults to the adjacent
     # lower left cell
-    block_x_min_center = block_x_min + (x_cellsize / 2)
-    block_y_min_center = block_y_min + (y_cellsize / 2)
+    block_x_min_corner = block_x_min - ((block_x_min - raster_x_min) % x_cellsize)
+    block_y_min_corner = block_y_min - ((block_y_min - raster_y_min) % y_cellsize)
+    block_x_max_corner = block_x_max + ((raster_x_max - block_x_max) % x_cellsize)
+    block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
 
-    # calculate the number or cols/ros from the lower left
-    ncols = max([int(ceil((block_x_max - block_x_min) / x_cellsize)), 1])
-    nrows = max([int(ceil((block_y_max - block_y_min) / y_cellsize)), 1])
+    # calculate the number of cols/rows from the lower left
+    ncols = max([int((block_x_max_corner - block_x_min_corner) / x_cellsize), 1])
+    nrows = max([int((block_y_max_corner - block_y_min_corner) / y_cellsize), 1])
 
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
-        z_array = arcpy.RasterToNumPyArray(z_raster, arcpy.Point(block_x_min_center, block_y_min_center),
+        z_array = arcpy.RasterToNumPyArray(z_raster, arcpy.Point(block_x_min_corner, block_y_min_corner),
                                            ncols, nrows, nodata_to_value)
     except:
         tbinfo = traceback.format_exc()
@@ -772,7 +759,7 @@ def get_topo_angles(nodeDict, block_extent, block_samples, z_raster, azimuthdisd
                 pt_x = ((distance * sin(radians(a))) + node_x)
                 pt_y = ((distance * cos(radians(a))) + node_y)
 
-                xy = coord_to_array(pt_x, pt_y, block_x_min, block_y_max, x_cellsize, y_cellsize)
+                xy = coord_to_array(pt_x, pt_y, block_x_min_corner, block_y_max_corner, x_cellsize, y_cellsize)
                 z_topo_list.append(z_array[xy[1], xy[0]])
 
             # convert distances to meters
