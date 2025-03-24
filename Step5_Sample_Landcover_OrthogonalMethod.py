@@ -260,7 +260,7 @@ def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_ce
     """converts x/y coordinates to col and row of the array"""
     col_x = int(((easting - block_x_min) - ((easting - block_x_min) % x_cellsize)) / x_cellsize)
     row_y = int(((block_y_max - northing) - ((block_y_max - northing) % y_cellsize)) / y_cellsize)
-
+    
     return [col_x, row_y]
 
 def create_lc_point_list(nodeDict, nodes_in_block, transsample_count, transsample_distance, start_bank):

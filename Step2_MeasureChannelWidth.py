@@ -136,7 +136,7 @@ def calc_channel_width(node_geom, bank_geom, aspect, line_dis, proj_nodes):
     pt1 = node_geom.pointFromAngleAndDistance(aspect, line_dis, "PLANAR")
     line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
     pt2 = line.intersect(bank_geom, 1)
-
+    
     if pt2.centroid:
         to_bank_distance = node_geom.distanceTo(pt2)
     else:

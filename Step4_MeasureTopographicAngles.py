@@ -343,7 +343,6 @@ def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_ce
 
     return [col_x, row_y]
 
-
 def plot_it(pts1, pts2, nodeID, a, b, b0, plot_dir):
     """plots the block and topo line"""
 
