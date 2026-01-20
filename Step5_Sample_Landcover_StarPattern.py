@@ -354,7 +354,7 @@ def create_lc_point_list(nodeDict, nodes_in_block, dirs, zones, transsample_dist
      
     return lc_point_list
 
-def create_block_list(nodes, block_size):
+def create_block_list(nodeDict, nodes, block_size, buffer):
     """Returns two lists, one containing the coordinate extent
     for each block that will be iteratively extracted to an array
     and the other containing node IDs within each block extent."""
@@ -362,13 +362,7 @@ def create_block_list(nodes, block_size):
     print("Calculating block extents")    
     x_coord_list = [nodeDict[nodeID]["POINT_X"] for nodeID in nodes]
     y_coord_list = [nodeDict[nodeID]["POINT_Y"] for nodeID in nodes]
-    
-    # calculate the buffer distance (in raster spatial units) to add to 
-    # the base bounding box when extracting to an array. The buffer is 
-    # equal to the sample distance + 1 to make sure the block includes 
-    # all the landcover samples for each node.
-    buffer = int((transsample_count + 1) * transsample_distance * con_from_m)
-    
+
     # calculate bounding box extent for samples
     x_min = min(x_coord_list)
     x_max = max(x_coord_list)
@@ -391,12 +385,12 @@ def create_block_list(nodes, block_size):
             # Upper right coordinate of block (in map units)
             block0_x_max = min([block0_x_min + block_size, x_max])
             block0_y_max = min([block0_y_min + block_size, y_max])
-            
-            block_x_min = block0_x_max
-            block_x_max = block0_x_min
-            block_y_min = block0_y_max
-            block_y_max = block0_y_min
-            
+
+            block_x_max = block0_x_max
+            block_x_min = block0_x_min
+            block_y_max = block0_y_max
+            block_y_min = block0_y_min
+
             nodes_in_block = []
             for nodeID in nodes:
                 node_x = nodeDict[nodeID]["POINT_X"]
@@ -405,21 +399,31 @@ def create_block_list(nodes, block_size):
                     block0_y_min <= node_y <= block0_y_max):
                     
                     nodes_in_block.append(nodeID)
-                    
-                    # Minimize the size of the block0 by the true 
-                    # extent of the nodes in the block
-                    if block_x_min > node_x: block_x_min = node_x
-                    if block_x_max < node_x: block_x_max = node_x
-                    if block_y_min > node_y: block_y_min = node_y
-                    if block_y_max < node_y: block_y_max = node_y
-            
+
             if nodes_in_block:
-                # add the block extent for processing
+
+                # Minimize the size of the block0 by the true
+                # extent of the nodes in the block
+                node_x_min = min([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                node_y_min = min([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+                node_x_max = max([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                node_y_max = max([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+
+                if block0_x_min < node_x_min: block_x_min = node_x_min
+                if block0_x_max > node_x_max: block_x_max = node_x_max
+                if block0_y_min < node_y_min: block_y_min = node_y_min
+                if block0_y_max > node_y_max: block_y_max = node_y_max
+
+                # Add the block extent for processing and the buffer distance.
+                # Because the node coordinates are used to determine if the node is within the block extent,
+                # a buffer distance is added to ensure each block extent will include all samples around nodes
+                # located at the edge of the block.
+
                 # order 0 left,      1 bottom,    2 right,     3 top
                 block_extents.append((block_x_min - buffer, block_y_min - buffer,
                                       block_x_max + buffer, block_y_max + buffer))           
                 block_nodes.append(nodes_in_block)
-    
+
     return block_extents, block_nodes
     
 def sample_raster(block, lc_point_list, raster, con):
@@ -428,15 +432,16 @@ def sample_raster(block, lc_point_list, raster, con):
         nodata_to_value = -9999 / con
     else:
         nodata_to_value = -9999
-        
-    # localize the block extent values
-    block_x_min = block[0]
-    block_y_min = block[1]
-    block_x_max = block[2]
-    block_y_max = block[3]
-    
+
     x_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEX").getOutput(0))
-    y_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEY").getOutput(0)) 
+    y_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEY").getOutput(0))
+
+    # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
+    # sampled are included in the array.
+    block_x_min = block[0] - x_cellsize
+    block_y_min = block[1] - y_cellsize
+    block_x_max = block[2] + x_cellsize
+    block_y_max = block[3] + y_cellsize
 
     # Get the coordinate extent of the input raster
     raster_x_min = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
@@ -567,7 +572,7 @@ try:
         block_size = int(con_from_m * 5000)
     else:
         block_size = int(con_from_m * block_size * 1000)
-    
+
     # Check to make sure the raster and input 
     # points are in the same projection.
     if proj.name != proj_ele.name:
@@ -637,9 +642,15 @@ try:
     # Get a list of the nodes, sort them
     nodes = list(nodeDict.keys())
     nodes.sort()
+
+    # calculate the buffer distance (in raster spatial units) to add to
+    # the base bounding box when extracting to an array. The buffer is
+    # equal to the sample distance + 1 to make sure the block includes
+    # all the landcover samples for each node.
+    buffer = int((transsample_count + 1) * transsample_distance * con_from_m)
    
     # Build the block list
-    block_extents, block_nodes = create_block_list(nodes, block_size)
+    block_extents, block_nodes = create_block_list(nodeDict, nodes, block_size, buffer)
     
     # Iterate through each block, calculate sample coordinates,
     # convert raster to array, sample the raster

@@ -226,7 +226,7 @@ def update_nodes_fc2(nodeDict, nodes_fc, addFields, nodes_to_query):
                 row[f+3] = nodeDict[streamID][stream_km][field]
                 cursor.updateRow(row)
 
-def create_block_list(nodeDict, nodes, buffer, block_size):
+def create_block_list(nodeDict, nodes, block_size, buffer):
     """Returns two lists, one containing the coordinate extent
     for each block that will be iteratively extracted to an array
     and the other containing the stream and node IDs within each
@@ -258,11 +258,11 @@ def create_block_list(nodeDict, nodes, buffer, block_size):
             # Upper right coordinate of block (in map units)
             block0_x_max = min([block0_x_min + block_size, x_max])
             block0_y_max = min([block0_y_min + block_size, y_max])
-            
-            block_x_min = block0_x_max
-            block_x_max = block0_x_min
-            block_y_min = block0_y_max
-            block_y_max = block0_y_min            
+
+            block_x_max = block0_x_max
+            block_x_min = block0_x_min
+            block_y_max = block0_y_max
+            block_y_min = block0_y_min
             
             nodes_in_block = []
             for nodeID in nodes:
@@ -270,20 +270,31 @@ def create_block_list(nodeDict, nodes, buffer, block_size):
                 node_y = nodeDict[nodeID]["POINT_Y"]
                 if (block0_x_min <= node_x <= block0_x_max and
                     block0_y_min <= node_y <= block0_y_max):
+
                     nodes_in_block.append([nodeID, node_x, node_y])
-                    
-                    # Minimize the size of the block0 by the true 
-                    # extent of the nodes in the block
-                    if block_x_min > node_x: block_x_min = node_x
-                    if block_x_max < node_x: block_x_max = node_x
-                    if block_y_min > node_y: block_y_min = node_y
-                    if block_y_max < node_y: block_y_max = node_y
-            
+
             if nodes_in_block:
-                # add the block extent for processing
+
+                # Minimize the size of the block0 by the true
+                # extent of the nodes in the block
+                node_x_min = min([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                node_y_min = min([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+                node_x_max = max([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                node_y_max = max([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+
+                if block0_x_min < node_x_min: block_x_min = node_x_min
+                if block0_x_max > node_x_max: block_x_max = node_x_max
+                if block0_y_min < node_y_min: block_y_min = node_y_min
+                if block0_y_max > node_y_max: block_y_max = node_y_max
+
+                # Add the block extent for processing and the buffer distance.
+                # Because the node coordinates are used to determine if the node is within the block extent,
+                # a buffer distance is added to ensure each block extent will include all samples around nodes
+                # located at the edge of the block.
+
                 # order 0 left,      1 bottom,    2 right,     3 top
-                block_extents.append([block_x_min - buffer, block_y_min - buffer,
-                                      block_x_max + buffer, block_y_max + buffer])           
+                block_extents.append((block_x_min - buffer, block_y_min - buffer,
+                                      block_x_max + buffer, block_y_max + buffer))
                 block_nodes.append(nodes_in_block)
     
     return block_extents, block_nodes
@@ -300,21 +311,22 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
         nodata_to_value = -9999 / con_z_to_m
     else:
         nodata_to_value = -9999
-        
-    # localize the block extent values
-    block_x_min = block[0]
-    block_y_min = block[1]
-    block_x_max = block[2]
-    block_y_max = block[3]
-    
-    x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
-    y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))   
 
-    # Get the coordinates extent of the input raster
-    raster_x_min = float(arcpy.GetRasterProperties_management(z_raster, "LEFT").getOutput(0))
-    raster_y_min = float(arcpy.GetRasterProperties_management(z_raster, "BOTTOM").getOutput(0))
-    raster_x_max = float(arcpy.GetRasterProperties_management(z_raster, "RIGHT").getOutput(0))
-    raster_y_max = float(arcpy.GetRasterProperties_management(z_raster, "TOP").getOutput(0))
+    x_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEX").getOutput(0))
+    y_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEY").getOutput(0))
+
+    # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
+    # sampled are included in the array.
+    block_x_min = block[0] - x_cellsize
+    block_y_min = block[1] - y_cellsize
+    block_x_max = block[2] + x_cellsize
+    block_y_max = block[3] + y_cellsize
+
+    # Get the coordinate extent of the input raster
+    raster_x_min = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
+    raster_y_min = float(arcpy.GetRasterProperties_management(raster, "BOTTOM").getOutput(0))
+    raster_x_max = float(arcpy.GetRasterProperties_management(raster, "RIGHT").getOutput(0))
+    raster_y_max = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
 
     # Calculate the block x and y offset from the raster and adjust
     # the block coordinates so they are at the raster cell corners.
@@ -324,7 +336,7 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
     block_y_min_corner = block_y_min - ((block_y_min - raster_y_min) % y_cellsize)
     block_x_max_corner = block_x_max + ((raster_x_max - block_x_max) % x_cellsize)
     block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
-    
+
     # calculate the number of cols/rows from the lower left
     ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
     nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
@@ -482,7 +494,7 @@ try:
         n_nodes = len(nodes)
         
         # Build the block list
-        block_extents, block_nodes = create_block_list(nodeDict, nodes, buffer, block_size)
+        block_extents, block_nodes = create_block_list(nodeDict, nodes, block_size, buffer)
         
         # Iterate through each block, calculate sample coordinates,
         # convert raster to array, sample the raster

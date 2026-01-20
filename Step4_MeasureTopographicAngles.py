@@ -389,7 +389,7 @@ def create_block_fc(block_segments, b, block_fc, proj):
             poly_array.removeAll()
 
 
-def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
+def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max, buffer):
     """Returns two lists, one containing the coordinate extent
     for each block that will be iteratively extracted to an array
     and the other containing the start and stop distances for each
@@ -434,8 +434,7 @@ def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
     x_width = int(x_max - x_min + 1)
     y_width = int(y_max - y_min + 1)
 
-    block_extents = []
-    block_samples = []
+    # Block Number
     b = 0
 
     # Build blocks
@@ -460,14 +459,14 @@ def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
             # --------------------------------------------------------
             # This is an argument for plot_it(). I used it for debugging.
             # It's a tuple of the x/y coords for each block segment.
-            block_for_plot = ((block_x_min, block_y_max),
-                              (block_x_min, block_y_min),
-                              (block_x_min, block_y_min),
-                              (block_x_max, block_y_min),
-                              (block_x_max, block_y_min),
-                              (block_x_max, block_y_max),
-                              (block_x_max, block_y_max),
-                              (block_x_min, block_y_max))
+            # block_for_plot = ((block_x_min, block_y_max),
+            #                   (block_x_min, block_y_min),
+            #                   (block_x_min, block_y_min),
+            #                   (block_x_max, block_y_min),
+            #                   (block_x_max, block_y_min),
+            #                   (block_x_max, block_y_max),
+            #                   (block_x_max, block_y_max),
+            #                   (block_x_min, block_y_max))
             # --------------------------------------------------------
 
             # Now start iterating through the topo list to evaluate
@@ -603,8 +602,8 @@ def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
 
             if topo_in_block:
                 # order 0 left,      1 bottom,    2 right,     3 top
-                blockDict[b]["extent"] = (block_x_min, block_y_min,
-                                          block_x_max, block_y_max)
+                blockDict[b]["extent"] = (block_x_min - buffer, block_y_min - buffer,
+                                      block_x_max + buffer, block_y_max + buffer)
                 blockDict[b]["samples"] = topo_in_block
                 blockDict[b]["nodes_to_update"] = nodes_to_update
 
@@ -701,11 +700,12 @@ def get_topo_angles(nodeDict, block_extent, block_samples, z_raster, azimuthdisd
     x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
     y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))
 
-    # localize the block extent values
-    block_x_min = block_extent[0]
-    block_y_min = block_extent[1]
-    block_x_max = block_extent[2]
-    block_y_max = block_extent[3]
+    # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
+    # sampled are included in the array.
+    block_x_min = block_extent[0] - x_cellsize
+    block_y_min = block_extent[1] - y_cellsize
+    block_x_max = block_extent[2] + x_cellsize
+    block_y_max = block_extent[3] + y_cellsize
 
     # Get the coordinates extent of the input raster
     # this could be in main so it doesn't have to run each time
@@ -924,7 +924,7 @@ try:
 
     # Build the blockDict
     blockDict = create_blocks(nodeDict, block_size, last_azimuth,
-                              searchDistance_max)
+                              searchDistance_max, x_cellsize)
 
     # Iterate through each block
     total_samples = 0
