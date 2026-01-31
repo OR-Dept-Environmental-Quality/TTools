@@ -1163,106 +1163,107 @@ class SampleElevationGradient:
                         row[f+3] = nodeDict[streamID][stream_km][field]
                         cursor.updateRow(row)
 
-    def create_block_list(nodeDict, nodes, block_size, buffer):
-        """Returns two lists, one containing the coordinate extent
-        for each block that will be iteratively extracted to an array
-        and the other containing the stream and node IDs within each
-        block extent."""
+        def create_block_list(nodeDict, nodes, block_size, buffer):
+            """Returns two lists, one containing the coordinate extent
+            for each block that will be iteratively extracted to an array
+            and the other containing the stream and node IDs within each
+            block extent."""
 
-        print("Calculating block extents")
-        x_coord_list = [nodeDict[nodeID]["POINT_X"] for nodeID in nodes]
-        y_coord_list = [nodeDict[nodeID]["POINT_Y"] for nodeID in nodes]
+            print("Calculating block extents")
+            x_coord_list = [nodeDict[nodeID]["POINT_X"] for nodeID in nodes]
+            y_coord_list = [nodeDict[nodeID]["POINT_Y"] for nodeID in nodes]
 
-        # calculate bounding box extent for samples
-        x_min = min(x_coord_list)
-        x_max = max(x_coord_list)
-        y_min = min(y_coord_list)
-        y_max = max(y_coord_list)
+            # calculate bounding box extent for samples
+            x_min = min(x_coord_list)
+            x_max = max(x_coord_list)
+            y_min = min(y_coord_list)
+            y_max = max(y_coord_list)
 
-        x_width = int(x_max - x_min + 1)
-        y_width = int(y_max - y_min + 1)
+            x_width = int(x_max - x_min + 1)
+            y_width = int(y_max - y_min + 1)
 
-        block_extents = []
-        block_nodes = []
+            block_extents = []
+            block_nodes = []
 
-        # Build data blocks
-        for x in range(0, x_width, block_size):
-            for y in range(0, y_width, block_size):
+            # Build data blocks
+            for x in range(0, x_width, block_size):
+                for y in range(0, y_width, block_size):
 
-                # Lower left coordinate of block (in map units)
-                block0_x_min = min([x_min + x, x_max])
-                block0_y_min = min([y_min + y, y_max])
-                # Upper right coordinate of block (in map units)
-                block0_x_max = min([block0_x_min + block_size, x_max])
-                block0_y_max = min([block0_y_min + block_size, y_max])
+                    # Lower left coordinate of block (in map units)
+                    block0_x_min = min([x_min + x, x_max])
+                    block0_y_min = min([y_min + y, y_max])
+                    # Upper right coordinate of block (in map units)
+                    block0_x_max = min([block0_x_min + block_size, x_max])
+                    block0_y_max = min([block0_y_min + block_size, y_max])
 
-                block_x_max = block0_x_max
-                block_x_min = block0_x_min
-                block_y_max = block0_y_max
-                block_y_min = block0_y_min
+                    block_x_max = block0_x_max
+                    block_x_min = block0_x_min
+                    block_y_max = block0_y_max
+                    block_y_min = block0_y_min
 
-                nodes_in_block = []
-                for nodeID in nodes:
-                    node_x = nodeDict[nodeID]["POINT_X"]
-                    node_y = nodeDict[nodeID]["POINT_Y"]
-                    if (block0_x_min <= node_x <= block0_x_max and
-                            block0_y_min <= node_y <= block0_y_max):
-                        nodes_in_block.append([nodeID, node_x, node_y])
+                    nodes_in_block = []
+                    for nodeID in nodes:
+                        node_x = nodeDict[nodeID]["POINT_X"]
+                        node_y = nodeDict[nodeID]["POINT_Y"]
+                        if (block0_x_min <= node_x <= block0_x_max and
+                                block0_y_min <= node_y <= block0_y_max):
+                            nodes_in_block.append([nodeID, node_x, node_y])
 
-                if nodes_in_block:
+                    if nodes_in_block:
 
-                    # Minimize the size of the block0 by the true
-                    # extent of the nodes in the block
-                    node_x_min = min([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
-                    node_y_min = min([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
-                    node_x_max = max([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
-                    node_y_max = max([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+                        # Minimize the size of the block0 by the true
+                        # extent of the nodes in the block
+                        node_x_min = min([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                        node_y_min = min([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+                        node_x_max = max([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                        node_y_max = max([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
 
-                    if block0_x_min < node_x_min: block_x_min = node_x_min
-                    if block0_x_max > node_x_max: block_x_max = node_x_max
-                    if block0_y_min < node_y_min: block_y_min = node_y_min
-                    if block0_y_max > node_y_max: block_y_max = node_y_max
+                        if block0_x_min < node_x_min: block_x_min = node_x_min
+                        if block0_x_max > node_x_max: block_x_max = node_x_max
+                        if block0_y_min < node_y_min: block_y_min = node_y_min
+                        if block0_y_max > node_y_max: block_y_max = node_y_max
 
-                    # Add the block extent for processing and the buffer distance.
-                    # Because the node coordinates are used to determine if the node is within the block extent,
-                    # a buffer distance is added to ensure each block extent will include all samples around nodes
-                    # located at the edge of the block.
+                        # Add the block extent for processing and the buffer distance.
+                        # Because the node coordinates are used to determine if the node is within the block extent,
+                        # a buffer distance is added to ensure each block extent will include all samples around nodes
+                        # located at the edge of the block.
 
-                    # order 0 left,      1 bottom,    2 right,     3 top
-                    block_extents.append((block_x_min - buffer, block_y_min - buffer,
-                                          block_x_max + buffer, block_y_max + buffer))
-                    block_nodes.append(nodes_in_block)
+                        # order 0 left,      1 bottom,    2 right,     3 top
+                        block_extents.append((block_x_min - buffer, block_y_min - buffer,
+                                              block_x_max + buffer, block_y_max + buffer))
+                        block_nodes.append(nodes_in_block)
 
-        return block_extents, block_nodes
-    
+            return block_extents, block_nodes
+
         def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
             """converts x/y coordinates to col and row of the array"""
             col_x = int(((easting - block_x_min) - ((easting - block_x_min) % x_cellsize)) / x_cellsize)
             row_y = int(((block_y_max - northing) - ((block_y_max - northing) % y_cellsize)) / y_cellsize)
             return [col_x, row_y]
-    
+
         def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
-    
+
             if con_z_to_m is not None:
                 nodata_to_value = -9999 / con_z_to_m
             else:
                 nodata_to_value = -9999
-        
-            # localize the block extent values
-            block_x_min = block[0]
-            block_y_min = block[1]
-            block_x_max = block[2]
-            block_y_max = block[3]
-    
+
             x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
-            y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))   
-    
-            # Get the coordinates extent of the input raster
+            y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))
+
+            # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
+            # sampled are included in the array.
+            block_x_min = block[0] - x_cellsize
+            block_y_min = block[1] - y_cellsize
+            block_x_max = block[2] + x_cellsize
+            block_y_max = block[3] + y_cellsize
+
+            # Get the coordinate extent of the input raster
             raster_x_min = float(arcpy.GetRasterProperties_management(z_raster, "LEFT").getOutput(0))
             raster_y_min = float(arcpy.GetRasterProperties_management(z_raster, "BOTTOM").getOutput(0))
             raster_x_max = float(arcpy.GetRasterProperties_management(z_raster, "RIGHT").getOutput(0))
             raster_y_max = float(arcpy.GetRasterProperties_management(z_raster, "TOP").getOutput(0))
-    
+
             # Calculate the block x and y offset from the raster and adjust
             # the block coordinates so they are at the raster cell corners.
             # This is for ESRI's RastertoNumpyArray function which defaults to the adjacent
@@ -1271,24 +1272,24 @@ class SampleElevationGradient:
             block_y_min_corner = block_y_min - ((block_y_min - raster_y_min) % y_cellsize)
             block_x_max_corner = block_x_max + ((raster_x_max - block_x_max) % x_cellsize)
             block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
-    
+
             # calculate the number of cols/rows from the lower left
             ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
             nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
-    
+
             # Construct the array. Note returned array is (row, col) so (y, x)
             try:
                 raster_array = arcpy.RasterToNumPyArray(z_raster, arcpy.Point(block_x_min_corner, block_y_min_corner),
                                                         ncols, nrows, nodata_to_value)
             except:
                 tbinfo = traceback.format_exc()
-                pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"       
-                sys.exit(pymsg)    
-    
-            # convert array values to meters if needed
+                pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"
+                sys.exit(pymsg)
+
+                # convert array values to meters if needed
             if con_z_to_m is not None:
                 raster_array = raster_array * con_z_to_m
-    
+
             z_list = []
             if raster_array.max() > -9999:
                 # There is at least one pixel of data
@@ -1299,26 +1300,26 @@ class SampleElevationGradient:
                         # Calculate the cell X/Y based on the base coordinate movement
                         cell_x = xy[0] + coord[0]
                         cell_y = xy[1] + coord[1]
-                        z_sampleList.append(raster_array[cell_y,cell_x])
-                
+                        z_sampleList.append(raster_array[cell_y, cell_x])
+
                     # sample at node:
                     z_node = raster_array[xy[1], xy[0]]
-                
+
                     # Remove no data values (-9999) unless they are all no data
                     if not max(z_sampleList) < -9998:
                         z_sampleList = [z for z in z_sampleList if z > -9999]
-                    # Get the lowest elevation        
+                    # Get the lowest elevation
                     node.append(min(z_sampleList))
                     node.append(z_node)
                     z_list.append(node)
-    
+
             else:
                 # No data, add -9999 for elevation and z_node
                 for node in nodes_in_block:
                     node.append(-9999)
                     node.append(-9999)
                     z_list.append(node)
-        
+
             return z_list
     
         def from_z_units_to_meters_con(zUnits):
@@ -1417,7 +1418,7 @@ class SampleElevationGradient:
             # the base bounding box when extracting to an array. The buffer is 
             # equal to the cellsize * the searchcells to make sure the block includes 
             # the surrounding cells at each corner
-            buffer = int((searchCells + 1)* cellsize)    
+            buffer = int((searchCells + 1)* cellsize)
     
             # Make a list of the base x/y coordinate movements
             # from the node origin. These values will be 
@@ -1439,7 +1440,7 @@ class SampleElevationGradient:
                 n_nodes = len(nodes)
         
                 # Build the block list
-                block_extents, block_nodes = create_block_list(nodeDict, nodes, buffer, block_size)
+                block_extents, block_nodes = create_block_list(nodeDict, nodes, block_size, buffer)
         
                 # Iterate through each block, calculate sample coordinates,
                 # convert raster to array, sample the raster
@@ -1690,9 +1691,9 @@ class MeasureTopographicAngles(object):
         # eliminate arcpy and use gdal for reading/writing feature class data
 
         # The below are used for debugging. Currently, turned off.
-        topo_line_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\topo_line"
-        block_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\blocks"
-        plot_dir = r"C:\workspace\ttools_tests\TTools_py39\plots"
+        #topo_line_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\topo_line"
+        #block_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\blocks"
+        #plot_dir = r"C:\workspace\ttools_tests\TTools_py39\plots"
 
         def nested_dict():
             """Build a nested dictionary"""
@@ -1963,7 +1964,6 @@ class MeasureTopographicAngles(object):
             plt.plot(x1, y1, 'b--', x2, y2, 'r--')
             plt.savefig(r"{0}\node{1}_a{2}_{3}b_{4}b0.png".format(plot_dir, nodeID, a, b, b0))
 
-
         def create_block_fc(block_segments, b, block_fc, proj):
             """Creates a poly line feature class of the block segments"""
 
@@ -1994,14 +1994,12 @@ class MeasureTopographicAngles(object):
                     cursor.insertRow([poly, b, s])
                     poly_array.removeAll()
 
-
-        def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max):
+        def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max, buffer):
             """Returns two lists, one containing the coordinate extent
             for each block that will be iteratively extracted to an array
             and the other containing the start and stop distances for each
             topo line that is within the block extent."""
 
-            arcpy.AddMessage("Preparing blocks and topo sampling")
             print("Preparing blocks and topo sampling")
 
             # Create a dictionary to lookup which nodesIDs can be updated after
@@ -2041,8 +2039,7 @@ class MeasureTopographicAngles(object):
             x_width = int(x_max - x_min + 1)
             y_width = int(y_max - y_min + 1)
 
-            block_extents = []
-            block_samples = []
+            # Block Number
             b = 0
 
             # Build blocks
@@ -2067,14 +2064,14 @@ class MeasureTopographicAngles(object):
                     # --------------------------------------------------------
                     # This is an argument for plot_it(). I used it for debugging.
                     # It's a tuple of the x/y coords for each block segment.
-                    block_for_plot = ((block_x_min, block_y_max),
-                                      (block_x_min, block_y_min),
-                                      (block_x_min, block_y_min),
-                                      (block_x_max, block_y_min),
-                                      (block_x_max, block_y_min),
-                                      (block_x_max, block_y_max),
-                                      (block_x_max, block_y_max),
-                                      (block_x_min, block_y_max))
+                    # block_for_plot = ((block_x_min, block_y_max),
+                    #                   (block_x_min, block_y_min),
+                    #                   (block_x_min, block_y_min),
+                    #                   (block_x_max, block_y_min),
+                    #                   (block_x_max, block_y_min),
+                    #                   (block_x_max, block_y_max),
+                    #                   (block_x_max, block_y_max),
+                    #                   (block_x_min, block_y_max))
                     # --------------------------------------------------------
 
                     # Now start iterating through the topo list to evaluate
@@ -2210,8 +2207,8 @@ class MeasureTopographicAngles(object):
 
                     if topo_in_block:
                         # order 0 left,      1 bottom,    2 right,     3 top
-                        blockDict[b]["extent"] = (block_x_min, block_y_min,
-                                                  block_x_max, block_y_max)
+                        blockDict[b]["extent"] = (block_x_min - buffer, block_y_min - buffer,
+                                                  block_x_max + buffer, block_y_max + buffer)
                         blockDict[b]["samples"] = topo_in_block
                         blockDict[b]["nodes_to_update"] = nodes_to_update
 
@@ -2222,7 +2219,6 @@ class MeasureTopographicAngles(object):
 
                     b = b + 1
             return blockDict
-
 
         def find_intersection(a, b, c, d, check_collinear=True):
             """Calculates 2D intersection coordinates of segments a-b and c-d.
@@ -2297,8 +2293,8 @@ class MeasureTopographicAngles(object):
                 return True, ixa, iyb, ixa, iyb
             return False, None, None, None, None
 
-
-        def get_topo_angles(nodeDict, block_extent, block_samples, z_raster, azimuthdisdict, searchDistance_max_m, con_z_to_m):
+        def get_topo_angles(block_extent, block_samples, z_raster, azimuthdisdict, searchDistance_max_m,
+                            con_z_to_m):
             """This gets the maximum topographic angle and other information for
             each topo line within the block. The data is saved to the nodeDict
             as a list."""
@@ -2308,11 +2304,12 @@ class MeasureTopographicAngles(object):
             x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
             y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))
 
-            # localize the block extent values
-            block_x_min = block_extent[0]
-            block_y_min = block_extent[1]
-            block_x_max = block_extent[2]
-            block_y_max = block_extent[3]
+            # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
+            # sampled are included in the array.
+            block_x_min = block_extent[0] - x_cellsize
+            block_y_min = block_extent[1] - y_cellsize
+            block_x_max = block_extent[2] + x_cellsize
+            block_y_max = block_extent[3] + y_cellsize
 
             # Get the coordinates extent of the input raster
             # this could be in main so it doesn't have to run each time
@@ -2377,11 +2374,8 @@ class MeasureTopographicAngles(object):
                     # remove the off raster samples
                     naindex = np.where(z_topo_array < -9998)
                     for x in naindex[0]: angle_array[x] = -9999
-                    
-                    # Find the max topo angle (in degrees)
+                    # Find the max topo angle
                     topoAngle = angle_array.max()
-##
-                    
                     # array index at the max topo angle
                     arryindex = np.where(angle_array == topoAngle)[0][0]
                     z_topo = z_topo_array[arryindex]
@@ -2497,13 +2491,9 @@ class MeasureTopographicAngles(object):
                 azimuthdict = {90: "TOPO_E", 180: "TOPO_S", 270: "TOPO_W"}
 
             elif topo_directions == 2:  # All directions
-#                azimuths = [45, 90, 135, 180, 225, 270, 315, 365]   #!MSF- Line commented out. North angle of 365 is incorrect, should be 360 or 0. 360 was erroring out so used 0 instead to point North
                 azimuths = [45, 90, 135, 180, 225, 270, 315, 0]
                 last_azimuth = 45
 
-                # azimuthdict = {45: "TOPO_NE", 90: "TOPO_E", 135: "TOPO_SE",
-                #                180: "TOPO_S", 225: "TOPO_SW", 270: "TOPO_W",
-                #                315: "TOPO_NW", 365: "TOPO_N"}                     #!MSF- Line commented out. North angle of 365 is incorrect and was causing model to crash. Updated to 360 or 0. 360 was erroring out so used 0 instead to point North
                 azimuthdict = {45: "TOPO_NE", 90: "TOPO_E", 135: "TOPO_SE",
                                180: "TOPO_S", 225: "TOPO_SW", 270: "TOPO_W",
                                315: "TOPO_NW", 0: "TOPO_N"}                     
@@ -2549,7 +2539,7 @@ class MeasureTopographicAngles(object):
 
             # Build the blockDict
             blockDict = create_blocks(nodeDict, block_size, last_azimuth,
-                                      searchDistance_max)
+                                      searchDistance_max, x_cellsize)
 
             # Iterate through each block
             total_samples = 0
@@ -2568,7 +2558,7 @@ class MeasureTopographicAngles(object):
                 # portion of the topo line in the block,
                 # convert raster to array, sample the raster
                 # calculate the topo angles and other info
-                topo_samples = get_topo_angles(nodeDict, block_extent, block_samples,
+                topo_samples = get_topo_angles(block_extent, block_samples,
                                                z_raster, azimuthdisdict,
                                                searchDistance_max, con_z_to_m)
                 if topo_samples:
@@ -3173,34 +3163,27 @@ class SampleLandcoverStartPattern(object):
      
             return lc_point_list
 
-        def create_block_list(nodes, block_size):
+        def create_block_list(nodeDict, nodes, block_size, buffer):
             """Returns two lists, one containing the coordinate extent
             for each block that will be iteratively extracted to an array
             and the other containing node IDs within each block extent."""
-    
-            arcpy.AddMessage("Calculating block extents")    
-            print("Calculating block extents")    
+
+            print("Calculating block extents")
             x_coord_list = [nodeDict[nodeID]["POINT_X"] for nodeID in nodes]
             y_coord_list = [nodeDict[nodeID]["POINT_Y"] for nodeID in nodes]
-    
-            # calculate the buffer distance (in raster spatial units) to add to 
-            # the base bounding box when extracting to an array. The buffer is 
-            # equal to the sample distance + 1 to make sure the block includes 
-            # all the landcover samples for each node.
-            buffer = int((transsample_count + 1) * transsample_distance * con_from_m)
-    
+
             # calculate bounding box extent for samples
             x_min = min(x_coord_list)
             x_max = max(x_coord_list)
-            y_min = min(y_coord_list) 
+            y_min = min(y_coord_list)
             y_max = max(y_coord_list)
-    
+
             x_width = int(x_max - x_min + 1)
             y_width = int(y_max - y_min + 1)
-    
+
             block_extents = []
             block_nodes = []
-      
+
             # Build data blocks
             for x in range(0, x_width, block_size):
                 for y in range(0, y_width, block_size):
@@ -3211,58 +3194,68 @@ class SampleLandcoverStartPattern(object):
                     # Upper right coordinate of block (in map units)
                     block0_x_max = min([block0_x_min + block_size, x_max])
                     block0_y_max = min([block0_y_min + block_size, y_max])
-            
-                    block_x_min = block0_x_max
-                    block_x_max = block0_x_min
-                    block_y_min = block0_y_max
-                    block_y_max = block0_y_min
-            
+
+                    block_x_max = block0_x_max
+                    block_x_min = block0_x_min
+                    block_y_max = block0_y_max
+                    block_y_min = block0_y_min
+
                     nodes_in_block = []
                     for nodeID in nodes:
                         node_x = nodeDict[nodeID]["POINT_X"]
                         node_y = nodeDict[nodeID]["POINT_Y"]
                         if (block0_x_min <= node_x <= block0_x_max and
-                            block0_y_min <= node_y <= block0_y_max):
-                    
+                                block0_y_min <= node_y <= block0_y_max):
                             nodes_in_block.append(nodeID)
-                    
-                            # Minimize the size of the block0 by the true 
-                            # extent of the nodes in the block
-                            if block_x_min > node_x: block_x_min = node_x
-                            if block_x_max < node_x: block_x_max = node_x
-                            if block_y_min > node_y: block_y_min = node_y
-                            if block_y_max < node_y: block_y_max = node_y
-            
+
                     if nodes_in_block:
-                        # add the block extent for processing
+
+                        # Minimize the size of the block0 by the true
+                        # extent of the nodes in the block
+                        node_x_min = min([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                        node_y_min = min([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+                        node_x_max = max([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                        node_y_max = max([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+
+                        if block0_x_min < node_x_min: block_x_min = node_x_min
+                        if block0_x_max > node_x_max: block_x_max = node_x_max
+                        if block0_y_min < node_y_min: block_y_min = node_y_min
+                        if block0_y_max > node_y_max: block_y_max = node_y_max
+
+                        # Add the block extent for processing and the buffer distance.
+                        # Because the node coordinates are used to determine if the node is within the block extent,
+                        # a buffer distance is added to ensure each block extent will include all samples around nodes
+                        # located at the edge of the block.
+
                         # order 0 left,      1 bottom,    2 right,     3 top
                         block_extents.append((block_x_min - buffer, block_y_min - buffer,
-                                              block_x_max + buffer, block_y_max + buffer))           
+                                              block_x_max + buffer, block_y_max + buffer))
                         block_nodes.append(nodes_in_block)
-    
+
             return block_extents, block_nodes
-    
+
         def sample_raster(block, lc_point_list, raster, con):
-#-----MSF - 9/15/2025
+
             # Normalize raster input so dataset path is always used (works for GPRasterLayer or dataset)
             try:
                 raster_src = arcpy.Describe(raster).catalogPath
             except:
                 raster_src = raster
-#-------------------    
+
             if con is not None:
                 nodata_to_value = -9999 / con
             else:
                 nodata_to_value = -9999
-        
-            # localize the block extent values
-            block_x_min = block[0]
-            block_y_min = block[1]
-            block_x_max = block[2]
-            block_y_max = block[3]
-# updated raster to raster_src - MSF 9/15/2025    
+
             x_cellsize = float(arcpy.GetRasterProperties_management(raster_src, "CELLSIZEX").getOutput(0))
-            y_cellsize = float(arcpy.GetRasterProperties_management(raster_src, "CELLSIZEY").getOutput(0)) 
+            y_cellsize = float(arcpy.GetRasterProperties_management(raster_src, "CELLSIZEY").getOutput(0))
+
+            # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
+            # sampled are included in the array.
+            block_x_min = block[0] - x_cellsize
+            block_y_min = block[1] - y_cellsize
+            block_x_max = block[2] + x_cellsize
+            block_y_max = block[3] + y_cellsize
 
             # Get the coordinate extent of the input raster
             raster_x_min = float(arcpy.GetRasterProperties_management(raster_src, "LEFT").getOutput(0))
@@ -3278,25 +3271,24 @@ class SampleLandcoverStartPattern(object):
             block_y_min_corner = block_y_min - ((block_y_min - raster_y_min) % y_cellsize)
             block_x_max_corner = block_x_max + ((raster_x_max - block_x_max) % x_cellsize)
             block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
-    
+
             # calculate the number of cols/rows from the lower left
             ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
             nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
-    
+
             # Construct the array. Note returned array is (row, col) so (y, x)
             try:
-                # updated raster to raster_src - MSF 9/15/2025
                 raster_array = arcpy.RasterToNumPyArray(raster_src, arcpy.Point(block_x_min_corner, block_y_min_corner),
                                                         ncols, nrows, nodata_to_value)
             except:
                 tbinfo = traceback.format_exc()
-                pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"       
-                sys.exit(pymsg)    
-    
-            # convert array values to meters if needed
+                pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"
+                sys.exit(pymsg)
+
+                # convert array values to meters if needed
             if con is not None:
                 raster_array = raster_array * con
-    
+
             lc_point_list_new = []
             if raster_array.max() > -9999:
                 # There is at least one pixel of data
@@ -3309,7 +3301,7 @@ class SampleLandcoverStartPattern(object):
                 for point in lc_point_list:
                     point.append(-9999)
                     lc_point_list_new.append(point)
-            return lc_point_list_new            
+            return lc_point_list_new
 
         def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
             """Updates the input point feature class with data from the
@@ -3485,9 +3477,15 @@ class SampleLandcoverStartPattern(object):
             # Get a list of the nodes, sort them
             nodes = list(nodeDict.keys())
             nodes.sort()
+
+            # calculate the buffer distance (in raster spatial units) to add to
+            # the base bounding box when extracting to an array. The buffer is
+            # equal to the sample distance + 1 to make sure the block includes
+            # all the landcover samples for each node.
+            buffer = int((transsample_count + 1) * transsample_distance * con_from_m)
    
             # Build the block list
-            block_extents, block_nodes = create_block_list(nodes, block_size)
+            block_extents, block_nodes = create_block_list(nodeDict, nodes, block_size, buffer)
     
             # Iterate through each block, calculate sample coordinates,
             # convert raster to array, sample the raster
@@ -3991,34 +3989,27 @@ class SampleLandcoverOrthogonalMethod(object):
      
             return lc_point_list
 
-        def create_block_list(nodes, block_size):
+        def create_block_list(nodeDict, nodes, block_size, buffer):
             """Returns two lists, one containing the coordinate extent
             for each block that will be iteratively extracted to an array
             and the other containing node IDs within each block extent."""
-    
-            arcpy.AddMessage("Calculating block extents")    
-            print("Calculating block extents")    
+
+            print("Calculating block extents")
             x_coord_list = [nodeDict[nodeID]["POINT_X"] for nodeID in nodes]
             y_coord_list = [nodeDict[nodeID]["POINT_Y"] for nodeID in nodes]
-    
-            # calculate the buffer distance (in raster spatial units) to add to 
-            # the base bounding box when extracting to an array. The buffer is 
-            # equal to the sample distance + 1 to make sure the block includes 
-            # all the landcover samples for each node.
-            buffer_dis = int((transsample_count + 1) * transsample_distance * con_from_m)
-    
+
             # calculate bounding box extent for samples
             x_min = min(x_coord_list)
             x_max = max(x_coord_list)
-            y_min = min(y_coord_list) 
+            y_min = min(y_coord_list)
             y_max = max(y_coord_list)
-    
+
             x_width = int(x_max - x_min + 1)
             y_width = int(y_max - y_min + 1)
-    
+
             block_extents = []
             block_nodes = []
-      
+
             # Build data blocks
             for x in range(0, x_width, block_size):
                 for y in range(0, y_width, block_size):
@@ -4029,59 +4020,68 @@ class SampleLandcoverOrthogonalMethod(object):
                     # Upper right coordinate of block (in map units)
                     block0_x_max = min([block0_x_min + block_size, x_max])
                     block0_y_max = min([block0_y_min + block_size, y_max])
-            
-                    block_x_min = block0_x_max
-                    block_x_max = block0_x_min
-                    block_y_min = block0_y_max
-                    block_y_max = block0_y_min
-            
+
+                    block_x_max = block0_x_max
+                    block_x_min = block0_x_min
+                    block_y_max = block0_y_max
+                    block_y_min = block0_y_min
+
                     nodes_in_block = []
                     for nodeID in nodes:
                         node_x = nodeDict[nodeID]["POINT_X"]
                         node_y = nodeDict[nodeID]["POINT_Y"]
                         if (block0_x_min <= node_x <= block0_x_max and
-                            block0_y_min <= node_y <= block0_y_max):
-                    
+                                block0_y_min <= node_y <= block0_y_max):
                             nodes_in_block.append(nodeID)
-                    
-                            # Minimize the size of the block0 by the true 
-                            # extent of the nodes in the block
-                            if block_x_min > node_x: block_x_min = node_x
-                            if block_x_max < node_x: block_x_max = node_x
-                            if block_y_min > node_y: block_y_min = node_y
-                            if block_y_max < node_y: block_y_max = node_y
-            
+
                     if nodes_in_block:
-                        # add the block extent for processing
+
+                        # Minimize the size of the block0 by the true
+                        # extent of the nodes in the block
+                        node_x_min = min([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                        node_y_min = min([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+                        node_x_max = max([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
+                        node_y_max = max([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+
+                        if block0_x_min < node_x_min: block_x_min = node_x_min
+                        if block0_x_max > node_x_max: block_x_max = node_x_max
+                        if block0_y_min < node_y_min: block_y_min = node_y_min
+                        if block0_y_max > node_y_max: block_y_max = node_y_max
+
+                        # Add the block extent for processing and the buffer distance.
+                        # Because the node coordinates are used to determine if the node is within the block extent,
+                        # a buffer distance is added to ensure each block extent will include all samples around nodes
+                        # located at the edge of the block.
+
                         # order 0 left,      1 bottom,    2 right,     3 top
-                        block_extents.append((block_x_min - buffer_dis, block_y_min - buffer_dis,
-                                              block_x_max + buffer_dis, block_y_max + buffer_dis))           
+                        block_extents.append((block_x_min - buffer, block_y_min - buffer,
+                                              block_x_max + buffer, block_y_max + buffer))
                         block_nodes.append(nodes_in_block)
-    
+
             return block_extents, block_nodes
-    
+
         def sample_raster(block, lc_point_list, raster, con):
-#-----MSF - 9/15/2025
+
             # Normalize raster input so dataset path is always used (works for GPRasterLayer or dataset)
             try:
                 raster_src = arcpy.Describe(raster).catalogPath
             except:
                 raster_src = raster
-#-------------------    
-    
+
             if con is not None:
                 nodata_to_value = -9999 / con
             else:
                 nodata_to_value = -9999
-        
-            # localize the block extent values
-            block_x_min = block[0]
-            block_y_min = block[1]
-            block_x_max = block[2]
-            block_y_max = block[3]
-    
+
             x_cellsize = float(arcpy.GetRasterProperties_management(raster_src, "CELLSIZEX").getOutput(0))
-            y_cellsize = float(arcpy.GetRasterProperties_management(raster_src, "CELLSIZEY").getOutput(0)) 
+            y_cellsize = float(arcpy.GetRasterProperties_management(raster_src, "CELLSIZEY").getOutput(0))
+
+            # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
+            # sampled are included in the array.
+            block_x_min = block[0] - x_cellsize
+            block_y_min = block[1] - y_cellsize
+            block_x_max = block[2] + x_cellsize
+            block_y_max = block[3] + y_cellsize
 
             # Get the coordinate extent of the input raster
             raster_x_min = float(arcpy.GetRasterProperties_management(raster_src, "LEFT").getOutput(0))
@@ -4097,25 +4097,24 @@ class SampleLandcoverOrthogonalMethod(object):
             block_y_min_corner = block_y_min - ((block_y_min - raster_y_min) % y_cellsize)
             block_x_max_corner = block_x_max + ((raster_x_max - block_x_max) % x_cellsize)
             block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
-    
+
             # calculate the number of cols/rows from the lower left
             ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
             nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
-    
+
             # Construct the array. Note returned array is (row, col) so (y, x)
             try:
-# updated raster to raster_src - MSF 9/15/2025    
                 raster_array = arcpy.RasterToNumPyArray(raster_src, arcpy.Point(block_x_min_corner, block_y_min_corner),
                                                         ncols, nrows, nodata_to_value)
             except:
                 tbinfo = traceback.format_exc()
-                pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"       
-                sys.exit(pymsg)    
-    
-            # convert array values to meters if needed
+                pymsg = tbinfo + "\nError Info:\n" + "\nNot enough memory. Reduce the block size"
+                sys.exit(pymsg)
+
+                # convert array values to meters if needed
             if con is not None:
                 raster_array = raster_array * con
-    
+
             lc_point_list_new = []
             if raster_array.max() > -9999:
                 # There is at least one pixel of data
@@ -4128,7 +4127,7 @@ class SampleLandcoverOrthogonalMethod(object):
                 for point in lc_point_list:
                     point.append(-9999)
                     lc_point_list_new.append(point)
-            return lc_point_list_new            
+            return lc_point_list_new
 
         def update_nodes_fc(nodeDict, nodes_fc, addFields, nodes_to_query):
             """Updates the input point feature class with data from the
@@ -4273,9 +4272,15 @@ class SampleLandcoverOrthogonalMethod(object):
             # Get a list of the nodes, sort them
             nodes = list(nodeDict.keys())
             nodes.sort()
+
+            # calculate the buffer distance (in raster spatial units) to add to
+            # the base bounding box when extracting to an array. The buffer is
+            # equal to the sample distance + 1 to make sure the block includes
+            # all the landcover samples for each node.
+            buffer = int((transsample_count + 1) * transsample_distance * con_from_m)
    
             # Build the block list
-            block_extents, block_nodes = create_block_list(nodes, block_size)
+            block_extents, block_nodes = create_block_list(nodeDict, nodes, block_size, buffer)
     
             # Iterate through each block, calculate sample coordinates,
             # convert raster to array, sample the raster
