@@ -312,8 +312,8 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
     else:
         nodata_to_value = -9999
 
-    x_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEX").getOutput(0))
-    y_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEY").getOutput(0))
+    x_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEX").getOutput(0))
+    y_cellsize = float(arcpy.GetRasterProperties_management(z_raster, "CELLSIZEY").getOutput(0))
 
     # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
     # sampled are included in the array.
@@ -323,10 +323,10 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
     block_y_max = block[3] + y_cellsize
 
     # Get the coordinate extent of the input raster
-    raster_x_min = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
-    raster_y_min = float(arcpy.GetRasterProperties_management(raster, "BOTTOM").getOutput(0))
-    raster_x_max = float(arcpy.GetRasterProperties_management(raster, "RIGHT").getOutput(0))
-    raster_y_max = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
+    raster_x_min = float(arcpy.GetRasterProperties_management(z_raster, "LEFT").getOutput(0))
+    raster_y_min = float(arcpy.GetRasterProperties_management(z_raster, "BOTTOM").getOutput(0))
+    raster_x_max = float(arcpy.GetRasterProperties_management(z_raster, "RIGHT").getOutput(0))
+    raster_y_max = float(arcpy.GetRasterProperties_management(z_raster, "TOP").getOutput(0))
 
     # Calculate the block x and y offset from the raster and adjust
     # the block coordinates so they are at the raster cell corners.
@@ -472,7 +472,7 @@ try:
     # the base bounding box when extracting to an array. The buffer is 
     # equal to the cellsize * the searchcells to make sure the block includes 
     # the surrounding cells at each corner
-    buffer = int((searchCells + 1)* cellsize)    
+    buffer = int((searchCells + 1)* cellsize)
 
     # Make a list of the base x/y coordinate movements
     # from the node origin. These values will be 
