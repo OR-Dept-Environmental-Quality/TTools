@@ -690,7 +690,7 @@ def find_intersection(a, b, c, d, check_collinear=True):
     return False, None, None, None, None
 
 
-def get_topo_angles(nodeDict, block_extent, block_samples, z_raster, azimuthdisdict, searchDistance_max_m, con_z_to_m):
+def get_topo_angles(block_extent, block_samples, z_raster, azimuthdisdict, searchDistance_max_m, con_z_to_m):
     """This gets the maximum topographic angle and other information for
     each topo line within the block. The data is saved to the nodeDict
     as a list."""
@@ -876,12 +876,12 @@ try:
         azimuthdict = {90: "TOPO_E", 180: "TOPO_S", 270: "TOPO_W"}
 
     elif topo_directions == 2:  # All directions
-        azimuths = [45, 90, 135, 180, 225, 270, 315, 365]
+        azimuths = [45, 90, 135, 180, 225, 270, 315, 0]
         last_azimuth = 45
 
         azimuthdict = {45: "TOPO_NE", 90: "TOPO_E", 135: "TOPO_SE",
                        180: "TOPO_S", 225: "TOPO_SW", 270: "TOPO_W",
-                       315: "TOPO_NW", 365: "TOPO_N"}
+                       315: "TOPO_NW", 0: "TOPO_N"}
 
     elif topo_directions == 3:
         azimuths = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
@@ -942,7 +942,7 @@ try:
         # portion of the topo line in the block,
         # convert raster to array, sample the raster
         # calculate the topo angles and other info
-        topo_samples = get_topo_angles(nodeDict, block_extent, block_samples,
+        topo_samples = get_topo_angles(block_extent, block_samples,
                                        z_raster, azimuthdisdict,
                                        searchDistance_max, con_z_to_m)
         if topo_samples:
