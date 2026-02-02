@@ -79,7 +79,12 @@ class Toolbox:
     def __init__(self):
         self.label = "TTools"
         self.alias = "TTools"
-        self.tools = [CreateStreamNodes, MeasureChannelWidth, SampleElevationGradient, MeasureTopographicAngles, SampleLandcoverStartPattern, SampleLandcoverOrthogonalMethod]  # Other tools will be added here later
+        self.tools = [CreateStreamNodes,
+                      MeasureChannelWidth,
+                      SampleElevationGradient,
+                      MeasureTopographicAngles,
+                      SampleLandcoverStarPattern,
+                      SampleLandcoverOrthogonalMethod]
 
 
 class CreateStreamNodes:
@@ -2570,7 +2575,7 @@ class MeasureTopographicAngles(object):
             print(msgs)
 
 
-class SampleLandcoverStartPattern(object):
+class SampleLandcoverStarPattern(object):
     def __init__(self):
         self.label = "Step 5A: Sample Landcover - Star Pattern"
         self.description = "Sample landcover raster values along transects oriented outward from the stream node in a star pattern."
