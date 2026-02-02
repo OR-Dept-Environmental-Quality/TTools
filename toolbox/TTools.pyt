@@ -77,8 +77,8 @@ from collections import Counter
 
 class Toolbox:
     def __init__(self):
-        self.label = "StreamTools"
-        self.alias = "streamtools"
+        self.label = "TTools"
+        self.alias = "TTools"
         self.tools = [CreateStreamNodes, MeasureChannelWidth, SampleElevationGradient, MeasureTopographicAngles, SampleLandcoverStartPattern, SampleLandcoverOrthogonalMethod]  # Other tools will be added here later
 
 
@@ -920,7 +920,7 @@ class SampleElevationGradient:
             datatype="GPDouble",
             parameterType="Required",
             direction="Input")
-        param5.value = 5
+        param5.value = 10
 
         param6 = arcpy.Parameter(
             displayName="Overwrite Existing Elevation/Gradient Fields",
@@ -1213,10 +1213,10 @@ class SampleElevationGradient:
 
                         # Minimize the size of the block0 by the true
                         # extent of the nodes in the block
-                        node_x_min = min([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
-                        node_y_min = min([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
-                        node_x_max = max([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
-                        node_y_max = max([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+                        node_x_min = min([nodeDict[nodeID[0]]["POINT_X"] for nodeID in nodes_in_block])
+                        node_y_min = min([nodeDict[nodeID[0]]["POINT_Y"] for nodeID in nodes_in_block])
+                        node_x_max = max([nodeDict[nodeID[0]]["POINT_X"] for nodeID in nodes_in_block])
+                        node_y_max = max([nodeDict[nodeID[0]]["POINT_Y"] for nodeID in nodes_in_block])
 
                         if block0_x_min < node_x_min: block_x_min = node_x_min
                         if block0_x_max > node_x_max: block_x_max = node_x_max
@@ -1592,6 +1592,7 @@ class MeasureTopographicAngles(object):
             datatype="GPDouble",
             parameterType="Required",
             direction="Input")
+        param6.value = 10
 
         param7 = arcpy.Parameter(
             displayName="Overwrite Existing Data",
@@ -1685,15 +1686,6 @@ class MeasureTopographicAngles(object):
 
         # ----------------------------------------------------------------------
         # ----------------------------------------------------------------------
-
-        # Future Updates
-        # update fc after each topo line sample so data isn't lost if the script crashes
-        # eliminate arcpy and use gdal for reading/writing feature class data
-
-        # The below are used for debugging. Currently, turned off.
-        #topo_line_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\topo_line"
-        #block_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\blocks"
-        #plot_dir = r"C:\workspace\ttools_tests\TTools_py39\plots"
 
         def nested_dict():
             """Build a nested dictionary"""
@@ -1942,57 +1934,12 @@ class MeasureTopographicAngles(object):
                     distance_array = np.array([searchDistance_min])
             return distance_array
 
-
         def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize):
             """converts x/y coordinates to col and row of the array"""
             col_x = int(((easting - block_x_min) - ((easting - block_x_min) % x_cellsize)) / x_cellsize)
             row_y = int(((block_y_max - northing) - ((block_y_max - northing) % y_cellsize)) / y_cellsize)
 
             return [col_x, row_y]
-
-        def plot_it(pts1, pts2, nodeID, a, b, b0, plot_dir):
-            """plots the block and topo line"""
-
-            import matplotlib.pyplot as plt
-
-            x1 = [i[0] for i in pts1]
-            y1 = [i[1] for i in pts1]
-
-            x2 = [i[0] for i in pts2]
-            y2 = [i[1] for i in pts2]
-
-            plt.plot(x1, y1, 'b--', x2, y2, 'r--')
-            plt.savefig(r"{0}\node{1}_a{2}_{3}b_{4}b0.png".format(plot_dir, nodeID, a, b, b0))
-
-        def create_block_fc(block_segments, b, block_fc, proj):
-            """Creates a poly line feature class of the block segments"""
-
-            poly_array = arcpy.Array()
-            pnt = arcpy.Point()
-            cursorfields = ["BLOCK", "SEGMENT"]
-
-            # Check to see if the block fc exists, if not create it
-            if not arcpy.Exists(block_fc):
-                # Create an empty output with the same projection as the input polyline
-                arcpy.CreateFeatureclass_management(os.path.dirname(block_fc),
-                                                    os.path.basename(block_fc),
-                                                    "POLYLINE", "", "DISABLED", "DISABLED",
-                                                    proj)
-
-                # Add attribute fields
-                for f in cursorfields:
-                    arcpy.AddField_management(block_fc, f, "DOUBLE", "", "", "",
-                                              "", "NULLABLE", "NON_REQUIRED")
-
-            with arcpy.da.InsertCursor(block_fc, ["SHAPE@"] + cursorfields) as cursor:
-                for s, segment in enumerate(block_segments):
-                    for pnt_x, pnt_y in segment:
-                        pnt.X = pnt_x
-                        pnt.Y = pnt_y
-                        poly_array.add(pnt)
-                    poly = arcpy.Polyline(poly_array)
-                    cursor.insertRow([poly, b, s])
-                    poly_array.removeAll()
 
         def create_blocks(NodeDict, block_size, last_azimuth, searchDistance_max, buffer):
             """Returns two lists, one containing the coordinate extent
@@ -2061,31 +2008,9 @@ class MeasureTopographicAngles(object):
                                       ((block_x_max, block_y_min), (block_x_max, block_y_max)),
                                       ((block_x_max, block_y_max), (block_x_min, block_y_max)))
 
-                    # --------------------------------------------------------
-                    # This is an argument for plot_it(). I used it for debugging.
-                    # It's a tuple of the x/y coords for each block segment.
-                    # block_for_plot = ((block_x_min, block_y_max),
-                    #                   (block_x_min, block_y_min),
-                    #                   (block_x_min, block_y_min),
-                    #                   (block_x_max, block_y_min),
-                    #                   (block_x_max, block_y_min),
-                    #                   (block_x_max, block_y_max),
-                    #                   (block_x_max, block_y_max),
-                    #                   (block_x_min, block_y_max))
-                    # --------------------------------------------------------
-
                     # Now start iterating through the topo list to evaluate
                     # if any part of the topo line is in the block extent
                     for nodeID, streamID, a, z_node, node_x, node_y, end_x, end_y in topo_list:
-
-                        # --------------------------------------------------------
-                        # This was used for debugging.
-                        # It slows the script WAY down.
-                        # topo_line = ((node_x, node_y),(end_x, end_y))
-                        # plot_it(block_for_plot, topo_line, nodeID, a, b, b0, plot_dir)
-                        # create_topo_line_fc(topo_line, streamID, nodeID, a,
-                        #                    topo_line_fc, proj)
-                        # --------------------------------------------------------
 
                         contains_node = False
                         contains_end = False
@@ -2211,11 +2136,6 @@ class MeasureTopographicAngles(object):
                                                   block_x_max + buffer, block_y_max + buffer)
                         blockDict[b]["samples"] = topo_in_block
                         blockDict[b]["nodes_to_update"] = nodes_to_update
-
-                        # --------------------------------------------------
-                        # Creates a feature class of the blocks.
-                        # create_block_fc(block_segments, b, block_fc, proj)
-                        # --------------------------------------------------
 
                     b = b + 1
             return blockDict
@@ -2430,20 +2350,6 @@ class MeasureTopographicAngles(object):
                 # Check if the topo output exists and delete if needed
             if arcpy.Exists(topo_fc) and overwrite_data:
                 arcpy.Delete_management(topo_fc)
-
-            # Check if the block fc exists and delete or throw an error
-            if arcpy.Exists(block_fc):
-                if overwrite_data:
-                    arcpy.Delete_management(block_fc)
-                else:
-                    arcpy.AddMessage("\nThis output already exists: \n" +
-                                     "{0}\n".format(block_fc) +
-                                     "overwrite data = False. New data will be " +
-                                     "appended to the existing feature class.")
-                    print("This output already exists: \n" +
-                          "{0}\n".format(block_fc) +
-                          "overwrite data = False. New data will be " +
-                          "appended to the existing feature class.")
 
             if overwrite_data:
                 env.overwriteOutput = True
@@ -2667,7 +2573,7 @@ class MeasureTopographicAngles(object):
 class SampleLandcoverStartPattern(object):
     def __init__(self):
         self.label = "Step 5A: Sample Landcover - Star Pattern"
-        self.description = "Calculate the maximum topographic shade angle for each stream node."
+        self.description = "Sample landcover raster values along transects oriented outward from the stream node in a star pattern."
         self.canRunInBackground = False
 
     def getParameterInfo(self):
@@ -2699,7 +2605,7 @@ class SampleLandcoverStartPattern(object):
             datatype="GPDouble",
             parameterType="Required",
             direction="Input")
- # Changed caption from "Sample Zone Only" to "Use Zone Sampling Method" - MSF 9/29/2025 
+
         param4 = arcpy.Parameter(
             displayName="Use Zone Sampling Method",
             name="zone_sample",
@@ -2745,7 +2651,8 @@ class SampleLandcoverStartPattern(object):
             displayName="Canopy Cover Type",
             name="canopy_data",
             datatype="GPString",
-            parameterType="Optional",
+            parameterType="Derived",
+            #parameterType="Optional",
             direction="Input")
         param9.filter.type = "ValueList"
         param9.filter.list = ["CanopyCover", "LAI", "None"]
@@ -2755,21 +2662,24 @@ class SampleLandcoverStartPattern(object):
             displayName="Canopy Raster",
             name="canopy_raster",
             datatype="GPRasterLayer",
-            parameterType="Optional",
+            parameterType="Derived",
+            #parameterType="Optional",
             direction="Input")
     
         param11 = arcpy.Parameter(
             displayName="K Raster",
             name="k_raster",
             datatype="GPRasterLayer",
-            parameterType="Optional",
+            parameterType="Derived",
+            #parameterType="Optional",
             direction="Input")
     
         param12 = arcpy.Parameter(
             displayName="Overhanging Vegetation Raster",
             name="oh_raster",
             datatype="GPRasterLayer",
-            parameterType="Optional",
+            #parameterType="Optional",
+            parameterType="Derived",
             direction="Input")
     
         param13 = arcpy.Parameter(
@@ -2801,6 +2711,7 @@ class SampleLandcoverStartPattern(object):
             datatype="GPDouble",
             parameterType="Required",
             direction="Input")
+        param16.value = 10
     
         param17 = arcpy.Parameter(
             displayName="Overwrite Existing Data",
@@ -3571,7 +3482,7 @@ import sys
 class SampleLandcoverOrthogonalMethod(object):
     def __init__(self):
         self.label = "Step 5B: Sample Landcover - Orthogonal Method"
-        self.description = "Sample landcover values along orthogonal transects from stream banks or nodes."
+        self.description = "Sample landcover raster values along orthogonal transects from stream banks or nodes."
         self.canRunInBackground = False
 
     def getParameterInfo(self):
@@ -3640,6 +3551,7 @@ class SampleLandcoverOrthogonalMethod(object):
             datatype ="GPDouble", 
             parameterType="Required", 
             direction = "Input")
+        param9.value = 10
         param10 = arcpy.Parameter(
             displayName="Overwrite Existing Data", 
             name = "overwrite_data", 
