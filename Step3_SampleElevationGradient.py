@@ -277,10 +277,10 @@ def create_block_list(nodeDict, nodes, block_size, buffer):
 
                 # Minimize the size of the block0 by the true
                 # extent of the nodes in the block
-                node_x_min = min([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
-                node_y_min = min([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
-                node_x_max = max([nodeDict[nodeID]["POINT_X"] for nodeID in nodes_in_block])
-                node_y_max = max([nodeDict[nodeID]["POINT_Y"] for nodeID in nodes_in_block])
+                node_x_min = min([nodeDict[nodeID[0]]["POINT_X"] for nodeID in nodes_in_block])
+                node_y_min = min([nodeDict[nodeID[0]]["POINT_Y"] for nodeID in nodes_in_block])
+                node_x_max = max([nodeDict[nodeID[0]]["POINT_X"] for nodeID in nodes_in_block])
+                node_y_max = max([nodeDict[nodeID[0]]["POINT_Y"] for nodeID in nodes_in_block])
 
                 if block0_x_min < node_x_min: block_x_min = node_x_min
                 if block0_x_max > node_x_max: block_x_max = node_x_max
