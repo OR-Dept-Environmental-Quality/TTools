@@ -1,2 +1,189 @@
 <?xml version="1.0"?>
-<metadata xml:lang="en"><Esri><CreaDate>20250821</CreaDate><CreaTime>15172500</CreaTime><ArcGISFormat>1.0</ArcGISFormat><SyncOnce>TRUE</SyncOnce><ModDate>20250916</ModDate><ModTime>15003300</ModTime><scaleRange><minScale>150000000</minScale><maxScale>5000</maxScale></scaleRange><ArcGISProfile>ItemDescription</ArcGISProfile></Esri><tool name="SampleLandcoverStartPattern" displayname="Step 5A: Sample Landcover - Star Pattern" toolboxalias="streamtools" xmlns=""><arcToolboxHelpPath>c:\program files\arcgis\pro\Resources\Help\gp</arcToolboxHelpPath><parameters><param name="nodes_fc" displayname="Stream Nodes Feature Class" type="Required" direction="Input" datatype="Feature Layer" expression="nodes_fc"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;File path to the stream nodes feature class. &lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="trans_count" displayname="Number of Transects per Node" type="Required" direction="Input" datatype="Long" expression="trans_count"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The number of transects (directions) to sample at each stream node. The degrees of separation between each transect is equal to 360 divided by the number of transects per node. For example, if the number of transects per node equals 8, then the azimuth of the first transect is 45 degrees (Northeast), the second transect is 90 degrees (East), and the eighth is 360 degrees (North). Transects are oriented clockwise from North. This field is ignored if Heat Source 8 Output Format option is checked.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="transsample_count" displayname="Number of Samples per Transect" type="Required" direction="Input" datatype="Long" expression="transsample_count"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;P STYLE="font-size:16ptmargin:0 0 8 0;"&gt;&lt;SPAN&gt;&lt;SPAN&gt;The number of samples per transect (direction). This number does not include the sample at the stream node.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="transsample_distance" displayname="Distance between samples (m)" type="Required" direction="Input" datatype="Double" expression="transsample_distance"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;P STYLE="font-size:16ptmargin:0 0 8 0;"&gt;&lt;SPAN&gt;&lt;SPAN&gt;The distance between transect samples measured in meters.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="zone_sample" displayname="Sample Zone Only" type="Required" direction="Input" datatype="Boolean" expression="zone_sample"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN&gt;Checkbox to indicate if each sample should represent a zone which is centered relative to the number of samples per transect as measured from the stream node. For example, if checked, the distance from the stream node to the sample location along each transect is equal to [the number of samples per transect * (sample number - 0.5)]. &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN&gt;This box should be checked if using Heat Source 7, Heat Source 8.0.1 - 8.0.5, or Heat Source 8.0.7 - 8.0.8 when the model is configured to use the zone method. &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN&gt;This box should be unchecked if using Heat Source 9, or Heat Source 8.0.7 - 8.0.8 when the model is configured to use the point method.&lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="heatsource8" displayname="HeatSource 8 Output Format" type="Required" direction="Input" datatype="Boolean" expression="heatsource8"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;Checkbox to indicate if the star pattern with 7 transects around each stream node in the following directions: Northeast, East, Southeast, South, Southwest, West, Northwest should be used. This is the configuration used by Heat Source model versions 7 and 8. If checked, the Number of Transects per Node input is ignored.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="sampleID_for_code" displayname="Add SampleID Field for Code Lookup" type="Required" direction="Input" datatype="Boolean" expression="sampleID_for_code"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;Checkbox to indicate if the sample ID should be used as the landcover value. If checked, the landcover raster will be ignored and only the elevation raster will be sampled. Generally, this should be unchecked.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="lc_raster" displayname="Landcover Raster" type="Required" direction="Input" datatype="Raster Layer" expression="lc_raster"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path to the landcover code, landcover height, or landcover elevation raster&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="lc_units" displayname="Landcover Units" type="Required" direction="Input" datatype="String" expression="Meters | Feet | None"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The unit of the landcover raster (a.k.a. the unit of height or elevation). Options include "Feet", "Meters", or "None". Use “None” if the landcover raster cell values are codes and do not represent elevation or height units.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="canopy_data" displayname="Canopy Cover Type" type="Optional" direction="Input" datatype="String" expression="{None | CanopyCover | LAI}"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The type of canopy cover data  in the canopy cover raster. Options include "CanopyCover", "LAI", or "None". &lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;Use “None” if not sampling a canopy raster. &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;The LAI is a dimensionless quantity that characterizes plant canopies, specifically the total leaf area per unit ground area. Note that the Leaf Area Index (LAI) raster is a type of geospatial data layer that represents the effective leaf area index across a landscape. &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;If Canopy Cover is “None”, the Canopy Raster, K Raster, and Overhanging Vegetation Raster inputs are ignored.&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="canopy_raster" displayname="Canopy Raster (Optional)" type="Optional" direction="Input" datatype="Raster Layer" expression="{canopy_raster}"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path to the canopy or LAI raster. Ignored if Canopy Cover input is "None".&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="k_raster" displayname="K Raster (Optional)" type="Optional" direction="Input" datatype="Raster Layer" expression="{k_raster}"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path to the K coefficient raster. This input is required if the Canopy Cover input is set equal to "LAI". This input is ignored if the Canopy Cover input is set to "None".&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="oh_raster" displayname="Overhanging Vegetation Raster (Optional)" type="Optional" direction="Input" datatype="Raster Layer" expression="{oh_raster}"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN&gt;&lt;SPAN&gt;File path to the overhanging vegetation raster. This input is ignored if the Canopy Cover input is set equal to "None"(blank).&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="z_raster" displayname="Elevation Raster" type="Required" direction="Input" datatype="Raster Layer" expression="z_raster"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;File path to the elevation raster&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="z_units" displayname="Elevation Units" type="Required" direction="Input" datatype="String" expression="Meters | Feet"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;The elevation raster units are specified here. Either "Feet" or "Meters". If the unit is not in feet or meters, the elevation values must be converted prior to tool input.&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="lc_point_fc" displayname="Output Landcover Point Feature Class" type="Required" direction="Output" datatype="Feature Class" expression="lc_point_fc"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path and name of output landcover point feature class.  This feature identifies the location and landcover sample values for each landcover sample point.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="block_size" displayname="Raster Block Size (km)" type="Required" direction="Input" datatype="Double" expression="block_size"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The length and width dimensions in kilometers for the square blocks of elevation raster cells pulled into an array. The suggested default value is 5. If an error occurs, try reducing the block size. To increase processing speed, the elevation raster is subdivided iteratively into smaller blocks and pulled into arrays for processing. Very large block sizes may use a lot of memory and result in an error.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param><param name="overwrite_data" displayname="Overwrite Existing Data" type="Required" direction="Input" datatype="Boolean" expression="overwrite_data"><dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;Checkbox to indicate whether existing landcover data in the stream nodes feature class and in the landcover point feature class can be overwritten.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;</dialogReference></param></parameters></tool><dataIdInfo><idCitation><resTitle>Step 5A: Sample Landcover - Star Pattern</resTitle></idCitation><searchKeys><keyword>TTools Step 5A: Sample Landcover - Star Pattern</keyword></searchKeys></dataIdInfo><distInfo><distributor><distorFormat><formatName>ArcToolbox Tool</formatName></distorFormat></distributor></distInfo><mdHrLv><ScopeCd value="005"/></mdHrLv><mdDateSt Sync="TRUE">20250916</mdDateSt></metadata>
+<metadata xml:lang="en">
+    <Esri>
+        <CreaDate>20250821</CreaDate>
+        <CreaTime>15172500</CreaTime>
+        <ArcGISFormat>1.0</ArcGISFormat>
+        <SyncOnce>TRUE</SyncOnce>
+        <ModDate>20250916</ModDate>
+        <ModTime>15003300</ModTime>
+        <scaleRange>
+            <minScale>150000000</minScale>
+            <maxScale>5000</maxScale>
+        </scaleRange>
+        <ArcGISProfile>ItemDescription</ArcGISProfile>
+    </Esri>
+    <tool name="SampleLandcoverStartPattern" displayname="Step 5A: Sample Landcover - Star Pattern"
+          toolboxalias="TTools" xmlns="">
+        <arcToolboxHelpPath>c:\program files\arcgis\pro\Resources\Help\gp</arcToolboxHelpPath>
+        <parameters>
+            <param name="nodes_fc" displayname="Stream Nodes Feature Class" type="Required" direction="Input"
+                   datatype="Feature Layer" expression="nodes_fc">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;File
+                    path to the stream nodes feature class. &lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="trans_count" displayname="Number of Transects per Node" type="Required" direction="Input"
+                   datatype="Long" expression="trans_count">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The
+                    number of transects (directions) to sample at each stream node. The degrees of separation between
+                    each transect is equal to 360 divided by the number of transects per node. For example, if the
+                    number of transects per node equals 8, then the azimuth of the first transect is 45 degrees
+                    (Northeast), the second transect is 90 degrees (East), and the eighth is 360 degrees (North).
+                    Transects are oriented clockwise from North. This field is ignored if Heat Source 8 Output Format
+                    option is checked.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="transsample_count" displayname="Number of Samples per Transect" type="Required"
+                   direction="Input" datatype="Long" expression="transsample_count">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;P STYLE="font-size:16ptmargin:0 0 8 0;"&gt;&lt;SPAN&gt;&lt;SPAN&gt;The
+                    number of samples per transect (direction). This number does not include the sample at the stream
+                    node.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="transsample_distance" displayname="Distance between samples (m)" type="Required"
+                   direction="Input" datatype="Double" expression="transsample_distance">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;P STYLE="font-size:16ptmargin:0 0 8 0;"&gt;&lt;SPAN&gt;&lt;SPAN&gt;The
+                    distance between transect samples measured in meters.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="zone_sample" displayname="Sample Zone Only" type="Required" direction="Input"
+                   datatype="Boolean" expression="zone_sample">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN&gt;Checkbox
+                    to indicate if each sample should represent a zone which is centered relative to the number of
+                    samples per transect as measured from the stream node. For example, if checked, the distance from
+                    the stream node to the sample location along each transect is equal to [the number of samples per
+                    transect * (sample number - 0.5)]. &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN&gt;This box should be
+                    checked if using Heat Source 7, Heat Source 8.0.1 - 8.0.5, or Heat Source 8.0.7 - 8.0.8 when the
+                    model is configured to use the zone method. &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN&gt;This box
+                    should be unchecked if using Heat Source 9, or Heat Source 8.0.7 - 8.0.8 when the model is
+                    configured to use the point method.&lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="heatsource8" displayname="HeatSource 8 Output Format" type="Required" direction="Input"
+                   datatype="Boolean" expression="heatsource8">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;Checkbox to indicate if the star pattern with 7 transects
+                    around each stream node in the following directions: Northeast, East, Southeast, South, Southwest,
+                    West, Northwest should be used. This is the configuration used by Heat Source model versions 7 and
+                    8. If checked, the Number of Transects per Node input is ignored.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="sampleID_for_code" displayname="Add SampleID Field for Code Lookup" type="Required"
+                   direction="Input" datatype="Boolean" expression="sampleID_for_code">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;Checkbox to indicate if the sample ID should be used as the
+                    landcover value. If checked, the landcover raster will be ignored and only the elevation raster will
+                    be sampled. Generally, this should be unchecked.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="lc_raster" displayname="Landcover Raster" type="Required" direction="Input"
+                   datatype="Raster Layer" expression="lc_raster">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path to the landcover code, landcover height, or
+                    landcover elevation raster&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="lc_units" displayname="Landcover Units" type="Required" direction="Input" datatype="String"
+                   expression="Meters | Feet | None">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The unit of the landcover raster (a.k.a. the unit of height or
+                    elevation). Options include "Feet", "Meters", or "None". Use “None” if the landcover raster cell
+                    values are codes and do not represent elevation or height units.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="canopy_data" displayname="Canopy Cover Type" type="Optional" direction="Input"
+                   datatype="String" expression="{None | CanopyCover | LAI}">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The type of canopy cover data in the canopy cover raster.
+                    Options include "CanopyCover", "LAI", or "None". &lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;Use “None” if not sampling a canopy raster. &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;The LAI is a dimensionless quantity that characterizes plant canopies,
+                    specifically the total leaf area per unit ground area. Note that the Leaf Area Index (LAI) raster is
+                    a type of geospatial data layer that represents the effective leaf area index across a landscape.
+                    &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;If Canopy Cover is “None”, the
+                    Canopy Raster, K Raster, and Overhanging Vegetation Raster inputs are ignored.&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="canopy_raster" displayname="Canopy Raster (Optional)" type="Optional" direction="Input"
+                   datatype="Raster Layer" expression="{canopy_raster}">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path to the canopy or LAI raster. Ignored if Canopy Cover
+                    input is "None".&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="k_raster" displayname="K Raster (Optional)" type="Optional" direction="Input"
+                   datatype="Raster Layer" expression="{k_raster}">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path to the K coefficient raster. This input is required
+                    if the Canopy Cover input is set equal to "LAI". This input is ignored if the Canopy Cover input is
+                    set to "None".&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="oh_raster" displayname="Overhanging Vegetation Raster (Optional)" type="Optional"
+                   direction="Input" datatype="Raster Layer" expression="{oh_raster}">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN&gt;&lt;SPAN&gt;File
+                    path to the overhanging vegetation raster. This input is ignored if the Canopy Cover input is set
+                    equal to "None"(blank).&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="z_raster" displayname="Elevation Raster" type="Required" direction="Input"
+                   datatype="Raster Layer" expression="z_raster">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;File path to the elevation raster&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="z_units" displayname="Elevation Units" type="Required" direction="Input" datatype="String"
+                   expression="Meters | Feet">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;The elevation raster units are specified here. Either "Feet" or "Meters".
+                    If the unit is not in feet or meters, the elevation values must be converted prior to tool input.&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="lc_point_fc" displayname="Output Landcover Point Feature Class" type="Required"
+                   direction="Output" datatype="Feature Class" expression="lc_point_fc">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path and name of output landcover point feature class.
+                    This feature identifies the location and landcover sample values for each landcover sample point.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="block_size" displayname="Raster Block Size (km)" type="Required" direction="Input"
+                   datatype="Double" expression="block_size">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The length and width dimensions in kilometers for the square
+                    blocks of elevation raster cells pulled into an array. The suggested default value is 10. If an error
+                    occurs, try reducing the block size. To increase processing speed, the elevation raster is
+                    subdivided iteratively into smaller blocks and pulled into arrays for processing. Very large block
+                    sizes may use a lot of memory and result in an error.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+            <param name="overwrite_data" displayname="Overwrite Existing Data" type="Required" direction="Input"
+                   datatype="Boolean" expression="overwrite_data">
+                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
+                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;Checkbox to indicate whether existing landcover data in the
+                    stream nodes feature class and in the landcover point feature class can be overwritten.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+                </dialogReference>
+            </param>
+        </parameters>
+    </tool>
+    <dataIdInfo>
+        <idCitation>
+            <resTitle>Step 5A: Sample Landcover - Star Pattern</resTitle>
+        </idCitation>
+        <searchKeys>
+            <keyword>TTools Step 5A: Sample Landcover - Star Pattern</keyword>
+        </searchKeys>
+    </dataIdInfo>
+    <distInfo>
+        <distributor>
+            <distorFormat>
+                <formatName>ArcToolbox Tool</formatName>
+            </distorFormat>
+        </distributor>
+    </distInfo>
+    <mdHrLv>
+        <ScopeCd value="005"/>
+    </mdHrLv>
+    <mdDateSt Sync="TRUE">20250916</mdDateSt>
+</metadata>
