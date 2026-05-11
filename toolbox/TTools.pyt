@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 TTools
-Version: [v9.2]
+Version: [v9.21]
 
 Primary Author: Ryan Michie
 Organization: [Oregon Department of Environmental Quality]
@@ -4192,9 +4192,16 @@ class SampleLandcoverOrthogonalMethod(object):
 
             # calculate the buffer distance (in raster spatial units) to add to
             # the base bounding box when extracting to an array. The buffer is
-            # equal to the sample distance + 1 to make sure the block includes
-            # all the landcover samples for each node.
-            buffer = int((transsample_count + 1) * transsample_distance * con_from_m)
+            # equal to the sample distance + 1  + max left/right channel width to make sure
+            # the block includes all the landcover samples for each node.
+            # Everything measured in meters here and converted to map units.
+
+            # Determine the max offset from the nod eto the start of the first transect sample.
+            offset_l_max = [nodeDict[nodeID].get("LEFT", 0) for nodeID in nodeDict]
+            offset_r_max = [nodeDict[nodeID].get("RIGHT", 0) for nodeID in nodeDict]
+            offset_max = max(offset_l_max + offset_r_max)
+
+            buffer = int(((transsample_count + 1) * transsample_distance + offset_max) * con_from_m)
    
             # Build the block list
             block_extents, block_nodes = create_block_list(nodeDict, nodes, block_size, buffer)
