@@ -427,14 +427,20 @@ def create_block_list(nodeDict, nodes, block_size, buffer):
     return block_extents, block_nodes
     
 def sample_raster(block, lc_point_list, raster, con):
-    
+
+    # Normalize raster input so dataset path is always used (works for GPRasterLayer or dataset)
+    try:
+        raster_src = arcpy.Describe(raster).catalogPath
+    except:
+        raster_src = raster
+
     if con is not None:
         nodata_to_value = -9999 / con
     else:
         nodata_to_value = -9999
 
-    x_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEX").getOutput(0))
-    y_cellsize = float(arcpy.GetRasterProperties_management(raster, "CELLSIZEY").getOutput(0))
+    x_cellsize = float(arcpy.GetRasterProperties_management(raster_src, "CELLSIZEX").getOutput(0))
+    y_cellsize = float(arcpy.GetRasterProperties_management(raster_src, "CELLSIZEY").getOutput(0))
 
     # localize the block extent values and add one cell distance to the size to ensure all cells that need to be
     # sampled are included in the array.
@@ -444,10 +450,10 @@ def sample_raster(block, lc_point_list, raster, con):
     block_y_max = block[3] + y_cellsize
 
     # Get the coordinate extent of the input raster
-    raster_x_min = float(arcpy.GetRasterProperties_management(raster, "LEFT").getOutput(0))
-    raster_y_min = float(arcpy.GetRasterProperties_management(raster, "BOTTOM").getOutput(0))
-    raster_x_max = float(arcpy.GetRasterProperties_management(raster, "RIGHT").getOutput(0))
-    raster_y_max = float(arcpy.GetRasterProperties_management(raster, "TOP").getOutput(0))
+    raster_x_min = float(arcpy.GetRasterProperties_management(raster_src, "LEFT").getOutput(0))
+    raster_y_min = float(arcpy.GetRasterProperties_management(raster_src, "BOTTOM").getOutput(0))
+    raster_x_max = float(arcpy.GetRasterProperties_management(raster_src, "RIGHT").getOutput(0))
+    raster_y_max = float(arcpy.GetRasterProperties_management(raster_src, "TOP").getOutput(0))
 
     # Calculate the block x and y offset from the raster and adjust
     # the block coordinates so they are at the raster cell corners.
@@ -464,7 +470,7 @@ def sample_raster(block, lc_point_list, raster, con):
     
     # Construct the array. Note returned array is (row, col) so (y, x)
     try:
-        raster_array = arcpy.RasterToNumPyArray(raster, arcpy.Point(block_x_min_corner, block_y_min_corner),
+        raster_array = arcpy.RasterToNumPyArray(raster_src, arcpy.Point(block_x_min_corner, block_y_min_corner),
                                                 ncols, nrows, nodata_to_value)
     except:
         tbinfo = traceback.format_exc()
