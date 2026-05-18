@@ -7,40 +7,35 @@ This script will take an input point feature (from Step 1) and sample the input 
 lowest elevation in a user defined search radius and calculate the gradient for each node in the downstream direction.
 
 REQUIREMENTS
-TTools steps 1 must be run before Step 3.
-ESRI ArcGIS Pro
-Python 3.7+
+    TTools step 1 must be run before Step 3.
+    ESRI ArcGIS Pro
+    Python 3.7+
 
-INPUT VARIABLES
-0: nodes_fc:
-Path to the TTools point feature class.
+PARAMETERS:
+    nodes_fc (str): Path to the TTools point feature class.
 
-1: searchCells
-The number of cells to search around the node for the lowest elevation.
+    searchCells (int): The number of cells to search around the node for the lowest elevation.
 
-2: smooth_flag
-Boolean (True/False) flag to indicate if smoothing should occur when the gradient is <= 0. When gradients are <= 0
-the algorithm moves downstream until it a positive gradient is found and then recalculate the gradient over the longer
-distance and applies the resulting value to all nodes over that distance.
+    smooth_flag (bool): True/False flag to indicate if smoothing should occur when the gradient
+        is <= 0. When gradients are <= 0 the algorithm moves downstream until a positive  gradient
+        is found and then recalculates the gradient over the longer distance and applies the
+        resulting value to all nodes over that distance.
 
-3: z_raster:
-Path and name of the ground elevation raster.
+    z_raster (str): Path and name of the ground elevation raster.
 
-4: z_units:
-z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is not in feet or meters the elevation
-values must be converted.
+    z_units (str): z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is
+        not in feet or meters the elevation values must be converted.
 
-6: block_size:
-The x and y size in kilometers for the z_raster blocks pulled into an array. Start with 5 if you aren't sure and reduce
-if there is an error. To increase processing the z_raster is subdivided iteratively into smaller blocks and pulled
-into arrays for processing. Very large block sizes may use a lot of memory and result in an error.
+    block_size (int): The x and y size in kilometers for the z_raster blocks pulled into an
+        array. Start with 10 if you aren't sure and reduce if there is an error. To increase
+        processing the z_raster is subdivided iteratively into smaller blocks and pulled into
+        arrays for processing. Very large block sizes may use a lot of memory and result in
+        an error.
 
-7: overwrite_data:
-True/False flag if existing data in nodes_fc can be overwritten.
+    overwrite_data (bool): True/False flag if existing data in nodes_fc can be overwritten.
 
 OUTPUTS
-0. nodes_fc:
-New fields ELEVATION and GRADIENT are added into nodes_fc.
+    nodes_fc: New fields ELEVATION and GRADIENT are added into nodes_fc.
 
 """
 # Import system modules
@@ -57,12 +52,12 @@ from collections import defaultdict
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
+nodes_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_nodes_star"
 searchCells = 2
 smooth_flag = True
-z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
+z_raster = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_rasters\jcw_be_m_mosaic.tif"
 z_units = "Meters"
-block_size = 5
+block_size = 10
 overwrite_data = True
 # End input variables
 # ----------------------------------------------------------------------

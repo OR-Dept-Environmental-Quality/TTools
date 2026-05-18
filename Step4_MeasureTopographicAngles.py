@@ -7,52 +7,45 @@ This script will take an input point feature (from Step 1) and calculate the max
 shade angle for each stream node in different directions.
 
 REQUIREMENTS
-TTools steps 1 - 3 must be run before Step 4.
-ESRI ArcGIS Pro w/ Spatial Analyst extension
-Python 3.7+
+    TTools steps 1 - 3 must be run before Step 4.
+    ESRI ArcGIS Pro w/ Spatial Analyst extension
+    Python 3.7+
 
-INPUT VARIABLES
-0: nodes_fc:
-Path to the TTools point feature class.
+PARAMETERS:
+    nodes_fc (str): Path to the TTools point feature class.
 
-1: topo_directions
-An integer value corresponding to the specific list of azimuth directions to sample (e.g. topo_directions = 1).
-Options listed below.
+    topo_directions (int): An integer value corresponding to the specific list of azimuth
+        directions to sample (e.g. topo_directions = 1). Options listed below.
+        1. Heat Source or Washington Department of Ecology's Shade model: [270, 180, 90]
+        2. All cardinal and intercardinal directions: [45, 90, 135, 180, 225, 270, 315, 360]
+        3. CE-QUAL-W2: [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
 
-1. Heat Source or Washington Department of Ecology's Shade model: [270, 180, 90]
-2. All cardinal and intercardinal directions: [45, 90, 135, 180, 225, 270, 315, 360]
-3. CE-QUAL-W2: [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
+    searchDistance_max_km (float): The maximum distance in kilometers to search for the largest
+        topographic shade angle.
 
-2: searchDistance_max_km
-The maximum distance in kilometers to search for the largest topographic shade angle.
+    z_raster (str): Path and name of the ground elevation raster.
 
-3: z_raster:
-Path and name of the ground elevation raster.
+    z_units (str): z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is
+        not in feet or meters the elevation values must be converted.
 
-4: z_units:
-z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is not in feet or meters the elevation
-values must be converted.
+    topo_fc (str): Path and name of output topographic point feature. This feature identifies
+    the location on the z_raster producing the largest topographic shade angle for each node
+    and sample direction.
 
-5: topo_fc:
-Path and name of output topographic point feature. This feature identifies the location on the z_raster producing
-the largest topographic shade angle for each node and sample direction.
+    block_size (int): The x and y size in kilometers for the z_raster blocks pulled into an
+        array. Start with 10 if you aren't sure and reduce if there is an error. To increase
+        processing the z_raster is subdivided iteratively into smaller blocks and pulled into
+        arrays for processing. Very large block sizes may use a lot of memory and result in
+        an error.
 
-6: block_size:
-The x and y size in kilometers for the z_raster blocks pulled into an array. Start with 5 if you aren't sure and reduce
-if there is an error. To increase processing the z_raster is subdivided iteratively into smaller blocks and pulled
-into arrays for processing. Very large block sizes may use a lot of memory and result in an error.
+    overwrite_data (bool): True/False flag if existing data in nodes_fc and topo_fc can be overwritten.
 
-7: overwrite_data:
-True/False flag if existing data in nodes_fc and topo_fc can be overwritten.
+OUTPUTS
+    nodes_fc: New fields are added into nodes_fc with the maximum topographic shade angles
+        for each direction at each node.
 
-# OUTPUTS
-0. nodes_fc:
-New fields are added into nodes_fc with the maximum topographic shade angles for each direction at each node.
-
-1. topo_fc: - point for each x/y location of the maximum elevation.
-New point feature class created with a point at each x/y location that produces the largest topographic shade angle
-for each node and sample direction.
-
+    topo_fc: New point feature class created with a point at each x/y location that produces
+        the largest topographic shade angle for each node and sample direction.
 """
 # Import system modules
 import sys
@@ -68,16 +61,15 @@ from collections import defaultdict
 import numpy as np
 
 # ----------------------------------------------------------------------
-# Start input variables
-nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
+# Input Parameters
+nodes_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_nodes_star"
 topo_directions = 1
 searchDistance_max_km = 10
-z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
+z_raster = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_rasters\jcw_be_m_mosaic.tif"
 z_units = "Meters"
-topo_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\topo_samples"
-block_size = 5
+topo_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_topo"
+block_size = 10
 overwrite_data = True
-# End input variables
 # ----------------------------------------------------------------------
 
 # Future Updates
@@ -723,7 +715,7 @@ def get_topo_angles(block_extent, block_samples, z_raster, azimuthdisdict, searc
     block_x_max_corner = block_x_max + ((raster_x_max - block_x_max) % x_cellsize)
     block_y_max_corner = block_y_max + ((raster_y_max - block_y_max) % y_cellsize)
 
-    # calculate the number of cols/ros from the lower left
+    # calculate the number of cols/rows from the lower left
     ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
     nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
 

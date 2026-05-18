@@ -12,27 +12,21 @@ TTools steps 1 must be run before Step 2.
 ESRI ArcPro
 Python 3.7+
 
-INPUT VARIABLES
-0: nodes_fc:
-Path to the TTools point feature class.
-
-1: rb_fc
-The right bank feature class. The right bank is on the right looking downstream.
-
-2: lb_fc
-The left bank feature class. The left bank is on the left looking downstream.
-
-3: overwrite_data:
-True/False flag if existing data in nodes_fc can be overwritten.
+PARAMETERS:
+    nodes_fc (str): Path to the TTools point feature class.
+    rb_fc (str): The right bank feature class. The right bank is on the right looking downstream.
+    lb_fc (str): The left bank feature class. The left bank is on the left looking downstream.
+    overwrite_data (bool): True/False flag if existing data in nodes_fc can be overwritten.
 
 OUTPUTS
-0. nodes_fc:
-New fields listed below are added into nodes_fc.
-CHANWIDTH: distance in meters between left and right banks.
-LEFT: distance in meters from the stream node to the closest edge of the left bank feature 90 degrees
-perpendicular to teh stream aspect.
-RIGHT: distance in meters from the stream ode to the closest edge of the right bank feature 90 degrees
-perpendicular to teh stream aspect.
+    nodes_fc: New fields listed below are added into nodes_fc.
+        CHANWIDTH: distance in meters between left and right banks.
+
+        LEFT: distance in meters from the stream node to the closest edge of the left bank feature 90 degrees
+        perpendicular to the stream aspect.
+
+        RIGHT: distance in meters from the stream ode to the closest edge of the right bank feature 90 degrees
+        perpendicular to the stream aspect.
 """
 # Import system modules
 import sys
@@ -47,9 +41,9 @@ from collections import defaultdict
 
 # ----------------------------------------------------------------------
 # Start input variables
-nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
-rb_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_rightbank"
-lb_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_leftbank"
+nodes_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_nodes_star"
+rb_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_rightbank"
+lb_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_leftbank"
 overwrite_data = True
 # End input variables
 # ----------------------------------------------------------------------

@@ -6,7 +6,7 @@ TTools Step 5: Sample Landcover - Orthogonal Method
 The orthogonal sampling method will take an input point
 feature (from Step 1) and sample an input landcover raster along two
 transects that are orthogonal to the stream aspect (left and right looking downstream).
-The numer of sample points along each transect and distance between samples
+The number of sample points along each transect and distance between samples
 is user defined. The transect can start at the stream node or at
 the right and left banks.
 
@@ -14,56 +14,49 @@ The Orthogonal sampling method can be used to develop inputs for Heat Source 6,
 Washington Department of Ecology's Shade model, and the shade file for CE-QUAL-W2.
 
 REQUIREMENTS
-TTools steps 1 - 3 must be run before Step 5.
-ESRI ArcGIS Pro w/ Spatial Analyst extension
-Python 3.7+
+    TTools steps 1 - 3 must be run before Step 5.
+    ESRI ArcGIS Pro w/ Spatial Analyst extension
+    Python 3.7+
 
-INPUT VARIABLES
-0: nodes_fc:
-path to the TTools point feature class.
+PARAMETERS:
+    nodes_fc (str): Path to the TTools point feature class.
 
-1: start_bank:
-boolean (True/False) to indicate if the transect should start at the stream bank. If False the transect will start at
-the stream node. Normally set to True.
+    start_bank (bool): True/False flag to indicate if the transect
+        should start at the stream bank. If False the transect will start at the stream node.
+        Normally set to True.
 
-2: transsample_count:
-Number of samples per transect. The number DOES NOT include the sample at the stream node.
+    transsample_count (int): Number of samples per transect. The number DOES NOT include the
+        sample at the stream node.
 
-3: transsample_distance:
-The distance between transect samples (meters).
+    transsample_distance (float): The distance between transect samples (meters).
 
-5: lc_raster:
-Path and name of the land cover code, height, or elevation raster.
+    lc_raster (str): Path and name of the land cover code, height, or elevation raster.
 
-6: lc_units:
-z units of the lc_raster (aka units of height or elevation). Use "Feet", "Meters", or None if the lc_raster values are
-codes and do not represent elevation or height units.
+    lc_units (str): z units of the lc_raster (aka units of height or elevation). Use "Feet",
+        "Meters", or None if the lc_raster values are codes and do not represent elevation
+        or height units.
 
-7: z_raster:
-Path and name of the ground elevation raster.
+    z_raster (str): Path and name of the ground elevation raster.
 
-8: z_units:
-z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is not in feet or meters the elevation values
-must be converted.
+    z_units (str): z_raster ground elevation units. Either "Feet" or "Meters". If the z unit is
+        not in feet or meters the elevation values must be converted.
 
-9: lc_point_fc:
-Path and name of output sample point feature file.
+    lc_point_fc (str): Path and name of output sample point feature file.
 
-10: block_size:
-The x and y size in kilometers for each raster block pulled into an array. Start with 5 if you aren't sure and reduce
-if there is an error. To increase processing speed rasters are subdivided iteratively into smaller blocks and pulled
-into arrays for processing. Very large block sizes may use a lot of memory and result in an error.
+    block_size (int): The x and y size in kilometers for each raster block pulled into an array.
+        Start with 10 if you aren't sure and reduce if there is an error. To increase processing
+        speed rasters are subdivided iteratively into smaller blocks and pulled into arrays for
+        processing. Very large block sizes may use a lot of memory and result in an error.
 
-11: overwrite_data:
-True/False flag if existing data in nodes_fc and lc_point_fc can be overwritten.
+    overwrite_data (bool): True/False flag if existing data in nodes_fc and lc_point_fc can be
+        overwritten.
 
 OUTPUTS
-0. nodes_fc:
-New fields are added into nodes_fc with the Landcover and elevation values for each transect sample
+    nodes_fc: New fields are added into nodes_fc with the Landcover and elevation values for
+        each transect sample.
 
-1. lc_point_fc:
-New point feature class created with a point at each x/y sample and the sample raster values
-
+    lc_point_fc: New point feature class created with a point at each x/y sample and the
+        sample raster values.
 """
 # Import system modules
 import sys
@@ -77,22 +70,19 @@ from collections import defaultdict, OrderedDict
 import arcpy
 from arcpy import env
 
-from Step4_MeasureTopographicAngles import nodeID
-
 # ----------------------------------------------------------------------
-# Start input variables
-nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
+# Input Parameters
+nodes_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_nodes_ortho"
 start_bank = True
 transsample_count = 9
 transsample_distance = 8
-lc_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_vght_m_mosaic"
+lc_raster = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_rasters\jcw_vght_m_mosaic.tif"
 lc_units = "Meters"
-z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
+z_raster = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_rasters\jcw_be_m_mosaic.tif"
 z_units = "Meters"
-lc_point_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_LC_orthog_samples"
-block_size = 5
+lc_point_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_lc_samples_ortho"
+block_size = 10
 overwrite_data = True
-# End input variables
 # ----------------------------------------------------------------------
 
 # General script steps include:
