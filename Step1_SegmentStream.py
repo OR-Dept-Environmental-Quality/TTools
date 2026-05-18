@@ -19,7 +19,7 @@ PARAMETERS:
 
     node_dx (int): Spacing between nodes in meters.
 
-    ont_stream_km (bool): True/False flag to indicate that a continuous stream km
+    cont_stream_km (bool): True/False flag to indicate that a continuous stream km
         should be used for all nodes regardless of the unique the values in the sid_field
 
     checkDirection (bool): True/False flag to check if the stream was digitized in
