@@ -371,13 +371,23 @@ class CreateStreamNodes:
                 for row in nodeList:
                     cursor.insertRow(row)
 
-            #Change X/Y from input spatial units to decimal degrees
+            # Change X/Y from input spatial units to decimal degrees
+            # This selects the best geographic datum transformation for the
+            # input projection and extent. ListTransformations returns
+            # all the workable transformations with the best match first.
+            # when the nodes and target share same datum (e.g. WGS 84)
+            # the list is empty and no transformation needed.
             proj_dd = arcpy.SpatialReference(4326) # GCS_WGS_1984
-            with arcpy.da.UpdateCursor(nodes_fc,["SHAPE@X","SHAPE@Y","LONGITUDE",
-                                                 "LATITUDE"],"",proj_dd) as cursor:
+            extent = arcpy.Describe(nodes_fc).extent
+            transforms = arcpy.ListTransformations(proj, proj_dd, extent)
+            # Use the first transformation recommended by arcpy.
+            transform_to_use = transforms[0] if transforms else ""
+
+            with arcpy.da.UpdateCursor(nodes_fc,["SHAPE@","LONGITUDE","LATITUDE"]) as cursor:
                 for row in cursor:
-                    row[2] = row[0] # LONGITUDE
-                    row[3] = row[1] # LATITUDE
+                    pt_dd = row[0].projectAs(proj_dd, transform_to_use)
+                    row[1] = pt_dd.centroid.X # LONGITUDE
+                    row[2] = pt_dd.centroid.Y # LATITUDE
                     cursor.updateRow(row)
 
         def check_stream_direction(stream, z_raster, streamID):
