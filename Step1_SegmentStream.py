@@ -8,42 +8,41 @@ unique stream ID polyline at a user defined spacing measured from the downstream
 the digitized direction to determine the downstream end.
 
 REQUIREMENTS
-ESRI ArcPro
-Python 3.7+
+    ESRI ArcPro license with arcpy
+    Python 3.7+
 
-INPUT VARIABLES
-0: streamline_fc:
-Path to the stream centerline polyline feature class.
+PARAMETERS:
+    streamline_fc (str): Path to the stream centerline polyline feature class.
 
-1: sid_field:
-Name of the attribute field in streamline_fc holding the unique stream identifier such as the stream name or ID number.
+    sid_field (str): Name of the attribute field in streamline_fc holding the unique
+        stream identifier such as the stream name or ID number.
 
-2: node_dx
-Spacing between nodes in meters.
+    node_dx (int): Spacing between nodes in meters.
 
-3: cont_stream_km
-Boolean (True/False) flag to indicate that a continuous stream km should be used for all nodes regardless of the
-unique the values in the sid_field
+    ont_stream_km (bool): True/False flag to indicate that a continuous stream km
+        should be used for all nodes regardless of the unique the values in the sid_field
 
-4: checkDirection
-Boolean (True/False) flag to check if the stream was digitized in correct direction. If checkDirection = True
-z_raster must be set.
+    checkDirection (bool): True/False flag to check if the stream was digitized in
+        correct direction. If checkDirection = True, z_raster must be set.
 
-5: z_raster:
-Path and name of the ground elevation raster. Ignored if checkDirection = False.
+    z_raster (str, optional): Path and name of the ground elevation raster.
+        Ignored if checkDirection = False.
 
-6: nodes_fc
-Path and name of the output to node feature class.
+    nodes_fc (str): Path and name of the output to node feature class.
 
-OUTPUTS
-0. nodes_fc:
-New point feature class with the following fields:
-NODE_ID - Unique node ID.
-STREAM_ID - Field matching a unique stream identifier from the sid_field.
-STREAM_KM - Double measured from the downstream end of the stream for each STREAM ID
-LONGITUDE - Decimal degrees X coordinate of the node using GCS_WGS_1984 datum.
-LATITUDE - Decimal degrees Y coordinate of the node using GCS_WGS_1984 datum.
-ASPECT - Stream aspect in the direction of flow.
+OUTPUTS:
+    nodes_fc: New point feature class with the following fields:
+        NODE_ID - Unique node ID.
+
+        STREAM_ID - Field matching a unique stream identifier from the sid_field.
+
+        STREAM_KM - Double measured from the downstream end of the stream for each STREAM ID
+
+        LONGITUDE - Decimal degrees X coordinate of the node using GCS_WGS_1984 datum.
+
+        LATITUDE - Decimal degrees Y coordinate of the node using GCS_WGS_1984 datum.
+
+        ASPECT - Stream aspect in the direction of flow.
 
 """
 
@@ -60,15 +59,14 @@ import arcpy
 from arcpy import env
 
 # ----------------------------------------------------------------------
-# Start Fill in Data
-streamline_fc = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jc_thalweg"
+# Input Parameters
+streamline_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_thalweg"
 sid_field = "NAME"
 node_dx = 50
 cont_stream_km = False
 checkDirection = True
-z_raster = r"C:\workspace\ttools_tests\JohnsonCreek.gdb\jcw_be_m_mosaic"
-nodes_fc = r"C:\workspace\ttools_tests\TTools_py39\jc_test_py39.gdb\jc_stream_nodes_py39"
-# End Fill in Data
+z_raster = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_rasters\jcw_be_m_mosaic.tif"
+nodes_fc = r"C:\Workspace\TTools_Tests\Johnson_Creek\GIS\TTools_JC_test_features_gdb\JohnsonCreek.gdb\jc_nodes_star"
 # ----------------------------------------------------------------------
 
 # Future Updates
@@ -202,13 +200,23 @@ def create_nodes_fc(nodeList, nodes_fc, sid_field, proj):
         for row in nodeList:
             cursor.insertRow(row)
 
-    #Change X/Y from input spatial units to decimal degrees
+    # Change X/Y from input spatial units to decimal degrees
+    # This selects the best geographic datum transformation for the
+    # input projection and extent. ListTransformations returns
+    # all the workable transformations with the best match first.
+    # when the nodes and target share same datum (e.g. WGS 84)
+    # the list is empty and no transformation needed.
     proj_dd = arcpy.SpatialReference(4326) # GCS_WGS_1984
-    with arcpy.da.UpdateCursor(nodes_fc,["SHAPE@X","SHAPE@Y","LONGITUDE",
-                                         "LATITUDE"],"",proj_dd) as cursor:
+    extent = arcpy.Describe(nodes_fc).extent
+    transforms = arcpy.ListTransformations(proj, proj_dd, extent)
+    # Use the first transformation recommended by arcpy.
+    transform_to_use = transforms[0] if transforms else ""
+
+    with arcpy.da.UpdateCursor(nodes_fc,["SHAPE@","LONGITUDE","LATITUDE"]) as cursor:
         for row in cursor:
-            row[2] = row[0] # LONGITUDE
-            row[3] = row[1] # LATITUDE
+            pt_dd = row[0].projectAs(proj_dd, transform_to_use)
+            row[1] = pt_dd.centroid.X # LONGITUDE
+            row[2] = pt_dd.centroid.Y # LATITUDE
             cursor.updateRow(row)
 
 def check_stream_direction(stream, z_raster, streamID):
