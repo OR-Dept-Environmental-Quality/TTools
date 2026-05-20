@@ -10,8 +10,8 @@ of Ecology's [Shade][2] model, or the shade input file for [CE-QUAL-W2][3].
 
 Requires
 ESRI ArcGIS Pro w/ Spatial Analyst extension
-Python 3.7+
-Numpy 1.24+
+Python 3.10+
+Numpy 1.26+
 
 Previous TTools extensions for ESRI ArcView 3, ArcGIS 9 - 10.8 can be found here: http://www.oregon.gov/deq/wq/tmdls/Pages/TMDLs-Tools.aspx
 
