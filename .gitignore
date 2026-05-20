@@ -1,6 +1,7 @@
 #
 info
-ttools
 Junkyard.py
 Toolbox.*
 Output_To_csv.py
+.idea
+tests
