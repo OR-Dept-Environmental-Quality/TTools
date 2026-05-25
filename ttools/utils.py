@@ -11,15 +11,19 @@ import arcpy
 
 
 def message(msg):
-    """Print a message to the console and send it to ArcGIS Pro."""
-    print(msg)
-    arcpy.AddMessage(msg)
+    """Print a message."""
+    try:
+        arcpy.AddMessage(msg)
+    except Exception:
+        print(msg)
 
 
 def warning(msg):
-    """Print a warning to the console and send it to ArcGIS Pro."""
-    print(msg)
-    arcpy.AddWarning(msg)
+    """Print a warning message."""
+    try:
+        arcpy.AddWarning(msg)
+    except Exception:
+        print(msg)
 
 
 # -----------------------------------------------------------------------
