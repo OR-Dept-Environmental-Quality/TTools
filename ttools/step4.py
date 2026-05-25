@@ -5,7 +5,7 @@ import gc
 import time
 import traceback
 from datetime import timedelta
-from math import radians, sin, cos, hypot, ceil
+from math import radians, sin, cos, ceil
 from collections import defaultdict
 
 import numpy as np
@@ -13,7 +13,7 @@ import arcpy
 
 from ttools.utils import (to_meters_con, from_meters_con,
                           from_z_units_to_meters_con, coord_to_array,
-                          message, read_fc, update_fc, get_raster_info,
+                          message, update_fc, get_raster_info,
                           raster_to_array)
 
 
@@ -28,21 +28,44 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
 
     message("Reading nodes feature class")
 
-    nodeDict = read_fc(nodes_fc)
+    nodeDict = {}
+    incursorFields = ["NODE_ID", "STREAM_ID", "Z_NODE", "SHAPE@X", "SHAPE@Y"]
+
+    # Get a list of existing fields
+    existingFields = []
+    for f in arcpy.ListFields(nodes_fc):
+        existingFields.append(f.name)
 
     # Check to see if the 1st field exists if yes add it.
     check_field = addFields[0]
-    first_node = next(iter(nodeDict.values()))
 
-    if not overwrite_data and check_field in first_node:
-        # if the data is null or zero (0 = default for shapefile),
-        # it is retrieved and will be overwritten.
-        filtered = {}
-        for nodeID in nodeDict:
-            val = nodeDict[nodeID].get(check_field)
-            if val is None or val == 0 or val < -9998:
-                filtered[nodeID] = nodeDict[nodeID]
-        nodeDict = filtered
+    if overwrite_data is False and check_field in existingFields:
+        incursorFields.append(check_field)
+    else:
+        overwrite_data = True
+
+    # Determine input point spatial units
+    proj = arcpy.Describe(nodes_fc).spatialReference
+
+    with arcpy.da.SearchCursor(nodes_fc, incursorFields, "", proj) as Inrows:
+        if overwrite_data:
+            for row in Inrows:
+                nodeDict[row[0]] = {}
+                nodeDict[row[0]]["STREAM_ID"] = row[1]
+                nodeDict[row[0]]["Z_NODE"] = row[2]
+                nodeDict[row[0]]["POINT_X"] = row[3]
+                nodeDict[row[0]]["POINT_Y"] = row[4]
+
+        else:
+            for row in Inrows:
+                # if the data is null or zero (0 = default for shapefile),
+                # it is retrieved and will be overwritten.
+                if row[5] is None or row[5] == 0 or row[5] < -9998:
+                    nodeDict[row[0]] = {}
+                    nodeDict[row[0]]["STREAM_ID"] = row[1]
+                    nodeDict[row[0]]["Z_NODE"] = row[2]
+                    nodeDict[row[0]]["POINT_X"] = row[3]
+                    nodeDict[row[0]]["POINT_Y"] = row[4]
 
     if len(nodeDict) == 0:
         raise ValueError("The fields checked in the input point feature class " +
@@ -142,7 +165,7 @@ def build_search_array(searchDistance_min, searchDistance_max, cellsize, use_ski
     return distance_array
 
 
-def create_blocks(nodeDict, block_size, last_azimuth, searchDistance_max, buffer, azimuths):
+def create_blocks(nodeDict, block_size, searchDistance_max, buffer, azimuths):
     """Returns two lists, one containing the coordinate extent
     for each block that will be iteratively extracted to an array
     and the other containing the start and stop distances for each
@@ -201,7 +224,6 @@ def create_blocks(nodeDict, block_size, last_azimuth, searchDistance_max, buffer
             block_x_max = min([block_x_min + block_size, x_max])
             block_y_max = min([block_y_min + block_size, y_max])
 
-            nodes_to_update = []
             topo_in_block = []
 
             block_segments = (((block_x_min, block_y_max), (block_x_min, block_y_min)),
@@ -215,7 +237,6 @@ def create_blocks(nodeDict, block_size, last_azimuth, searchDistance_max, buffer
 
                 contains_node = False
                 contains_end = False
-                last_sample = False
 
                 # check if the node is inside the block
                 if (block_x_min <= node_x <= block_x_max and
@@ -227,23 +248,7 @@ def create_blocks(nodeDict, block_size, last_azimuth, searchDistance_max, buffer
                         block_y_min <= end_y <= block_y_max):
                     contains_end = True
 
-                # check if this is the last block to process for this node
-                if a == last_azimuth:
-                    if a == 45:
-                        # we have to get the coordinate at
-                        # the far upper right corner
-                        searchDistance_last = (hypot(searchDistance_max, searchDistance_max))
-                        last_x = ((searchDistance_last * sin(radians(a))) + node_x)
-                        last_y = ((searchDistance_last * cos(radians(a))) + node_y)
-                    else:
-                        last_x = end_x
-                        last_y = end_y
-
-                    if (block_x_min <= last_x <= block_x_max and
-                            block_y_min <= last_y <= block_y_max):
-                        last_sample = True
-
-                        # check if the entire topo line segment is inside the block
+                # check if the entire topo line segment is inside the block
                 if contains_node and contains_end:
                     block_search_start = 0
                     block_search_end = searchDistance_max
@@ -254,8 +259,6 @@ def create_blocks(nodeDict, block_size, last_azimuth, searchDistance_max, buffer
                                           end_x, end_y,
                                           block_search_start,
                                           block_search_end])
-
-                    if last_sample: nodes_to_update.append(nodeID)
 
                 # check if and where the topo segment cross the block
                 else:
@@ -302,10 +305,6 @@ def create_blocks(nodeDict, block_size, last_azimuth, searchDistance_max, buffer
                                               block_search_start,
                                               block_search_end])
 
-                        if last_sample and not nodeDict[nodeID]["updated"]:
-                            nodes_to_update.append(nodeID)
-                            nodeDict[nodeID]["updated"] = True
-
                     elif len(distance) > 1:
                         # two intersections, crosses the block
                         # two intersections, end or start on block line
@@ -321,25 +320,45 @@ def create_blocks(nodeDict, block_size, last_azimuth, searchDistance_max, buffer
                                               block_search_start,
                                               block_search_end])
 
-                        if last_sample and contains_end and not nodeDict[nodeID]["updated"]:
-                            nodes_to_update.append(nodeID)
-                            nodeDict[nodeID]["updated"] = True
-
-                    elif last_sample and not contains_end and not nodeDict[nodeID]["updated"]:
-                        nodes_to_update.append(nodeID)
-                        nodeDict[nodeID]["updated"] = True
-
                     del distance[:]
 
             if topo_in_block:
                 # order 0 left,      1 bottom,    2 right,     3 top
                 blockDict[b]["extent"] = (block_x_min - buffer, block_y_min - buffer,
                                       block_x_max + buffer, block_y_max + buffer)
+                blockDict[b]["sample_extent"] = (block_x_min, block_y_min,
+                                                 block_x_max, block_y_max)
                 blockDict[b]["samples"] = topo_in_block
-                blockDict[b]["nodes_to_update"] = nodes_to_update
+                blockDict[b]["nodes_to_update"] = []
 
             b = b + 1
+
+    node_last_block = {}
+    blockIDs = list(blockDict.keys())
+    blockIDs.sort()
+    for blockID in blockIDs:
+        for sample in blockDict[blockID]["samples"]:
+            node_last_block[sample[0]] = blockID
+
+    for nodeID in node_last_block:
+        blockDict[node_last_block[nodeID]]["nodes_to_update"].append(nodeID)
+
     return blockDict
+
+
+def filter_distance_array(distance_array, node_x, node_y, a, sample_extent):
+    """Return search distances and coordinates that fall within the block extent."""
+    sin_a = sin(radians(a))
+    cos_a = cos(radians(a))
+    pt_x_array = distance_array * sin_a + node_x
+    pt_y_array = distance_array * cos_a + node_y
+
+    in_block = ((pt_x_array >= sample_extent[0]) &
+                (pt_x_array <= sample_extent[2]) &
+                (pt_y_array >= sample_extent[1]) &
+                (pt_y_array <= sample_extent[3]))
+
+    return distance_array[in_block], pt_x_array[in_block], pt_y_array[in_block]
 
 
 def find_intersection(a, b, c, d, check_collinear=True):
@@ -416,7 +435,7 @@ def find_intersection(a, b, c, d, check_collinear=True):
     return False, None, None, None, None
 
 
-def get_topo_angles(block_extent, block_samples, z_raster, azimuthdisdict, searchDistance_max_m, con_z_to_m, con_to_m):
+def get_topo_angles(block_extent, sample_extent, block_samples, z_raster, azimuthdisdict, searchDistance_max_m, con_z_to_m, con_to_m):
     """This gets the maximum topographic angle and other information for
     each topo line within the block. The data is saved to the nodeDict
     as a list."""
@@ -467,33 +486,49 @@ def get_topo_angles(block_extent, block_samples, z_raster, azimuthdisdict, searc
 
     topo_samples = []
     if z_array.max() > -9999:
+        distance_array_dict = {}
+        for sample in block_samples:
+            a = sample[2]
+            if a not in distance_array_dict:
+                cellsize = azimuthdisdict[a]
+                distance_array_dict[a] = build_search_array(0,
+                                                            searchDistance_max_m,
+                                                            cellsize,
+                                                            use_skippy=False)
+
         # There is at least one pixel of data
         for (nodeID, streamID, a, z_node,
              node_x, node_y, end_x, end_y,
              block_search_start, block_search_end) in block_samples:
 
             # create list of distance movements along the topo line
-            # from the block edges
+            # that are within the block extent
             # this is in units of the fc
-            cellsize = azimuthdisdict[a]
-            distance_array = build_search_array(block_search_start,
-                                                block_search_end,
-                                                cellsize,
-                                                use_skippy=False)
+            distance_array, pt_x_array, pt_y_array = filter_distance_array(
+                distance_array_dict[a], node_x, node_y, a, sample_extent)
+            if len(distance_array) == 0:
+                continue
 
-            z_topo_list = []
-            for distance in distance_array:
-                pt_x = ((distance * sin(radians(a))) + node_x)
-                pt_y = ((distance * cos(radians(a))) + node_y)
+            # Vectorized coordinate calculation along the topo line
+            sin_a = sin(radians(a))
+            cos_a = cos(radians(a))
 
-                xy = coord_to_array(pt_x, pt_y, block_x_min_corner,
-                                    block_y_max_corner, x_cellsize,
-                                    y_cellsize)
-                z_topo_list.append(z_array[xy[1], xy[0]])
+            # Vectorized coord_to_array
+            # dx is the x distance from the raster block's left edge to each topo sample point.
+            # dy is the y distance from the raster block's top edge down to each topo sample point.
+            dx = pt_x_array - block_x_min_corner
+            dy = block_y_max_corner - pt_y_array
+            col_x_array = ((dx - (dx % x_cellsize)) / x_cellsize).astype(int)
+            row_y_array = ((dy - (dy % y_cellsize)) / y_cellsize).astype(int)
+
+            # Clip to valid array indices
+            col_x_array = np.clip(col_x_array, 0, z_array.shape[1] - 1)
+            row_y_array = np.clip(row_y_array, 0, z_array.shape[0] - 1)
+
+            z_topo_array = z_array[row_y_array, col_x_array]
 
             # convert distances to meters
             distance_array_m = distance_array * con_to_m
-            z_topo_array = np.array(z_topo_list)
 
             # Calculate the topo angles along the topo line
             angle_array = np.degrees(np.arctan((z_topo_array - z_node) / distance_array_m))
@@ -509,8 +544,8 @@ def get_topo_angles(block_extent, block_samples, z_raster, azimuthdisdict, searc
             z_change = z_topo - z_node
             # distance from the node to topo angle location in units of fc
             topoAngleDistance = distance_array[arryindex]
-            topoAngle_x = (topoAngleDistance * sin(radians(a))) + node_x
-            topoAngle_y = (topoAngleDistance * cos(radians(a))) + node_y
+            topoAngle_x = (topoAngleDistance * sin_a) + node_x
+            topoAngle_y = (topoAngleDistance * cos_a) + node_y
             topoAngleDistance_m = topoAngleDistance * con_to_m
             off_rastersamples = (z_topo_array < -9998).sum()
 
@@ -612,13 +647,11 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
 
         if topo_directions == 1:
             azimuths = [270, 180, 90]
-            last_azimuth = 90
 
             azimuthdict = {90: "TOPO_E", 180: "TOPO_S", 270: "TOPO_W"}
 
         elif topo_directions == 2:  # All directions
             azimuths = [45, 90, 135, 180, 225, 270, 315, 0]
-            last_azimuth = 45
 
             azimuthdict = {45: "TOPO_NE", 90: "TOPO_E", 135: "TOPO_SE",
                            180: "TOPO_S", 225: "TOPO_SW", 270: "TOPO_W",
@@ -626,7 +659,6 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
 
         elif topo_directions == 3:
             azimuths = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
-            last_azimuth = 20
 
             azimuthdict = {0: "TOPO01", 20: "TOPO02", 40: "TOPO03", 60: "TOPO04", 80: "TOPO05", 100: "TOPO06", 120: "TOPO07",
                            140: "TOPO08", 160: "TOPO09", 180: "TOPO10", 200: "TOPO11", 220: "TOPO12", 240: "TOPO13",
@@ -652,13 +684,9 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
         # Read the feature class data into a dictionary
         nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
 
-        # Initialize the updated flag for each node
-        for nodeID in nodeDict:
-            nodeDict[nodeID]["updated"] = False
-
         # Build the blockDict
-        blockDict = create_blocks(nodeDict, block_size, last_azimuth,
-                                  searchDistance_max, x_cellsize, azimuths)
+        blockDict = create_blocks(nodeDict, block_size, searchDistance_max,
+                                  x_cellsize, azimuths)
 
         # Iterate through each block
         all_topo_list = []
@@ -668,6 +696,7 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
 
         for p, blockID in enumerate(blockIDs):
             block_extent = blockDict[blockID]["extent"]
+            sample_extent = blockDict[blockID]["sample_extent"]
             block_samples = blockDict[blockID]["samples"]
             block_samples.sort()
 
@@ -677,7 +706,7 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
             # portion of the topo line in the block,
             # convert raster to array, sample the raster
             # calculate the topo angles and other info
-            topo_samples = get_topo_angles(block_extent, block_samples,
+            topo_samples = get_topo_angles(block_extent, sample_extent, block_samples,
                                            z_raster, azimuthdisdict,
                                            searchDistance_max, con_z_to_m,
                                            con_to_m)
@@ -718,7 +747,6 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
                         # delete some data
                         nodeDict[nodeID].pop(field, None)
                         nodeDict[nodeID].pop(topo_key, None)
-                        nodeDict[nodeID].pop("updated", None)
 
                 all_topo_list.extend(topo_list)
                 all_nodes_updated.extend(nodes_to_update)
