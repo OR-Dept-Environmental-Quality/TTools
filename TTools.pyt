@@ -2,6 +2,8 @@
 """
 TTools
 
+This file and the .XML files must be located one directory above the ttools folder.
+
 Primary Author: Ryan Michie
 Organization: [Oregon Department of Environmental Quality]
 
