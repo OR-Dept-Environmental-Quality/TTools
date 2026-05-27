@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 TTools
-Version: [v10.0]
 
 Primary Author: Ryan Michie
 Organization: [Oregon Department of Environmental Quality]
@@ -66,10 +65,7 @@ def log_run(tool_name, params):
 #-----------
 import arcpy
 import sys
-import time
 import traceback
-from datetime import timedelta
-from math import ceil
 
 class Toolbox:
     def __init__(self):

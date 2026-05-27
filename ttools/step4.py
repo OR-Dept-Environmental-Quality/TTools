@@ -12,7 +12,7 @@ import numpy as np
 import arcpy
 
 from ttools.utils import (to_meters_con, from_meters_con,
-                          from_z_units_to_meters_con, coord_to_array,
+                          from_z_units_to_meters_con,
                           message, update_fc, get_raster_info,
                           raster_to_array)
 
@@ -575,7 +575,7 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
         topo_directions (int): An integer value corresponding to the specific list of azimuth
             directions to sample (e.g. topo_directions = 1). Options listed below.
             1. Heat Source or Washington Department of Ecology's Shade model: [270, 180, 90]
-            2. All cardinal and intercardinal directions: [45, 90, 135, 180, 225, 270, 315, 360]
+            2. All cardinal and intercardinal directions: [45, 90, 135, 180, 225, 270, 315, 0/360]
             3. CE-QUAL-W2: [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280,
                300, 320, 340]
         searchDistance_max_km (float): The maximum distance in kilometers to search for the largest

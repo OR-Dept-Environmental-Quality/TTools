@@ -483,7 +483,7 @@ def step5(nodes_fc, method, transsample_count, transsample_distance,
         trans_count (int): method="star" only. Number of transects per node. The degrees of
             separation between each transect is equal to 360 / trans_count. If trans_count = 8,
             the heading of the first transect is 45 degrees (Northeast), the second transect is
-            90 degrees (West), and the eighth is 360 degrees (North). Transects are oriented
+            90 degrees (East), and the eighth is 360 degrees (North). Transects are oriented
             clockwise from north. trans_count is ignored if heatsource8 = True.
         zone_sample (bool): method="star" only. True/False flag to indicate if the sample should
             represent a zone and be centered relative to the transsample_distance as measured from
@@ -693,7 +693,7 @@ def step5_star(nodes_fc, trans_count, transsample_count, transsample_distance,
         trans_count (int): Number of transects per node. The degrees of
             separation between each transect is equal to 360 / trans_count. If trans_count = 8,
             the heading of the first transect is 45 degrees (Northeast), the second transect is
-            90 degrees (West), and the eighth is 360 degrees (North). Transects are oriented
+            90 degrees (East), and the eighth is 360 degrees (North). Transects are oriented
             clockwise from north. trans_count is ignored if heatsource8 = True.
         transsample_count (int): Number of samples per transect. The number DOES NOT include the
             sample at the stream node.

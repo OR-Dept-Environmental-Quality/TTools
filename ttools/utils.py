@@ -5,8 +5,6 @@ These functions were duplicated across multiple TTools scripts
 and are consolidated here.
 """
 
-from math import ceil
-import numpy as np
 import arcpy
 
 
