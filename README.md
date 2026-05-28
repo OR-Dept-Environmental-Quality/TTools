@@ -23,24 +23,26 @@ Previous TTools extensions for ESRI ArcView 3, ArcGIS 9 - 10.8 can be found here
 
 The contents of `TTools/` can be saved anywhere on your computer but the file structure and file names must be maintained, especially if used as a toolbox directly within ArcPro. 
 
+```text
 TTools/
-|-- TTools.pyt
-|-- TTools.pyt.xml
-|-- TTools.CreateStreamNodes.pyt.xml
-|-- TTools.MeasureChannelWidth.pyt.xml
-|-- TTools.MeasureTopographicAngles.pyt.xml
-|-- TTools.SampleElevationGradient.pyt.xml
-|-- TTools.SampleLandcoverOrthogonalMethod.pyt.xml
-|-- TTools.SampleLandcoverStarPattern.pyt.xml
-|-- ttools/
-    |-- __init__.py
-    |-- __version__.py
-    |-- step1.py
-    |-- step2.py
-    |-- step3.py
-    |-- step4.py
-    |-- step5.py
-    |-- utils.py
+├── TTools.pyt
+├── TTools.pyt.xml
+├── TTools.CreateStreamNodes.pyt.xml
+├── TTools.MeasureChannelWidth.pyt.xml
+├── TTools.MeasureTopographicAngles.pyt.xml
+├── TTools.SampleElevationGradient.pyt.xml
+├── TTools.SampleLandcoverOrthogonalMethod.pyt.xml
+├── TTools.SampleLandcoverStarPattern.pyt.xml
+└── ttools/
+    ├── __init__.py
+    ├── version.py
+    ├── step1.py
+    ├── step2.py
+    ├── step3.py
+    ├── step4.py
+    ├── step5.py
+    └── utils.py
+```
 
 ## Add TTools to ArcPro
 
