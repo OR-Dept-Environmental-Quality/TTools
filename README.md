@@ -35,7 +35,7 @@ TTools/
 ├── TTools.SampleLandcoverStarPattern.pyt.xml
 └── ttools/
     ├── __init__.py
-    ├── version.py
+    ├── __version__.py
     ├── step1.py
     ├── step2.py
     ├── step3.py
@@ -62,9 +62,9 @@ Before starting the tool, the Arc GIS Pro TTools Toolbox requires the following:
 
 3.	Required Extension. The ArcGIS Pro Spatial Analyst extension must be enabled to use the toolbox.
 4. Load the ArcToolbox in ArcGIS Pro. Open or create a new ArcGIS Pro project from the Catalog pane. If it is not visible, go to: View → Catalog Pane. This will show the ArcGIS Pro Catalog Pane and show Toolboxes
-5. Add the toolbox to ArcGIS Pro. From the main menu ribbon in ArcGIS Pro, right-click Toolbox → Add Toolbox → Browse to where the toolbox file (*.pyt) is located → Select the Toolbox file “TTools.pyt” → Click OK 
+5. Add the toolbox to ArcGIS Pro. From the main menu ribbon in ArcGIS Pro, right-click Toolbox → Add Toolbox → Browse to the toolbox file (`TTools.pyt`)  → Select the Toolbox file `TTools.pyt` → Click OK 
 6. From the Catalog pane, click on the arrow next to Toolboxes to show all available Toolboxes. 
-7. Click on the arrow next to the n TTools.pyt toolbox in the Catalog to display the tools available in the toolbox
+7. Click on the arrow next to the `TTools.pyt` toolbox in the Catalog to display the tools available in the toolbox.
 
 See the TTools user guide or [ESRI documentation][4] for additional instructions.
 
@@ -72,11 +72,17 @@ See the TTools user guide or [ESRI documentation][4] for additional instructions
 
 ## Use TTools from a python script
 
-TTools can be used from a python script. There is no python package install required as long as the `ttools` folder (lower case) shown in file structure diagram is saved somewhere on your computer and the python environment being used can import arcpy.
+TTools can be used from a python script. There is no python package install required as long as 
+1. The lower case `ttools` folder shown in the file structure diagram is saved somewhere on your computer. 
+2. The script points to the `ttools` folder as shown in the example below
+3. There is a valid ArcPro license with spatial analyst extension.
+4. The python environment being used can import arcpy.
 
-See `TTools_Example_Script.py` or the example below.
+Documentation for each TTools step can be found in the user guide, in each python file e.g. `step1.py`, or using (`help(step1)`).
 
 ```python
+# This example is also saved to `TTools_Example_Script.py` located in the repository root.
+
 import os
 import sys
 import arcpy
@@ -109,64 +115,54 @@ from ttools import step1, step2, step3, step4, step5_ortho, step5_star
 
 # ------------------------------------------------------------------------
 # TTools Step 1: Create Stream Nodes
-step1(
-    streamline_fc=streamline_fc,
-    sid_field="NAME",
-    node_dx=50,
-    cont_stream_km=False,
-    nodes_fc=nodes_fc,
-    checkDirection=True,
-    z_raster=z_raster,
-)
+step1(streamline_fc=streamline_fc,
+      sid_field="NAME",
+      node_dx=50,
+      cont_stream_km=False,
+      nodes_fc=nodes_fc,
+      checkDirection=True,
+      z_raster=z_raster)
 
 # ------------------------------------------------------------------------
 # TTools Step 2: Measure Channel Widths
-step2(
-    nodes_fc=nodes_fc,
-    rb_fc=rb_fc,
-    lb_fc=lb_fc,
-    overwrite_data=True,
-)
+step2(nodes_fc=nodes_fc,
+      rb_fc=rb_fc,
+      lb_fc=lb_fc,
+      overwrite_data=True)
 
 # ------------------------------------------------------------------------
 # TTools Step 3: Sample Elevation and Gradient
-step3(
-    nodes_fc=nodes_fc,
-    searchCells=2,
-    smooth_flag=True,
-    z_raster=z_raster,
-    z_units="Meters",
-    block_size=10,
-    overwrite_data=True,
-)
+step3(nodes_fc=nodes_fc,
+      searchCells=2,
+      smooth_flag=True,
+      z_raster=z_raster,
+      z_units="Meters",
+      block_size=10,
+      overwrite_data=True)
 # ------------------------------------------------------------------------
 # TTools Step 4: Measure Topographic Shade Angles
-step4(
-    nodes_fc=nodes_fc,
-    topo_directions=2,
-    searchDistance_max_km=10,
-    z_raster=z_raster,
-    z_units="Meters",
-    topo_fc=topo_samples_fc,
-    block_size=10,
-    overwrite_data=True,
-)
+step4(nodes_fc=nodes_fc,
+      topo_directions=2,
+      searchDistance_max_km=10,
+      z_raster=z_raster,
+      z_units="Meters",
+      topo_fc=topo_samples_fc,
+      block_size=10,
+      overwrite_data=True)
 
 # ------------------------------------------------------------------------
 # TTools Step 5: Sample Landcover - Star Pattern
-step5_star(
-    nodes_fc=nodes_fc,
-    trans_count=8,
-    transsample_count=5,
-    transsample_distance=8,
-    zone_sample=False,
-    heatsource8=False,
-    lc_raster=lc_raster,
-    lc_units="Meters",
-    z_raster=z_raster,
-    z_units="Meters",
-    lc_point_fc=lc_samples_fc,
-    block_size=10,
-    overwrite_data=True,
-)
+step5_star(nodes_fc=nodes_fc,
+           trans_count=8,
+           transsample_count=5,
+           transsample_distance=8,
+           zone_sample=False,
+           heatsource8=False,
+           lc_raster=lc_raster,
+           lc_units="Meters",
+           z_raster=z_raster,
+           z_units="Meters",
+           lc_point_fc=lc_samples_fc,
+           block_size=10,
+           overwrite_data=True)
 ```
