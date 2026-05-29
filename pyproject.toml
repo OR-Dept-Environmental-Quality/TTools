@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ttools"
+version = "9.2"
+description = "TTools is a collection of python methods used in conjunction with ESRI ArcGIS Pro 3.x to sample and assemble stream channel and land cover geospatial data for input into the Heat Source model, Washington Department of Ecology's Shade model, or the shade input file for CE-QUAL-W2"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.10, <4"
+authors = [
+    {name = "Ryan Michie", email = "ryan.michie@deq.oregon.gov"},
+]
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.urls]
+
+[tool.setuptools.packages.find]
+include = ["ttools*"]

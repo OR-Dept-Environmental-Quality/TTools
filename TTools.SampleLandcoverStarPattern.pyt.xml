@@ -13,7 +13,7 @@
         </scaleRange>
         <ArcGISProfile>ItemDescription</ArcGISProfile>
     </Esri>
-    <tool name="SampleLandcoverStartPattern" displayname="Step 5A: Sample Landcover - Star Pattern"
+    <tool name="SampleLandcoverStarPattern" displayname="Step 5A: Sample Landcover - Star Pattern"
           toolboxalias="TTools" xmlns="">
         <arcToolboxHelpPath>c:\program files\arcgis\pro\Resources\Help\gp</arcToolboxHelpPath>
         <parameters>
@@ -70,14 +70,6 @@
                     8. If checked, the Number of Transects per Node input is ignored.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
                 </dialogReference>
             </param>
-            <param name="sampleID_for_code" displayname="Add SampleID Field for Code Lookup" type="Required"
-                   direction="Input" datatype="Boolean" expression="sampleID_for_code">
-                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
-                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;Checkbox to indicate if the sample ID should be used as the
-                    landcover value. If checked, the landcover raster will be ignored and only the elevation raster will
-                    be sampled. Generally, this should be unchecked.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
-                </dialogReference>
-            </param>
             <param name="lc_raster" displayname="Landcover Raster" type="Required" direction="Input"
                    datatype="Raster Layer" expression="lc_raster">
                 <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
@@ -91,41 +83,6 @@
                     STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The unit of the landcover raster (a.k.a. the unit of height or
                     elevation). Options include "Feet", "Meters", or "None". Use “None” if the landcover raster cell
                     values are codes and do not represent elevation or height units.&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
-                </dialogReference>
-            </param>
-            <param name="canopy_data" displayname="Canopy Cover Type" type="Optional" direction="Input"
-                   datatype="String" expression="{None | CanopyCover | LAI}">
-                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
-                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;The type of canopy cover data in the canopy cover raster.
-                    Options include "CanopyCover", "LAI", or "None". &lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN
-                    STYLE="font-size:16pt"&gt;Use “None” if not sampling a canopy raster. &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN
-                    STYLE="font-size:16pt"&gt;The LAI is a dimensionless quantity that characterizes plant canopies,
-                    specifically the total leaf area per unit ground area. Note that the Leaf Area Index (LAI) raster is
-                    a type of geospatial data layer that represents the effective leaf area index across a landscape.
-                    &lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN STYLE="font-size:16pt"&gt;If Canopy Cover is “None”, the
-                    Canopy Raster, K Raster, and Overhanging Vegetation Raster inputs are ignored.&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
-                </dialogReference>
-            </param>
-            <param name="canopy_raster" displayname="Canopy Raster (Optional)" type="Optional" direction="Input"
-                   datatype="Raster Layer" expression="{canopy_raster}">
-                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
-                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path to the canopy or LAI raster. Ignored if Canopy Cover
-                    input is "None".&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
-                </dialogReference>
-            </param>
-            <param name="k_raster" displayname="K Raster (Optional)" type="Optional" direction="Input"
-                   datatype="Raster Layer" expression="{k_raster}">
-                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN
-                    STYLE="font-size:16pt"&gt;&lt;SPAN&gt;File path to the K coefficient raster. This input is required
-                    if the Canopy Cover input is set equal to "LAI". This input is ignored if the Canopy Cover input is
-                    set to "None".&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
-                </dialogReference>
-            </param>
-            <param name="oh_raster" displayname="Overhanging Vegetation Raster (Optional)" type="Optional"
-                   direction="Input" datatype="Raster Layer" expression="{oh_raster}">
-                <dialogReference>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN&gt;&lt;SPAN&gt;File
-                    path to the overhanging vegetation raster. This input is ignored if the Canopy Cover input is set
-                    equal to "None"(blank).&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;P&gt;&lt;SPAN /&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
                 </dialogReference>
             </param>
             <param name="z_raster" displayname="Elevation Raster" type="Required" direction="Input"
