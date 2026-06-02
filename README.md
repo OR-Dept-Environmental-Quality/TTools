@@ -1,6 +1,6 @@
 TTools 
 ======
-Current Version: TTools 9.2
+Current Version: TTools 9.3
 
 ## About
 
@@ -10,7 +10,7 @@ of Ecology's [Shade][2] model, or the shade input file for [CE-QUAL-W2][3].
 
 Requires
 ESRI ArcGIS Pro w/ Spatial Analyst extension
-Python 3.10+
+Python 3.11+
 Numpy 1.26+
 
 Previous TTools extensions for ESRI ArcView 3, ArcGIS 9 - 10.8 can be found here: http://www.oregon.gov/deq/wq/tmdls/Pages/TMDLs-Tools.aspx
@@ -68,7 +68,7 @@ Before starting the tool, the Arc GIS Pro TTools Toolbox requires the following:
 
 See the TTools user guide or [ESRI documentation][4] for additional instructions.
 
-[4]:(https://doc.esri.com/en/arcgis-pro/latest/help/projects/connect-to-a-toolbox.html#A9E)
+[4]: https://doc.esri.com/en/arcgis-pro/latest/help/projects/connect-to-a-toolbox.html#A9E
 
 ## Use TTools from a python script
 

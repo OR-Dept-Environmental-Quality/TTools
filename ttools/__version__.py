@@ -1,3 +1,3 @@
 """TTools package version."""
 
-__version__ = "9.2"
+__version__ = "9.3"
