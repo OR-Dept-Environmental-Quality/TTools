@@ -14,7 +14,7 @@ Most Python 2 to Python 3 updates by:
 Tommy Franzen
 Organization: [The Freshwater Trust]
 
-Arc Toolbox TTools.pyt developed by Tetra Tech, with funding from the U.S. Environmental Protection Agency, June 2025
+Arc Toolbox TTools.pyt version 1 developed by Tetra Tech, with funding from the U.S. Environmental Protection Agency, June 2025
 
 """
 
