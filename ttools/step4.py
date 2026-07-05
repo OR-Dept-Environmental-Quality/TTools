@@ -615,6 +615,10 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
             raise ValueError("This output does not exist: \n" +
                      "{0}\n".format(nodes_fc))
 
+        # Check if the topo sample fc exists and delete if needed
+        if arcpy.Exists(topo_fc) and overwrite_data:
+            arcpy.Delete_management(topo_fc)
+
         # Determine input point spatial units
         proj = arcpy.Describe(nodes_fc).spatialReference
         proj_ele = arcpy.Describe(z_raster).spatialReference
