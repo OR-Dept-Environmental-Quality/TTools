@@ -201,6 +201,7 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
     z_list = []
     if raster_array.max() > -9999:
         # There is at least one pixel of data
+        n_rows, n_cols = raster_array.shape
         for node in nodes_in_block:
             xy = coord_to_array(node[1], node[2], block_x_min_corner, block_y_max_corner, x_cellsize, y_cellsize)
             z_sampleList = []
@@ -208,10 +209,18 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
                 # Calculate the cell X/Y based on the base coordinate movement
                 cell_x = xy[0] + coord[0]
                 cell_y = xy[1] + coord[1]
-                z_sampleList.append(raster_array[cell_y, cell_x])
+                if 0 <= cell_y < n_rows and 0 <= cell_x < n_cols:
+                    z_sampleList.append(raster_array[cell_y, cell_x])
+                else:
+                    # off raster sample
+                    z_sampleList.append(-9999)
 
             # sample at node:
-            z_node = raster_array[xy[1], xy[0]]
+            if 0 <= xy[1] < n_rows and 0 <= xy[0] < n_cols:
+                z_node = raster_array[xy[1], xy[0]]
+            else:
+                # off raster sample
+                z_node = -9999
 
             # Remove no data values (-9999) unless they are all no data
             if not max(z_sampleList) < -9998:

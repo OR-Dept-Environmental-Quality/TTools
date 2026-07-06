@@ -485,78 +485,76 @@ def get_topo_angles(block_extent, sample_extent, block_samples, z_raster, azimut
         z_array = z_array * con_z_to_m
 
     topo_samples = []
-    if z_array.max() > -9999:
-        distance_array_dict = {}
-        for sample in block_samples:
-            a = sample[2]
-            if a not in distance_array_dict:
-                cellsize = azimuthdisdict[a]
-                distance_array_dict[a] = build_search_array(0,
-                                                            searchDistance_max_m,
-                                                            cellsize,
-                                                            use_skippy=False)
+    distance_array_dict = {}
+    for sample in block_samples:
+        a = sample[2]
+        if a not in distance_array_dict:
+            cellsize = azimuthdisdict[a]
+            distance_array_dict[a] = build_search_array(0,
+                                                        searchDistance_max_m,
+                                                        cellsize,
+                                                        use_skippy=False)
 
-        # There is at least one pixel of data
-        for (nodeID, streamID, a, z_node,
-             node_x, node_y, end_x, end_y,
-             block_search_start, block_search_end) in block_samples:
+    for (nodeID, streamID, a, z_node,
+         node_x, node_y, end_x, end_y,
+         block_search_start, block_search_end) in block_samples:
 
-            # create list of distance movements along the topo line
-            # that are within the block extent
-            # this is in units of the fc
-            distance_array, pt_x_array, pt_y_array = filter_distance_array(
-                distance_array_dict[a], node_x, node_y, a, sample_extent)
-            if len(distance_array) == 0:
-                continue
+        # create list of distance movements along the topo line
+        # that are within the block extent
+        # this is in units of the fc
+        distance_array, pt_x_array, pt_y_array = filter_distance_array(
+            distance_array_dict[a], node_x, node_y, a, sample_extent)
+        if len(distance_array) == 0:
+            continue
 
-            # Vectorized coordinate calculation along the topo line
-            sin_a = sin(radians(a))
-            cos_a = cos(radians(a))
+        sin_a = sin(radians(a))
+        cos_a = cos(radians(a))
 
-            # Vectorized coord_to_array
-            # dx is the x distance from the raster block's left edge to each topo sample point.
-            # dy is the y distance from the raster block's top edge down to each topo sample point.
-            dx = pt_x_array - block_x_min_corner
-            dy = block_y_max_corner - pt_y_array
-            col_x_array = ((dx - (dx % x_cellsize)) / x_cellsize).astype(int)
-            row_y_array = ((dy - (dy % y_cellsize)) / y_cellsize).astype(int)
+        # Vectorized coord_to_array
+        # dx is the x distance from the raster block's left edge to each topo sample point.
+        # dy is the y distance from the raster block's top edge down to each topo sample point.
+        dx = pt_x_array - block_x_min_corner
+        dy = block_y_max_corner - pt_y_array
+        col_x_array = ((dx - (dx % x_cellsize)) / x_cellsize).astype(int)
+        row_y_array = ((dy - (dy % y_cellsize)) / y_cellsize).astype(int)
 
-            # Clip to valid array indices
-            col_x_array = np.clip(col_x_array, 0, z_array.shape[1] - 1)
-            row_y_array = np.clip(row_y_array, 0, z_array.shape[0] - 1)
+        # indices that are not off raster
+        valid_index = ((0 <= row_y_array) & (row_y_array < z_array.shape[0]) &
+                       (0 <= col_x_array) & (col_x_array < z_array.shape[1]))
 
-            z_topo_array = z_array[row_y_array, col_x_array]
+        z_topo_array = np.full(len(row_y_array), -9999.0)
+        z_topo_array[valid_index] = z_array[row_y_array[valid_index], col_x_array[valid_index]]
 
-            # convert distances to meters
-            distance_array_m = distance_array * con_to_m
+        # convert distances to meters
+        distance_array_m = distance_array * con_to_m
 
-            # Calculate the topo angles along the topo line
-            angle_array = np.degrees(np.arctan((z_topo_array - z_node) / distance_array_m))
-            # remove the off raster samples
-            naindex = np.where(z_topo_array < -9998)
-            for x in naindex[0]: angle_array[x] = -9999
-            # Find the max topo angle
-            topoAngle = angle_array.max()
-            # array index at the max topo angle
-            arryindex = np.where(angle_array == topoAngle)[0][0]
-            z_topo = z_topo_array[arryindex]
-            # elevation change between topo angle location and node elevation
-            z_change = z_topo - z_node
-            # distance from the node to topo angle location in units of fc
-            topoAngleDistance = distance_array[arryindex]
-            topoAngle_x = (topoAngleDistance * sin_a) + node_x
-            topoAngle_y = (topoAngleDistance * cos_a) + node_y
-            topoAngleDistance_m = topoAngleDistance * con_to_m
-            off_rastersamples = (z_topo_array < -9998).sum()
+        # Calculate the topo angles along the topo line
+        angle_array = np.degrees(np.arctan((z_topo_array - z_node) / distance_array_m))
+        # remove the off raster samples
+        naindex = np.where(z_topo_array < -9998)
+        for x in naindex[0]: angle_array[x] = -9999
+        # Find the max topo angle
+        topoAngle = angle_array.max()
+        # array index at the max topo angle
+        arryindex = np.where(angle_array == topoAngle)[0][0]
+        z_topo = z_topo_array[arryindex]
+        # elevation change between topo angle location and node elevation
+        z_change = z_topo - z_node
+        # distance from the node to topo angle location in units of fc
+        topoAngleDistance = distance_array[arryindex]
+        topoAngle_x = (topoAngleDistance * sin_a) + node_x
+        topoAngle_y = (topoAngleDistance * cos_a) + node_y
+        topoAngleDistance_m = topoAngleDistance * con_to_m
+        off_rastersamples = (z_topo_array < -9998).sum()
 
-            topo_samples.append([topoAngle_x, topoAngle_y,
-                                 topoAngle_x, topoAngle_y,
-                                 streamID, nodeID, a,
-                                 topoAngle, z_topo,
-                                 z_node, z_change,
-                                 topoAngleDistance_m,
-                                 searchDistance_max_m,
-                                 off_rastersamples])
+        topo_samples.append([topoAngle_x, topoAngle_y,
+                             topoAngle_x, topoAngle_y,
+                             streamID, nodeID, a,
+                             topoAngle, z_topo,
+                             z_node, z_change,
+                             topoAngleDistance_m,
+                             searchDistance_max_m,
+                             off_rastersamples])
 
     return topo_samples
 
