@@ -55,7 +55,7 @@ def log_run(tool_name, params):
             if val in (None, "", "#"):
                 val = "<null>"
 
-            param_values.append(str(val))
+            param_values.append(f"{p.name} = {val}")
         except Exception as e:
             param_values.append(f"<error: {e}>")
 
