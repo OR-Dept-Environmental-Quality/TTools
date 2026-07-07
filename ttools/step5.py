@@ -1,6 +1,5 @@
 """TTools Step 5: Sample Landcover"""
 import sys
-import os
 import gc
 import time
 import traceback
@@ -8,11 +7,12 @@ from datetime import timedelta
 from math import radians, sin, cos, ceil
 from collections import OrderedDict
 
-import arcpy
-
-from ttools.utils import (from_meters_con, from_z_units_to_meters_con,
-                          coord_to_array, message, read_fc, update_fc,
-                          get_raster_info, raster_to_array)
+from ttools.utils import (from_meters_con,
+                          from_z_units_to_meters_con, coord_to_array,
+                          message)
+from ttools.geo_package import (read_fc, update_fc, update_sample_fc,
+                            get_crs, crs_equal, get_raster_info, raster_to_array,
+                            fc_exists, delete_fc)
 
 
 # -----------------------------------------------------------------------
@@ -46,63 +46,15 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
 
 
 def update_lc_point_fc(lc_point_list, type, lc_point_fc,
-                       nodes_fc, nodes_in_block, overwrite_data, proj):
+                       nodes_in_block, overwrite_data, proj):
     """Creates/updates the output landcover sample point feature
     class using the data from the landcover point list"""
 
-    # Create an empty output with the same projection as the input polyline
-    cursorfields = ["POINT_X", "POINT_Y"] + ["STREAM_ID", "NODE_ID", "SAMPLE_ID",
-                                            "TRANS_DIR", "TRANSECT",
-                                            "SAMPLE", "KEY"] + type
+    fields_to_update = ["POINT_X", "POINT_Y", "STREAM_ID", "NODE_ID", "SAMPLE_ID",
+                        "TRANS_DIR", "TRANSECT", "SAMPLE", "KEY"] + type
 
-    # Check if the output exists and create if not
-    if not arcpy.Exists(lc_point_fc):
-        arcpy.CreateFeatureclass_management(os.path.dirname(lc_point_fc),
-                                            os.path.basename(lc_point_fc),
-                                            "POINT", "", "DISABLED", "DISABLED", proj)
-
-        # Determine Stream ID field properties
-        sid_type = arcpy.ListFields(nodes_fc, "STREAM_ID")[0].type
-        sid_precision = arcpy.ListFields(nodes_fc, "STREAM_ID")[0].precision
-        sid_scale = arcpy.ListFields(nodes_fc, "STREAM_ID")[0].scale
-        sid_length = arcpy.ListFields(nodes_fc, "STREAM_ID")[0].length
-
-        typeDict = {"POINT_X": "DOUBLE",
-                    "POINT_Y": "DOUBLE",
-                    "NODE_ID": "LONG",
-                    "SAMPLE_ID": "LONG",
-                    "TRANS_DIR": "DOUBLE",
-                    "TRANSECT": "SHORT",
-                    "SAMPLE": "SHORT",
-                    "KEY": "TEXT",}
-
-        for t in type:
-            typeDict[t] = "DOUBLE"
-
-        # Add attribute fields
-        for f in cursorfields:
-            if f == "STREAM_ID":
-                arcpy.AddField_management(lc_point_fc, f, sid_type,
-                                          sid_precision, sid_scale, sid_length,
-                                          "", "NULLABLE", "NON_REQUIRED")
-            else:
-                arcpy.AddField_management(lc_point_fc, f, typeDict[f], "",
-                                          "", "", "", "NULLABLE", "NON_REQUIRED")
-
-    if not overwrite_data:
-        # Build a query to retrieve existing rows from the nodes
-        # that need updating
-        whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_in_block))
-
-        # delete those rows
-        with arcpy.da.UpdateCursor(lc_point_fc, ["NODE_ID"], whereclause) as cursor:
-            for row in cursor:
-                cursor.deleteRow()
-
-    with arcpy.da.InsertCursor(lc_point_fc, ["SHAPE@X", "SHAPE@Y"] +
-                               cursorfields) as cursor:
-        for row in lc_point_list:
-            cursor.insertRow(row)
+    update_sample_fc(lc_point_list, lc_point_fc, fields_to_update,
+                     nodes_in_block, overwrite_data, proj)
 
 
 def setup_lcdata_headers_orthogonal(transsample_count):
@@ -416,9 +368,14 @@ def sample_raster(block, lc_point_list, raster, con):
     lc_point_list_new = []
     if raster_array.max() > -9999:
         # There is at least one pixel of data
+        n_rows, n_cols = raster_array.shape
         for point in lc_point_list:
             xy = coord_to_array(point[0], point[1], block_x_min_corner, block_y_max_corner, x_cellsize, y_cellsize)
-            point.append(raster_array[xy[1], xy[0]])
+            if 0 <= xy[1] < n_rows and 0 <= xy[0] < n_cols:
+                point.append(raster_array[xy[1], xy[0]])
+            else:
+                # off raster sample
+                point.append(-9999)
             lc_point_list_new.append(point)
     else:
         # No data, add -9999
@@ -521,18 +478,16 @@ def step5(nodes_fc, method, transsample_count, transsample_distance,
         startTime = time.time()
 
         # Check if the node fc exists
-        if not arcpy.Exists(nodes_fc):
+        if not fc_exists(nodes_fc):
             raise ValueError("This output does not exist: \n" +
                      "{0}\n".format(nodes_fc))
 
         # Check if the lc point fc exists and delete if needed
-        if arcpy.Exists(lc_point_fc) and overwrite_data:
-            arcpy.Delete_management(lc_point_fc)
+        if fc_exists(lc_point_fc) and overwrite_data:
+            delete_fc(lc_point_fc)
 
         # Determine input spatial units and set unit conversion factors
-        proj = arcpy.Describe(nodes_fc).spatialReference
-        proj_ele = arcpy.Describe(z_raster).spatialReference
-        proj_lc = arcpy.Describe(lc_raster).spatialReference if lc_raster else None
+        proj = get_crs(nodes_fc)
 
         con_from_m = from_meters_con(nodes_fc)
         con_lc_to_m = from_z_units_to_meters_con(lc_units) if lc_units else None
@@ -546,11 +501,11 @@ def step5(nodes_fc, method, transsample_count, transsample_distance,
 
         # Check to make sure the raster and input
         # points are in the same projection.
-        if proj.name != proj_ele.name:
+        if not crs_equal(nodes_fc, z_raster):
             raise ValueError("Input points and elevation raster do not have the " +
                      "same projection. Please reproject your data.")
 
-        if proj_lc is not None and proj_lc.name != proj_ele.name:
+        if lc_raster is not None and not crs_equal(lc_raster, z_raster):
             raise ValueError("The landcover and elevation rasters do not have the " +
                      "same projection. Please reproject your data.")
 
@@ -649,8 +604,7 @@ def step5(nodes_fc, method, transsample_count, transsample_distance,
 
             # Build the output point feature class using the data
             update_lc_point_fc(lc_point_list, list(rasterDict.keys()),
-                               lc_point_fc, nodes_fc, nodes_in_block,
-                               overwrite_data, proj)
+                               lc_point_fc, nodes_in_block, False, proj)
 
             total_samples = total_samples + len(lc_point_list)
             del lc_point_list

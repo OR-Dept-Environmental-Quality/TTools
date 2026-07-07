@@ -1,6 +1,5 @@
 """TTools Step 4: Measure Topographic Shade Angles"""
 import sys
-import os
 import gc
 import time
 import traceback
@@ -9,12 +8,13 @@ from math import radians, sin, cos, ceil
 from collections import defaultdict
 
 import numpy as np
-import arcpy
 
 from ttools.utils import (to_meters_con, from_meters_con,
                           from_z_units_to_meters_con,
-                          message, update_fc, get_raster_info,
-                          raster_to_array)
+                          message)
+from ttools.geo_package import (read_fc, update_fc, update_sample_fc,
+                            get_crs, crs_equal, get_raster_info, raster_to_array,
+                            fc_exists, delete_fc)
 
 
 def nested_dict():
@@ -28,44 +28,26 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
 
     message("Reading nodes feature class")
 
-    nodeDict = {}
-    incursorFields = ["NODE_ID", "STREAM_ID", "Z_NODE", "SHAPE@X", "SHAPE@Y"]
+    nodeDict = read_fc(nodes_fc)
 
-    # Get a list of existing fields
-    existingFields = []
-    for f in arcpy.ListFields(nodes_fc):
-        existingFields.append(f.name)
+    if overwrite_data:
+        for nodeID in nodeDict:
+            for field in addFields:
+                nodeDict[nodeID].pop(field, None)
 
     # Check to see if the 1st field exists if yes add it.
     check_field = addFields[0]
+    first_node = next(iter(nodeDict.values()))
 
-    if overwrite_data is False and check_field in existingFields:
-        incursorFields.append(check_field)
-    else:
-        overwrite_data = True
-
-    # Determine input point spatial units
-    proj = arcpy.Describe(nodes_fc).spatialReference
-
-    with arcpy.da.SearchCursor(nodes_fc, incursorFields, "", proj) as Inrows:
-        if overwrite_data:
-            for row in Inrows:
-                nodeDict[row[0]] = {}
-                nodeDict[row[0]]["STREAM_ID"] = row[1]
-                nodeDict[row[0]]["Z_NODE"] = row[2]
-                nodeDict[row[0]]["POINT_X"] = row[3]
-                nodeDict[row[0]]["POINT_Y"] = row[4]
-
-        else:
-            for row in Inrows:
-                # if the data is null or zero (0 = default for shapefile),
-                # it is retrieved and will be overwritten.
-                if row[5] is None or row[5] == 0 or row[5] < -9998:
-                    nodeDict[row[0]] = {}
-                    nodeDict[row[0]]["STREAM_ID"] = row[1]
-                    nodeDict[row[0]]["Z_NODE"] = row[2]
-                    nodeDict[row[0]]["POINT_X"] = row[3]
-                    nodeDict[row[0]]["POINT_Y"] = row[4]
+    if not overwrite_data and check_field in first_node:
+        # if the data is null or zero (0 = default for shapefile),
+        # it is retrieved and will be overwritten.
+        filtered = {}
+        for nodeID in nodeDict:
+            val = nodeDict[nodeID].get(check_field)
+            if val is None or val == 0 or val < -9998:
+                filtered[nodeID] = nodeDict[nodeID]
+        nodeDict = filtered
 
     if len(nodeDict) == 0:
         raise ValueError("The fields checked in the input point feature class " +
@@ -74,53 +56,16 @@ def read_nodes_fc(nodes_fc, overwrite_data, addFields):
     return nodeDict
 
 
-def update_topo_fc(topo_list, topo_fc, nodes_fc, nodes_to_update, overwrite_data, proj):
+def update_topo_fc(topo_list, topo_fc, nodes_to_update, overwrite_data, proj):
     """Creates/updates the output topo point feature
     class using the data from the topo list"""
 
-    # Create an empty output with the same projection as the input polyline
-    cursorfields = ["POINT_X", "POINT_Y", "STREAM_ID", "NODE_ID",
-                    "AZIMUTH", "TOPOANGLE", "TOPO_ELE", "NODE_ELE",
-                    "ELE_CHANGE", "TOPODIS", "SEARCHDIS", "NA_SAMPLES"]
+    fields_to_update = ["POINT_X", "POINT_Y", "STREAM_ID", "NODE_ID",
+                        "AZIMUTH", "TOPOANGLE", "TOPO_ELE", "NODE_ELE",
+                        "ELE_CHANGE", "TOPODIS", "SEARCHDIS", "NA_SAMPLES"]
 
-    # Check if the output exists and create if not
-    if not arcpy.Exists(topo_fc):
-        arcpy.CreateFeatureclass_management(os.path.dirname(topo_fc),
-                                            os.path.basename(topo_fc),
-                                            "POINT", "", "DISABLED", "DISABLED", proj)
-
-        # Determine Stream ID field properties
-        sid_type = arcpy.ListFields(nodes_fc, "STREAM_ID")[0].type
-        sid_precision = arcpy.ListFields(nodes_fc, "STREAM_ID")[0].precision
-        sid_scale = arcpy.ListFields(nodes_fc, "STREAM_ID")[0].scale
-        sid_length = arcpy.ListFields(nodes_fc, "STREAM_ID")[0].length
-
-        # Add attribute fields # TODO add dictionary of field types
-        # so they aren't all double
-        for f in cursorfields:
-            if f == "STREAM_ID":
-                arcpy.AddField_management(topo_fc, f, sid_type,
-                                          sid_precision, sid_scale, sid_length,
-                                          "", "NULLABLE", "NON_REQUIRED")
-
-            else:
-                arcpy.AddField_management(topo_fc, f, "DOUBLE", "", "", "",
-                                          "", "NULLABLE", "NON_REQUIRED")
-
-    if not overwrite_data:
-        # Build a query to retrieve existing rows from the nodes
-        # that need updating
-        whereclause = """{0} IN ({1})""".format("NODE_ID", ','.join(str(i) for i in nodes_to_update))
-
-        # delete those rows
-        with arcpy.da.UpdateCursor(topo_fc, ["NODE_ID"], whereclause) as cursor:
-            for row in cursor:
-                cursor.deleteRow()
-
-    with arcpy.da.InsertCursor(topo_fc, ["SHAPE@X", "SHAPE@Y"] +
-                                        cursorfields) as cursor:
-        for row in topo_list:
-            cursor.insertRow(row)
+    update_sample_fc(topo_list, topo_fc, fields_to_update,
+                     nodes_to_update, overwrite_data, proj)
 
 
 def build_search_array(searchDistance_min, searchDistance_max, cellsize, use_skippy):
@@ -485,78 +430,81 @@ def get_topo_angles(block_extent, sample_extent, block_samples, z_raster, azimut
         z_array = z_array * con_z_to_m
 
     topo_samples = []
-    if z_array.max() > -9999:
-        distance_array_dict = {}
-        for sample in block_samples:
-            a = sample[2]
-            if a not in distance_array_dict:
-                cellsize = azimuthdisdict[a]
-                distance_array_dict[a] = build_search_array(0,
-                                                            searchDistance_max_m,
-                                                            cellsize,
-                                                            use_skippy=False)
+    distance_array_dict = {}
+    for sample in block_samples:
+        a = sample[2]
+        if a not in distance_array_dict:
+            cellsize = azimuthdisdict[a]
+            distance_array_dict[a] = build_search_array(0,
+                                                        searchDistance_max_m,
+                                                        cellsize,
+                                                        use_skippy=False)
 
-        # There is at least one pixel of data
-        for (nodeID, streamID, a, z_node,
-             node_x, node_y, end_x, end_y,
-             block_search_start, block_search_end) in block_samples:
+    # There is at least one pixel of data
+    for (nodeID, streamID, a, z_node,
+         node_x, node_y, end_x, end_y,
+         block_search_start, block_search_end) in block_samples:
 
-            # create list of distance movements along the topo line
-            # that are within the block extent
-            # this is in units of the fc
-            distance_array, pt_x_array, pt_y_array = filter_distance_array(
-                distance_array_dict[a], node_x, node_y, a, sample_extent)
-            if len(distance_array) == 0:
-                continue
+        # create list of distance movements along the topo line
+        # that are within the block extent
+        # this is in units of the fc
+        distance_array, pt_x_array, pt_y_array = filter_distance_array(
+            distance_array_dict[a], node_x, node_y, a, sample_extent)
+        if len(distance_array) == 0:
+            continue
 
-            # Vectorized coordinate calculation along the topo line
-            sin_a = sin(radians(a))
-            cos_a = cos(radians(a))
+        sin_a = sin(radians(a))
+        cos_a = cos(radians(a))
 
-            # Vectorized coord_to_array
-            # dx is the x distance from the raster block's left edge to each topo sample point.
-            # dy is the y distance from the raster block's top edge down to each topo sample point.
-            dx = pt_x_array - block_x_min_corner
-            dy = block_y_max_corner - pt_y_array
-            col_x_array = ((dx - (dx % x_cellsize)) / x_cellsize).astype(int)
-            row_y_array = ((dy - (dy % y_cellsize)) / y_cellsize).astype(int)
+        # Vectorized coord_to_array
+        # dx is the x distance from the raster block's left edge to each topo sample point.
+        # dy is the y distance from the raster block's top edge down to each topo sample point.
+        dx = pt_x_array - block_x_min_corner
+        dy = block_y_max_corner - pt_y_array
+        col_x_array = ((dx - (dx % x_cellsize)) / x_cellsize).astype(int)
+        row_y_array = ((dy - (dy % y_cellsize)) / y_cellsize).astype(int)
 
-            # Clip to valid array indices
-            col_x_array = np.clip(col_x_array, 0, z_array.shape[1] - 1)
-            row_y_array = np.clip(row_y_array, 0, z_array.shape[0] - 1)
+        # Clip to valid array indices
+        col_x_array = np.clip(col_x_array, 0, z_array.shape[1] - 1)
+        row_y_array = np.clip(row_y_array, 0, z_array.shape[0] - 1)
 
-            z_topo_array = z_array[row_y_array, col_x_array]
+        # indices that are not off raster
+        valid_index = ((0 <= row_y_array) & (row_y_array < z_array.shape[0]) &
+                       (0 <= col_x_array) & (col_x_array < z_array.shape[1]))
 
-            # convert distances to meters
-            distance_array_m = distance_array * con_to_m
+        z_topo_array = np.full(len(row_y_array), -9999.0)
+        z_topo_array[valid_index] = z_array[row_y_array[valid_index], col_x_array[valid_index]]
 
-            # Calculate the topo angles along the topo line
-            angle_array = np.degrees(np.arctan((z_topo_array - z_node) / distance_array_m))
-            # remove the off raster samples
-            naindex = np.where(z_topo_array < -9998)
-            for x in naindex[0]: angle_array[x] = -9999
-            # Find the max topo angle
-            topoAngle = angle_array.max()
-            # array index at the max topo angle
-            arryindex = np.where(angle_array == topoAngle)[0][0]
-            z_topo = z_topo_array[arryindex]
-            # elevation change between topo angle location and node elevation
-            z_change = z_topo - z_node
-            # distance from the node to topo angle location in units of fc
-            topoAngleDistance = distance_array[arryindex]
-            topoAngle_x = (topoAngleDistance * sin_a) + node_x
-            topoAngle_y = (topoAngleDistance * cos_a) + node_y
-            topoAngleDistance_m = topoAngleDistance * con_to_m
-            off_rastersamples = (z_topo_array < -9998).sum()
+        # convert distances to meters
+        distance_array_m = distance_array * con_to_m
 
-            topo_samples.append([topoAngle_x, topoAngle_y,
-                                 topoAngle_x, topoAngle_y,
-                                 streamID, nodeID, a,
-                                 topoAngle, z_topo,
-                                 z_node, z_change,
-                                 topoAngleDistance_m,
-                                 searchDistance_max_m,
-                                 off_rastersamples])
+        # Calculate the topo angles along the topo line
+        angle_array = np.degrees(np.arctan((z_topo_array - z_node) / distance_array_m))
+        # remove the off raster samples
+        naindex = np.where(z_topo_array < -9998)
+        for x in naindex[0]: angle_array[x] = -9999
+        # Find the max topo angle
+        topoAngle = angle_array.max()
+        # array index at the max topo angle
+        arryindex = np.where(angle_array == topoAngle)[0][0]
+        z_topo = z_topo_array[arryindex]
+        # elevation change between topo angle location and node elevation
+        z_change = z_topo - z_node
+        # distance from the node to topo angle location in units of fc
+        topoAngleDistance = distance_array[arryindex]
+        topoAngle_x = (topoAngleDistance * sin_a) + node_x
+        topoAngle_y = (topoAngleDistance * cos_a) + node_y
+        topoAngleDistance_m = topoAngleDistance * con_to_m
+        off_rastersamples = (z_topo_array < -9998).sum()
+
+        topo_samples.append([topoAngle_x, topoAngle_y,
+                             topoAngle_x, topoAngle_y,
+                             streamID, nodeID, a,
+                             topoAngle, z_topo,
+                             z_node, z_change,
+                             topoAngleDistance_m,
+                             searchDistance_max_m,
+                             off_rastersamples])
 
     return topo_samples
 
@@ -611,17 +559,20 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
         startTime = time.time()
 
         # Check if the node fc exists
-        if not arcpy.Exists(nodes_fc):
+        if not fc_exists(nodes_fc):
             raise ValueError("This output does not exist: \n" +
                      "{0}\n".format(nodes_fc))
 
+        # Check if the topo sample fc exists and delete if needed
+        if fc_exists(topo_fc) and overwrite_data:
+            delete_fc(topo_fc)
+
         # Determine input point spatial units
-        proj = arcpy.Describe(nodes_fc).spatialReference
-        proj_ele = arcpy.Describe(z_raster).spatialReference
+        proj = get_crs(nodes_fc)
 
         # Check to make sure the raster and input
         # points are in the same projection.
-        if proj.name != proj_ele.name:
+        if not crs_equal(nodes_fc, z_raster):
             raise ValueError("Input points and elevation raster do not have the " +
                      "same projection. Please reproject your data.")
 
@@ -756,7 +707,7 @@ def step4(nodes_fc, topo_directions, searchDistance_max_km, z_raster, z_units,
 
         # Write the topo feature class
         if all_topo_list:
-            update_topo_fc(all_topo_list, topo_fc, nodes_fc, all_nodes_updated,
+            update_topo_fc(all_topo_list, topo_fc, all_nodes_updated,
                            overwrite_data, proj)
 
         endTime = time.time()

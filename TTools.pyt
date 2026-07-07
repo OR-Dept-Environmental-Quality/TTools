@@ -55,7 +55,7 @@ def log_run(tool_name, params):
             if val in (None, "", "#"):
                 val = "<null>"
 
-            param_values.append(str(val))
+            param_values.append(f"{p.name} = {val}")
         except Exception as e:
             param_values.append(f"<error: {e}>")
 
@@ -68,6 +68,12 @@ def log_run(tool_name, params):
 import arcpy
 import sys
 import traceback
+
+from ttools.utils import set_message_method, set_warning_method
+from ttools.geo_package import set_geo_package
+set_message_method(arcpy.AddMessage)
+set_warning_method(arcpy.AddWarning)
+set_geo_package(use_arcpy=True)
 
 class Toolbox:
     def __init__(self):

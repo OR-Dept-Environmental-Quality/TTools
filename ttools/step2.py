@@ -7,43 +7,9 @@ import traceback
 from datetime import timedelta
 from math import ceil
 
-import arcpy
-
-from ttools.utils import to_meters_con, message, warning, read_fc, update_fc
-
-
-def read_polyline_geometry(polyline_fc, proj_polyline):
-    """Reads an input polyline into an arcpy polyline geometry object."""
-    poly_list = []
-    # Get the x and y of each vertex in the polyline and save
-    # it as a list.
-    for row in arcpy.da.SearchCursor(polyline_fc, ["SHAPE@"]):
-        for part in row[0]:
-            for pnt in part:
-                poly_list.append(arcpy.Point(pnt.X, pnt.Y))
-    poly_array = arcpy.Array(poly_list)
-    # put it into a geometry object.
-    poly_geom = arcpy.Polyline(poly_array, proj_polyline)
-    del row
-    return (poly_geom)
-
-
-def calc_channel_width(node_geom, bank_geom, aspect, line_dis, proj_nodes):
-    """Calculate the distance from a node to a bank along a
-    perpendicular transect."""
-    pt1 = node_geom.pointFromAngleAndDistance(aspect, line_dis, "PLANAR")
-    line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
-    pt2 = line.intersect(bank_geom, 1)
-
-    if pt2.centroid:
-        to_bank_distance = node_geom.distanceTo(pt2)
-    else:
-        # No intersection = no bank 90 deg from aspect
-        # Find the minimum distance to bank, regardless of the angle
-        near_distance = bank_geom.queryPointAndDistance(node_geom.centroid)
-        to_bank_distance = near_distance[2]
-
-    return (to_bank_distance)
+from ttools.utils import to_meters_con, message, warning
+from ttools.geo_package import (read_fc, get_crs, crs_equal, update_fc, fc_exists,
+                            read_polyline_geometry, calc_channel_width)
 
 
 def read_nodes_fc(nodes_fc, overwrite_data, addFields):
@@ -107,22 +73,20 @@ def step2(nodes_fc, rb_fc, lb_fc, overwrite_data=True):
         startTime = time.time()
 
         # Check if the output exists
-        if not arcpy.Exists(nodes_fc):
+        if not fc_exists(nodes_fc):
             raise ValueError("This output does not exist: \n" +
                      "{0}\n".format(nodes_fc))
 
         # Determine input spatial units
-        proj_nodes = arcpy.Describe(nodes_fc).spatialReference
-        proj_rb = arcpy.Describe(rb_fc).spatialReference
-        proj_lb = arcpy.Describe(lb_fc).spatialReference
+        proj_nodes = get_crs(nodes_fc)
 
         # Check to make sure the rb_fc/lb_fc and input points are
         # in the same projection.
-        if proj_nodes.name != proj_rb.name:
+        if not crs_equal(nodes_fc, rb_fc):
             raise ValueError("Input points and right bank feature class do not have " +
                      "the same projection. Please reproject your data.")
 
-        if proj_nodes.name != proj_lb.name:
+        if not crs_equal(nodes_fc, lb_fc):
             raise ValueError("Input points and left bank feature class do not have " +
                      "the same projection. Please reproject your data.")
 
@@ -138,8 +102,8 @@ def step2(nodes_fc, rb_fc, lb_fc, overwrite_data=True):
         nodeDict = read_nodes_fc(nodes_fc, overwrite_data, addFields)
 
         # Read each of the bank polylines into geometry objects
-        rb_geom = read_polyline_geometry(rb_fc, proj_rb)
-        lb_geom = read_polyline_geometry(lb_fc, proj_lb)
+        rb_geom = read_polyline_geometry(rb_fc)
+        lb_geom = read_polyline_geometry(lb_fc)
 
         nodes = list(nodeDict.keys())
         nodes.sort()
@@ -151,7 +115,6 @@ def step2(nodes_fc, rb_fc, lb_fc, overwrite_data=True):
             node_x = float(nodeDict[nodeID]["POINT_X"])
             node_y = float(nodeDict[nodeID]["POINT_Y"])
             aspect = float(nodeDict[nodeID]["ASPECT"])
-            node_geom = arcpy.PointGeometry(arcpy.Point(node_x, node_y), proj_nodes)
 
             # calculate right and left transect directions in degrees
             dir_lb = aspect - 90
@@ -163,10 +126,12 @@ def step2(nodes_fc, rb_fc, lb_fc, overwrite_data=True):
             if dir_rb > 360:
                 dir_rb = dir_rb - 360
 
-            lb_distance = calc_channel_width(node_geom, lb_geom, dir_lb,
-                                             out_dis, proj_nodes)
-            rb_distance = calc_channel_width(node_geom, rb_geom, dir_rb,
-                                             out_dis, proj_nodes)
+            lb_distance = calc_channel_width(node_x, node_y, lb_geom,
+                                             dir_lb, out_dis,
+                                             proj_nodes)
+            rb_distance = calc_channel_width(node_x, node_y, rb_geom,
+                                             dir_rb, out_dis,
+                                             proj_nodes)
 
             if lb_distance is None:
                 warning(f"Warning: There is not a left bank polyline 90 degrees perpendicular to the aspect at Node ID {nodeID}.")
