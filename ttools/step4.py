@@ -464,10 +464,6 @@ def get_topo_angles(block_extent, sample_extent, block_samples, z_raster, azimut
         col_x_array = ((dx - (dx % x_cellsize)) / x_cellsize).astype(int)
         row_y_array = ((dy - (dy % y_cellsize)) / y_cellsize).astype(int)
 
-        # Clip to valid array indices
-        col_x_array = np.clip(col_x_array, 0, z_array.shape[1] - 1)
-        row_y_array = np.clip(row_y_array, 0, z_array.shape[0] - 1)
-
         # indices that are not off raster
         valid_index = ((0 <= row_y_array) & (row_y_array < z_array.shape[0]) &
                        (0 <= col_x_array) & (col_x_array < z_array.shape[1]))
