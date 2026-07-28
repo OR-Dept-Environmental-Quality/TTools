@@ -35,6 +35,12 @@ def calc_channel_width(node_geom, bank_geom, aspect, line_dis, proj_nodes):
     line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj_nodes)
     pt2 = line.intersect(bank_geom, 1)
 
+    # test to make sure that there is only one point of intersection
+    if pt2.isMultipart:
+        print("Warning: there is more than one point of intersection between the bankline and a transect perpendicular from a node.")
+        print("This occurs at the node with coordinates (x, y) = ", (node_geom.centroid.X, node_geom.centroid.Y))
+        print("This program selects the point of intersection that is closest to the node and reports that distance.")
+
     if pt2.centroid:
         to_bank_distance = node_geom.distanceTo(pt2)
     else:
