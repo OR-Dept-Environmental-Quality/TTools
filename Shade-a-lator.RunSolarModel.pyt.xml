@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<metadata xml:lang="en">
+	<Esri>
+		<CreaDate>20250821</CreaDate>
+		<CreaTime>15172500</CreaTime>
+		<ArcGISFormat>1.0</ArcGISFormat>
+		<SyncOnce>TRUE</SyncOnce>
+		<ModDate>20250916</ModDate>
+		<ModTime>15003300</ModTime>
+		<scaleRange>
+			<minScale>150000000</minScale>
+			<maxScale>5000</maxScale>
+		</scaleRange>
+		<ArcGISProfile>ItemDescription</ArcGISProfile>
+	</Esri>
+	<tool name="RunSolarModel" displayname="2. Run Heat Source 9 Solar Model" toolboxalias="Shade-a-lator" xmlns="">
+		<arcToolboxHelpPath>c:\program files\arcgis\pro\Resources\Help\gp</arcToolboxHelpPath>
+		<parameters>
+			<param name="models_file" displayname="Model List" type="Required" direction="Input" datatype="File" expression="models_file">
+				<dialogReference>Path to the model list file created from the model setup step. The model list has columns for 'stream_id', 'model_dir', and 'status'. stream_id is the unique identifier for each model. model_dir is the path to the model run directory containing the Heat Source control file. status is a field identifying the model run status. There are three status values: running: the model is currently running. complete: the model run has completed without error. failed: the model run failed due to an error.</dialogReference>
+			</param>
+			<param name="overwrite" displayname="Rerun Completed Models" type="Required" direction="Input" datatype="Boolean" expression="overwrite">
+				<dialogReference>If checked, runs all models regardless of status. Not checked skips completed models (status = complete).</dialogReference>
+			</param>
+			<param name="concurrent_models" displayname="Concurrent Models To Run" type="Required" direction="Input" datatype="Long" expression="concurrent_models">
+				<dialogReference>Maximum number of models running simultaneously. Defaults to 1, which runs one model at a time.</dialogReference>
+			</param>
+		</parameters>
+	</tool>
+	<dataIdInfo>
+		<idCitation>
+			<resTitle>Run Solar Model</resTitle>
+		</idCitation>
+		<searchKeys>
+			<keyword>TTools</keyword>
+			<keyword>Shade-a-lator</keyword>
+			<keyword>Heat Source</keyword>
+			<keyword>Solar radiation</keyword>
+			<keyword>Effective shade</keyword>
+		</searchKeys>
+	</dataIdInfo>
+	<distInfo>
+		<distributor>
+			<distorFormat>
+				<formatName>ArcToolbox Tool</formatName>
+			</distorFormat>
+		</distributor>
+	</distInfo>
+	<mdHrLv>
+		<ScopeCd value="005"/>
+	</mdHrLv>
+	<mdDateSt Sync="TRUE">20250916</mdDateSt>
+</metadata>

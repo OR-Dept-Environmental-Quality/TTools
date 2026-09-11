@@ -1,0 +1,139 @@
+<?xml version="1.0"?>
+<metadata xml:lang="en">
+    <Esri>
+        <CreaDate>20250821</CreaDate>
+        <CreaTime>15172500</CreaTime>
+        <ArcGISFormat>1.0</ArcGISFormat>
+        <SyncOnce>TRUE</SyncOnce>
+        <ModDate>20250916</ModDate>
+        <ModTime>15003300</ModTime>
+        <scaleRange>
+            <minScale>150000000</minScale>
+            <maxScale>5000</maxScale>
+        </scaleRange>
+        <ArcGISProfile>ItemDescription</ArcGISProfile>
+    </Esri>
+    <tool name="SetupSolarModel" displayname="1. Setup Heat Source 9 Solar Model"
+          toolboxalias="shadealator" xmlns="">
+        <arcToolboxHelpPath>c:\program files\arcgis\pro\Resources\Help\gp</arcToolboxHelpPath>
+        <parameters>
+            <param name="nodes_fc" displayname="Stream Nodes Feature Class" type="Required" direction="Input"
+                   datatype="Feature Layer" expression="nodes_fc">
+                <dialogReference>Path to the TTools node feature class with steps 1, 3, 4, and 5 (star pattern method) completed. Each node must have a unique NODE_ID.</dialogReference>
+            </param>
+			<param name="model_grouping_field" displayname="Model Grouping Field" type="Required" direction="Input"
+                   datatype="Field" expression="model_grouping_field">
+                <dialogReference>Name of the attribute field in nodes_fc used to group nodes into separate models.</dialogReference>
+            </param>
+			<param name="longsample" displayname="Spacing Between Nodes (meters)" type="Required" direction="Input"
+                   datatype="Long" expression="longsample">
+                <dialogReference>Longitudinal node spacing in meters. This controls the modeled stream kilometer interval. It must match the TTools node spacing and be a positive whole number. Shade-a-lator sets dx equal to longsample so nodes are not aggregated.</dialogReference>
+            </param>
+			<param name="trans_count" displayname="Number of Transects per Node" type="Required" direction="Input"
+                   datatype="Long" expression="trans_count">
+                <dialogReference>Number of transects per node. The degrees of separation between each transect is equal to 360 / trans_count. If trans_count = 8, the heading of the first transect is 45 degrees (Northeast), the second transect is 90 degrees (East), and the eighth is 360 degrees (North). Transects are oriented clockwise from north. trans_count is ignored if heatsource8 = True.</dialogReference>
+            </param>
+            <param name="transsample_count" displayname="Number of Samples per Transect" type="Required" direction="Input"
+                   datatype="Long" expression="transsample_count">
+                <dialogReference>Number of samples per transect. This number DOES NOT include the sample at the stream node.</dialogReference>
+            </param>
+            <param name="transsample_distance" displayname="Distance Between Transect Samples (meters)" type="Required" direction="Input"
+                   datatype="Double" expression="transsample_distance">
+                <dialogReference>The distance between transect samples (meters).</dialogReference>
+            </param>
+			<param name="lccodes" displayname="Land Cover Codes Input File" type="Required" direction="Input"
+                   datatype="File" expression="lccodes">
+                <dialogReference>Path to the land cover codes file. The land cover codes file is a CSV, including when csv_mode=False.</dialogReference>
+            </param>
+			<param name="canopy_data" displayname="Canopy Data Type" type="Required" direction="Input"
+                   datatype="String" expression="canopy_data">
+                <dialogReference>Controls the canopy metric used in land cover inputs. Use 'LAI' for effective leaf area index based inputs, or 'CanopyCover' for canopy cover based inputs.</dialogReference>
+            </param>
+			<param name="heatsource8" displayname="Use Heat Source 8 Land Cover Methods" type="Required" direction="Input"
+                   datatype="Boolean" expression="heatsource8">
+                <dialogReference>If checked, a heat source version 8 star pattern with 7 transects will be used. Heat source versions 7 and 8 use 7 transects around each stream node in the following directions: Northeast, East, Southeast, South, Southwest, West, Northwest. Defaults to unchecked.</dialogReference>
+            </param>
+            <param name="lcsampmethod" displayname="Land Cover Sample Method" type="Required" direction="Input"
+                   datatype="String" expression="point | zone">
+                <dialogReference>lcsampmethod controls how transect samples are interpreted in the shading geometry. Use 'point' when each sample is treated as a specific sampled location, or 'zone' when each sample represents a zone between sample points. Use "point" for TTools zone_sample=False and "zone" for TTools zone_sample=True. Defaults to "point".</dialogReference>
+            </param>
+			<param name="emergent" displayname="Account For Emergent Vegetation Shading" type="Required" direction="Input"
+                   datatype="Boolean" expression="emergent">
+                <dialogReference>Boolean flag for whether emergent vegetation shading is represented. If checked, the model includes the emergent vegetation slot in the land cover setup. Unless you are doing wetland modeling, it is recommended this be unchecked.</dialogReference>
+            </param>
+            <param name="modelstart" displayname="Modeling Start Date (yyyy-mm-dd)" type="Required" direction="Input"
+                   datatype="String" expression="modelstart">
+                <dialogReference>First date of the model simulation period, in 'YYYY-MM-DD' format.</dialogReference>
+            </param>
+            <param name="modelend" displayname="Modeling End Date (yyyy-mm-dd)" type="Required" direction="Input"
+                   datatype="String" expression="modelend">
+                <dialogReference>Last date of the model simulation period, in 'YYYY-MM-DD' format.</dialogReference>
+            </param>
+            <param name="offset" displayname="Time Offset From UTC (hours)" type="Required" direction="Input"
+                   datatype="Long" expression="offset">
+                <dialogReference>Offset is the local time offset from UTC in whole hours, expressed as an integer such as '-8' or '-7'. Negative values are west of UTC. The offset affects the solar calculations, not model time. Model time is determined by 'modelstart', 'modelend', and 'dt'. The model only accepts one offset for the entire model run. The date and time values used in the input and output files do not apply daylight savings changes. If the model period crosses a daylight savings transition, one offset should be selected (e.g. standard time or daylight savings time) and all input data should be converted to date and times using that offset.</dialogReference>
+            </param>
+            <param name="dt" displayname="Model Time Step (minutes)" type="Required" direction="Input"
+                   datatype="Double" expression="dt">
+                <dialogReference>Model time step in minutes. This must divide evenly into 60 minutes, so values such as '15', '10', '5', or '1' are sensible choices. A dt of '1' is recommended for most models. Defaults to 1.</dialogReference>
+            </param>
+            <param name="outputdt" displayname="Output Time Step (minutes)" type="Required" direction="Input"
+                   datatype="Double" expression="outputdt">
+                <dialogReference>The output time step, in minutes, for all output files except 'Shade', 'VTS', 'GapFraction', and 'Heat_SR3b'. These four are daily outputs. 'outputdt' must be greater than or equal to 'dt', and it must be an exact multiple of 'dt'. Except for 'Shade', 'VTS', 'GapFraction', and 'Heat_SR3b', all other output files write at 'outputdt' intervals starting at 'modelstart' and stopping on the 'modelend' date. Each daily timestamp in 'Shade', 'VTS', 'GapFraction', and 'Heat_SR3b' is the last modeled timestep included in that day.  Defaults to 60.</dialogReference>
+            </param>
+			<param name="model_dir" displayname="Model Directory" type="Required" direction="Input"
+                   datatype="Folder" expression="model_dir">
+                <dialogReference>Path to the top level directory where the model run folders and model list are saved. Each model run folder is named using the value from the model grouping field.</dialogReference>
+            </param>
+            <param name="inputdir" displayname="Model Inputs Directory" type="Required" direction="Input"
+                   datatype="String" expression="inputdir">
+                <dialogReference>Path to the folder that contains the model input files. Relative directories resolve from each model run folder. Absolute directories are used as supplied. Defaults to "inputs".</dialogReference>
+            </param>
+            <param name="outputdir" displayname="Model Outputs Directory" type="Required" direction="Input"
+                   datatype="String" expression="outputdir">
+                <dialogReference>Path to the folder where model outputs will be written. Relative directories resolve from each model run folder. Absolute directories are used as supplied. May be the same as inputdir. Defaults to "outputs".</dialogReference>
+            </param>
+            <param name="csv_mode" displayname="CSV Mode" type="Required" direction="Input"
+                   datatype="Boolean" expression="csv_mode">
+                <dialogReference>True creates CSV files for the model control files,  model inputs, and the model list. False creates Excel files. Defaults to False.</dialogReference>
+            </param>
+            <param name="overwrite" displayname="Overwrite Existing Setup Files" type="Required" direction="Input"
+                   datatype="Boolean" expression="overwrite">
+                <dialogReference>If checked, overwrites any existing model setup files. If not checked, preserves existing files and creates missing files. Defaults to False.</dialogReference>
+            </param>
+            <param name="usertxt" displayname="Model Description/User Notes" type="Optional" direction="Input"
+                   datatype="String" expression="usertxt">
+                <dialogReference>This is a field for the user to document descriptive details about the model, project, staff name, and other details. The value in the usertxt field is written to all model output files. Defaults to None.</dialogReference>
+            </param>
+            <param name="name" displayname="Simulation Name" type="Optional" direction="Input"
+                   datatype="String" expression="name">
+                <dialogReference>Model or simulation name. This is another descriptive field intended to keep track of the model simulation name and iteration number. Often multiple simulations are run so this provides a way to document that information. The value in the name field is written to all model output files. The same name is used for every group. Defaults to None.</dialogReference>
+            </param>
+
+        </parameters>
+    </tool>
+    <dataIdInfo>
+        <idCitation>
+            <resTitle>Setup Solar Model</resTitle>
+        </idCitation>
+        <searchKeys>
+			<keyword>TTools</keyword>
+			<keyword>Shade-a-lator</keyword>
+			<keyword>Heat Source</keyword>
+			<keyword>Solar radiation</keyword>
+			<keyword>Effective shade</keyword>
+
+        </searchKeys>
+    </dataIdInfo>
+    <distInfo>
+        <distributor>
+            <distorFormat>
+                <formatName>ArcToolbox Tool</formatName>
+            </distorFormat>
+        </distributor>
+    </distInfo>
+    <mdHrLv>
+        <ScopeCd value="005"/>
+    </mdHrLv>
+    <mdDateSt Sync="TRUE">20250916</mdDateSt>
+</metadata>

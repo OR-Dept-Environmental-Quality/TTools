@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<metadata xml:lang="en">
+	<Esri>
+		<CreaDate>20250811</CreaDate>
+		<CreaTime>17593300</CreaTime>
+		<ArcGISFormat>1.0</ArcGISFormat>
+		<SyncOnce>TRUE</SyncOnce>
+		<ModDate>20260910</ModDate>
+		<ModTime>204604</ModTime>
+		<scaleRange>
+			<minScale>150000000</minScale>
+			<maxScale>5000</maxScale>
+		</scaleRange>
+		<ArcGISProfile>ItemDescription</ArcGISProfile>
+	</Esri>
+	<toolbox name="Shade-a-lator" alias="shadealator">
+		<arcToolboxHelpPath>c:\program files\arcgis\pro\Resources\Help\gp</arcToolboxHelpPath>
+		<toolsets/>
+	</toolbox>
+	<dataIdInfo>
+		<idCitation>
+			<resTitle>Shade-a-lator</resTitle>
+		</idCitation>
+		<idPurp>Calculate solar radiation, effective shade, and gap fraction using Heat Source version 9 solar model
+            and the node feature class produced by TTools.
+        </idPurp>
+		<idAbs>&lt;DIV STYLE="text-align:Left;"&gt;&lt;DIV&gt;&lt;DIV&gt;&lt;P&gt;&lt;SPAN&gt;&lt;SPAN&gt;Shade-a-lator is used to set up and run Heat Source
+            solar models. Heat Source version 9.1.0 is bundled with this tool. TTools steps 1, 3, 4, and 5
+            (star pattern) must be run before Shade-a-lator can be used. A land cover code CSV file must also be developed.
+			The model calculates solar radiation flux through the atmosphere to the stream surface providing a timeseries
+			of flux values at different attenuation points (SR1 through SR5). Daily effective shade and gap fraction are also
+			output. The Shade-a-lator model is set up by default to assume no clouds. All model input files can be manually
+			edited if desired. The input nodes feature class is not modified. See the Heat Source user manual for more
+			information.
+			&lt;/SPAN&gt;&lt;/SPAN&gt;&lt;/P&gt;&lt;/DIV&gt;&lt;/DIV&gt;&lt;/DIV&gt;
+        </idAbs>
+		<idCredit>Oregon Department of Environmental Quality (DEQ)</idCredit>
+		<searchKeys>
+			<keyword>Shade-a-lator</keyword>
+			<keyword>Heat Source</keyword>
+			<keyword>Solar radiation</keyword>
+			<keyword>Effective shade</keyword>
+		</searchKeys>
+	</dataIdInfo>
+	<distInfo>
+		<distributor>
+			<distorFormat>
+				<formatName>ArcToolbox Toolbox</formatName>
+			</distorFormat>
+		</distributor>
+	</distInfo>
+	<mdHrLv>
+		<ScopeCd value="005"/>
+	</mdHrLv>
+	<mdDateSt Sync="TRUE">20250929</mdDateSt>
+</metadata>
