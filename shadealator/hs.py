@@ -42,13 +42,13 @@ def setup_solar(nodes_fc, model_grouping_field, longsample, trans_count, transsa
     groups = {}
 
     for nodeID, data in nodeDict.items():
-        streamID = data[model_grouping_field]
-        groups[streamID] = groups.get(streamID, 0) + 1
+        model_group_val = data[model_grouping_field]
+        groups[model_group_val] = groups.get(model_group_val, 0) + 1
 
     folders = set()
 
-    for streamID, node_count in groups.items():
-        folder = str(streamID)
+    for model_group_val, node_count in groups.items():
+        folder = str(model_group_val)
 
         # TODO Some error checking for names that can't be used as folder names
 
@@ -59,15 +59,15 @@ def setup_solar(nodes_fc, model_grouping_field, longsample, trans_count, transsa
     control_files = []
     model_rows = []
 
-    for streamID, node_count in groups.items():
-        msg = "Setting up solar model for {0}".format(streamID)
+    for model_group_val, node_count in groups.items():
+        msg = "Setting up solar model for {0}".format(model_group_val)
         message(msg)
 
         group_nodes = {nodeID: data for nodeID, data in nodeDict.items()
-                       if data[model_grouping_field] == streamID}
+                       if data[model_grouping_field] == model_group_val}
         node_ids = sorted(group_nodes, reverse=True)
 
-        run_dir = Path(model_dir, str(streamID))
+        run_dir = Path(model_dir, str(model_group_val))
         run_inputdir = Path(run_dir, inputdir).resolve()
         run_outputdir = Path(run_dir, outputdir).resolve()
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -126,7 +126,7 @@ def setup_solar(nodes_fc, model_grouping_field, longsample, trans_count, transsa
                 result = subprocess.run(cmd, check=True, stderr=subprocess.PIPE, text=True)
             except subprocess.CalledProcessError as exc:
                 msg = "Heat Source setup failed for model {0!r}.\nModel directory: {1}\n{2}".format(
-                    streamID, run_dir, exc.stderr)
+                    model_group_val, run_dir, exc.stderr)
                 raise RuntimeError(msg) from exc
             sys.stderr.write(result.stderr)
 
@@ -164,12 +164,12 @@ def setup_solar(nodes_fc, model_grouping_field, longsample, trans_count, transsa
                         fields[i] = "{0}_T{1}_{2}".format(prefix, tran, sample)
 
             for row, nodeID in zip(rows, node_ids):
-                row[0], row[1] = streamID, nodeID
+                row[0], row[1] = model_group_val, nodeID
                 for i, field in enumerate(fields, start=3):
                     if file_key == "lcdatafile" or field == "ELEVATION":
                         row[i] = group_nodes[nodeID][field]
                 if file_key == "morphfile":
-                    lookup_rows.append([streamID, nodeID, row[2], str(run_outputdir)])
+                    lookup_rows.append([model_group_val, nodeID, row[2], str(run_outputdir)])
 
             write_input(path=path, headers=headers, rows=rows, sheetname=sheetnames[file_key], csv_mode=csv_mode)
 
@@ -200,16 +200,16 @@ def setup_solar(nodes_fc, model_grouping_field, longsample, trans_count, transsa
         if overwrite or not path.exists():
             with path.open("w", newline="", encoding="utf-8") as output:
                 writer = csv.writer(output)
-                writer.writerow(["STREAM_ID", "NODE_ID", "STREAM_KM", "OUTPUTDIR"])
+                writer.writerow(["GROUP", "NODE_ID", "STREAM_KM", "OUTPUTDIR"])
                 writer.writerows(lookup_rows)
 
         control_files.append(str(control_path))
-        model_rows.append([streamID, str(run_dir), ""])
+        model_rows.append([model_group_val, str(run_dir), ""])
 
         del group_nodes
 
     if overwrite or not models_file.exists():
-        write_input(path=models_file, headers=["stream_id", "model_dir", "status"], rows=model_rows,
+        write_input(path=models_file, headers=["GROUP", "MODEL_DIR", "STATUS"], rows=model_rows,
                     sheetname="Model List", csv_mode=csv_mode)
 
     return control_files
@@ -235,8 +235,8 @@ def run_solar(models_file, overwrite=False, concurrent_models=1):
                     model_row = next(run_models, None)
                     if model_row is None:
                         break
-                    streamID, model_dir, status = model_row
-                    msg = "Running solar model for {0}".format(streamID)
+                    model_group_val, model_dir, status = model_row
+                    msg = "Running solar model for {0}".format(model_group_val)
                     message(msg)
                     model_row[2] = "running"
                     write_input(path=models_file, headers=model_list_headers,
