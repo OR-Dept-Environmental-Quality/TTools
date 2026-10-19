@@ -5,6 +5,7 @@ These functions were duplicated across multiple TTools scripts
 and are consolidated here.
 """
 
+from math import ceil
 import arcpy
 
 
@@ -120,9 +121,20 @@ def raster_to_array(raster_path, block_x_min_corner, block_y_min_corner,
     x_cellsize = raster.meanCellWidth
     y_cellsize = raster.meanCellHeight
 
+    raster_x_min = raster.extent.XMin
+    raster_y_max = raster.extent.YMax
+    col_start = round((block_x_min_corner - raster_x_min) / x_cellsize)
+    col_end = ceil((block_x_max_corner - raster_x_min) / x_cellsize)
+    row_start = round((raster_y_max - block_y_max_corner) / y_cellsize)
+    row_end = ceil((raster_y_max - block_y_min_corner) / y_cellsize)
+
     # calculate the number of cols/rows from the lower left
-    ncols = int((block_x_max_corner - block_x_min_corner) / x_cellsize)
-    nrows = int((block_y_max_corner - block_y_min_corner) / y_cellsize)
+    ncols = col_end - col_start
+    nrows = row_end - row_start
+
+    block_x_min_corner = raster_x_min + col_start * x_cellsize
+    block_y_min_corner = raster_y_max - row_end * y_cellsize
+    block_y_max_corner = raster_y_max - row_start * y_cellsize
 
     lower_left = arcpy.Point(block_x_min_corner, block_y_min_corner)
     array = arcpy.RasterToNumPyArray(raster_path, lower_left,
@@ -180,8 +192,10 @@ def from_z_units_to_meters_con(zUnits):
 
 
 def coord_to_array(easting, northing, block_x_min, block_y_max,
-                   x_cellsize, y_cellsize):
+                   x_cellsize, y_cellsize, raster_x_min, raster_y_max):
     """converts x/y coordinates to col and row of the array"""
-    col_x = int(((easting - block_x_min) - ((easting - block_x_min) % x_cellsize)) / x_cellsize)
-    row_y = int(((block_y_max - northing) - ((block_y_max - northing) % y_cellsize)) / y_cellsize)
+    dx = easting - raster_x_min
+    dy = raster_y_max - northing
+    col_x = round((dx - (dx % x_cellsize)) / x_cellsize) - round((block_x_min - raster_x_min) / x_cellsize)
+    row_y = round((dy - (dy % y_cellsize)) / y_cellsize) - round((raster_y_max - block_y_max) / y_cellsize)
     return [col_x, row_y]
