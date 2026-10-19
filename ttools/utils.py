@@ -86,9 +86,10 @@ def from_z_units_to_meters_con(zUnits):
     return con_z_to_m
 
 
-def coord_to_array(easting, northing, block_x_min, block_y_max,
-                   x_cellsize, y_cellsize):
+def coord_to_array(easting, northing, block_x_min, block_y_max, x_cellsize, y_cellsize, raster_x_min, raster_y_max):
     """converts x/y coordinates to col and row of the array"""
-    col_x = int(((easting - block_x_min) - ((easting - block_x_min) % x_cellsize)) / x_cellsize)
-    row_y = int(((block_y_max - northing) - ((block_y_max - northing) % y_cellsize)) / y_cellsize)
+    dx = easting - raster_x_min
+    dy = raster_y_max - northing
+    col_x = round((dx - (dx % x_cellsize)) / x_cellsize) - round((block_x_min - raster_x_min) / x_cellsize)
+    row_y = round((dy - (dy % y_cellsize)) / y_cellsize) - round((raster_y_max - block_y_max) / y_cellsize)
     return [col_x, row_y]

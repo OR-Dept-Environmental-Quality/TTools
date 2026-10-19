@@ -457,12 +457,12 @@ def get_topo_angles(block_extent, sample_extent, block_samples, z_raster, azimut
         cos_a = cos(radians(a))
 
         # Vectorized coord_to_array
-        # dx is the x distance from the raster block's left edge to each topo sample point.
-        # dy is the y distance from the raster block's top edge down to each topo sample point.
-        dx = pt_x_array - block_x_min_corner
-        dy = block_y_max_corner - pt_y_array
-        col_x_array = ((dx - (dx % x_cellsize)) / x_cellsize).astype(int)
-        row_y_array = ((dy - (dy % y_cellsize)) / y_cellsize).astype(int)
+        # dx is the x distance from the raster left edge to each topo sample point.
+        # dy is the y distance from the raster top edge down to each topo sample point.
+        dx = pt_x_array - raster_x_min
+        dy = raster_y_max - pt_y_array
+        col_x_array = np.rint((dx - (dx % x_cellsize)) / x_cellsize).astype(int) - round((block_x_min_corner - raster_x_min) / x_cellsize)
+        row_y_array = np.rint((dy - (dy % y_cellsize)) / y_cellsize).astype(int) - round((raster_y_max - block_y_max_corner) / y_cellsize)
 
         # indices that are not off raster
         valid_index = ((0 <= row_y_array) & (row_y_array < z_array.shape[0]) &

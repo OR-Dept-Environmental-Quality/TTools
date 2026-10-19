@@ -370,7 +370,8 @@ def sample_raster(block, lc_point_list, raster, con):
         # There is at least one pixel of data
         n_rows, n_cols = raster_array.shape
         for point in lc_point_list:
-            xy = coord_to_array(point[0], point[1], block_x_min_corner, block_y_max_corner, x_cellsize, y_cellsize)
+            xy = coord_to_array(point[0], point[1], block_x_min_corner, block_y_max_corner,
+                                x_cellsize, y_cellsize, raster_x_min, raster_y_max)
             if 0 <= xy[1] < n_rows and 0 <= xy[0] < n_cols:
                 point.append(raster_array[xy[1], xy[0]])
             else:

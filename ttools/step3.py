@@ -204,7 +204,8 @@ def sample_raster(block, nodes_in_block, z_raster, cellcoords, con_z_to_m):
         # There is at least one pixel of data
         n_rows, n_cols = raster_array.shape
         for node in nodes_in_block:
-            xy = coord_to_array(node[1], node[2], block_x_min_corner, block_y_max_corner, x_cellsize, y_cellsize)
+            xy = coord_to_array(node[1], node[2], block_x_min_corner, block_y_max_corner,
+                                x_cellsize, y_cellsize, raster_x_min, raster_y_max)
             z_sampleList = []
             for coord in cellcoords:
                 # Calculate the cell X/Y based on the base coordinate movement
@@ -309,7 +310,7 @@ def step3(nodes_fc, searchCells, smooth_flag, z_raster, z_units,
         # the base bounding box when extracting to an array. The buffer is
         # equal to the cellsize * the searchcells to make sure the block includes
         # the surrounding cells at each corner
-        buffer = int((searchCells + 1) * cellsize)
+        buffer = searchCells * cellsize
 
         # Make a list of the base x/y coordinate movements
         # from the node origin. These values will be
