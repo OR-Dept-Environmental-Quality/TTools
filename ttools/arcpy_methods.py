@@ -4,6 +4,7 @@ by geo_package.py when use_arcpy is True.
 """
 
 import os
+from math import ceil
 import numpy as np
 import arcpy
 
@@ -365,32 +366,27 @@ def raster_to_array_arcpy(raster_path, x_min, y_min, x_max, y_max,
     x_cellsize = raster.meanCellWidth
     y_cellsize = raster.meanCellHeight
 
-    # Clamp to raster extent
-    desc = arcpy.Describe(raster_path)
-    extent = desc.extent
-    x_min = max(x_min, extent.XMin)
-    y_min = max(y_min, extent.YMin)
-    x_max = min(x_max, extent.XMax)
-    y_max = min(y_max, extent.YMax)
+    raster_x_min = raster.extent.XMin
+    raster_y_max = raster.extent.YMax
+    col_start = round((x_min - raster_x_min) / x_cellsize)
+    col_end = ceil((x_max - raster_x_min) / x_cellsize)
+    row_start = round((raster_y_max - y_max) / y_cellsize)
+    row_end = ceil((raster_y_max - y_min) / y_cellsize)
 
     # Calculate ncols and nrows
-    ncols = int((x_max - x_min) / x_cellsize)
-    nrows = int((y_max - y_min) / y_cellsize)
+    ncols = col_end - col_start
+    nrows = row_end - row_start
 
-    if ncols <= 0 or nrows <= 0:
-        array = np.full((max(1, nrows), max(1, ncols)),
-                        nodata_value, dtype=np.float64)
-        return (array, x_min, y_max, x_cellsize, y_cellsize)
+    x_min = raster_x_min + col_start * x_cellsize
+    y_min = raster_y_max - row_end * y_cellsize
+    y_max = raster_y_max - row_start * y_cellsize
 
     # arcpy.RasterToNumPyArray takes the lower-left corner
     lower_left = arcpy.Point(x_min, y_min)
     array = arcpy.RasterToNumPyArray(raster_path, lower_left,
                                      ncols, nrows, nodata_value)
 
-    # y_max_actual is the top of the block
-    y_max_actual = y_min + nrows * y_cellsize
-
-    return (array, x_min, y_max_actual, x_cellsize, y_cellsize)
+    return (array, x_min, y_max, x_cellsize, y_cellsize)
 
 
 def sample_raster_at_point_arcpy(raster_path, x, y):
