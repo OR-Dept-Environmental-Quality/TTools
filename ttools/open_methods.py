@@ -90,7 +90,64 @@ def _open_raster(raster_path):
 
 
 # ---------------------------------------------------------------------------
-# Vector
+# CRS and field info
+# ---------------------------------------------------------------------------
+
+def get_crs_open(path):
+    """Get the CRS from a vector or raster file.
+
+    Parameters:
+        path (str): Path to the file.
+
+    Returns:
+        CRS: The coordinate reference system.
+    """
+    gdb_path, layer_name = _get_fc_path(path)
+
+    # Try as vector first
+    try:
+        if layer_name:
+            gdf = gpd.read_file(gdb_path, layer=layer_name, rows=0)
+        else:
+            gdf = gpd.read_file(path, rows=0)
+        return CRS(gdf.crs)
+    except Exception:
+        pass
+
+    # Try as raster
+    try:
+        with _open_raster(path) as src:
+            return CRS(src.crs)
+    except Exception:
+        pass
+
+    raise ValueError(f"Could not determine CRS from: {path}")
+
+
+def crs_equal_open(fc1, fc2):
+    """Compare CRS names for two feature class vector or raster paths using open source packages."""
+    crs_a = get_crs_open(fc1)
+    crs_b = get_crs_open(fc2)
+    return crs_a.equals(crs_b)
+
+
+def get_field_info_open(path, field_name):
+    """Get the data type for a feature class attribute field.
+
+    Parameters:
+        path (str): Path to the feature class.
+        field_name (str): Name of the field.
+
+    Returns:
+        str: The numpy/pandas dtype of the field.
+    """
+    gdf = read_fc_open(path)
+    if field_name in gdf.columns:
+        return str(gdf[field_name].dtype)
+    raise ValueError(f"Field '{field_name}' not found in {path}")
+
+# ---------------------------------------------------------------------------
+# Vector Read/Write
 # ---------------------------------------------------------------------------
 
 def fc_exists_open(path):
@@ -381,184 +438,6 @@ def update_sample_fc_open(point_list, sample_fc, fields_to_update,
     new_gdf.to_file(file_path, **kwargs)
 
 
-def get_crs_open(path):
-    """Get the CRS from a vector or raster file.
-
-    Parameters:
-        path (str): Path to the file.
-
-    Returns:
-        CRS: The coordinate reference system.
-    """
-    gdb_path, layer_name = _get_fc_path(path)
-
-    # Try as vector first
-    try:
-        if layer_name:
-            gdf = gpd.read_file(gdb_path, layer=layer_name, rows=0)
-        else:
-            gdf = gpd.read_file(path, rows=0)
-        return CRS(gdf.crs)
-    except Exception:
-        pass
-
-    # Try as raster
-    try:
-        with _open_raster(path) as src:
-            return CRS(src.crs)
-    except Exception:
-        pass
-
-    raise ValueError(f"Could not determine CRS from: {path}")
-
-
-def crs_equal_open(fc1, fc2):
-    """Compare CRS names for two feature class vector or raster paths using open source packages."""
-    crs_a = get_crs_open(fc1)
-    crs_b = get_crs_open(fc2)
-    return crs_a.equals(crs_b)
-
-
-def get_field_info_open(path, field_name):
-    """Get the data type for a feature class attribute field.
-
-    Parameters:
-        path (str): Path to the feature class.
-        field_name (str): Name of the field.
-
-    Returns:
-        str: The numpy/pandas dtype of the field.
-    """
-    gdf = read_fc_open(path)
-    if field_name in gdf.columns:
-        return str(gdf[field_name].dtype)
-    raise ValueError(f"Field '{field_name}' not found in {path}")
-
-
-# ---------------------------------------------------------------------------
-# Raster
-# ---------------------------------------------------------------------------
-
-def get_raster_info_open(raster_path):
-    """Get raster extent, cell size, and crs, and no data value.
-
-    Parameters:
-        raster_path (str): Path to the raster file.
-
-    Returns:
-        dict: Keys: 'x_cellsize', 'y_cellsize', 'x_min', 'y_min',
-            'x_max', 'y_max', 'crs', 'nodata'.
-    """
-    with _open_raster(raster_path) as src:
-        transform = src.transform
-        bounds = src.bounds
-
-        return {
-            "x_cellsize": abs(transform.a),
-            "y_cellsize": abs(transform.e),
-            "x_min": bounds.left,
-            "y_min": bounds.bottom,
-            "x_max": bounds.right,
-            "y_max": bounds.top,
-            "crs": CRS(src.crs),
-            "nodata": src.nodata,
-        }
-
-
-def raster_to_array_open(raster_path, x_min, y_min, x_max, y_max,
-                      nodata_value=-9999):
-    """Read a raster into a numpy array for a specified block extent.
-
-    Uses rasterio.windows.
-
-    Parameters:
-        raster_path (str): Path to the raster file.
-        x_min, y_min, x_max, y_max (float): Bounding box of the block
-            in map coordinates.
-        nodata_value (float): Value to use for nodata pixels in the
-            output array.
-
-    Returns:
-        tuple: (array, x_min_actual, y_max_actual, x_cellsize, y_cellsize)
-            where array is a 2D numpy array (row, col) and the min/max
-            values are the actual cell-aligned coordinates of the block.
-    """
-    with _open_raster(raster_path) as src:
-        x_cellsize = abs(src.transform.a)
-        y_cellsize = abs(src.transform.e)
-
-        # Clamp to raster extent
-        r_bounds = src.bounds
-        x_min = max(x_min, r_bounds.left)
-        y_min = max(y_min, r_bounds.bottom)
-        x_max = min(x_max, r_bounds.right)
-        y_max = min(y_max, r_bounds.top)
-
-        # Convert to row/col indices for precise windowing.
-        # Use round() for start indices because callers (e.g. step3)
-        # pre-align coordinates to cell corners — floating-point
-        # arithmetic can land just below the true integer (e.g.
-        # 1918.9999999999 instead of 1919), and int() truncation
-        # would shift the window by one cell.
-        col_start = round((x_min - r_bounds.left) / x_cellsize)
-        col_end = int(np.ceil((x_max - r_bounds.left) / x_cellsize))
-        row_start = round((r_bounds.top - y_max) / y_cellsize)
-        row_end = int(np.ceil((r_bounds.top - y_min) / y_cellsize))
-
-        # Clamp to valid raster dimensions
-        col_start = max(0, col_start)
-        row_start = max(0, row_start)
-        col_end = min(col_end, src.width)
-        row_end = min(row_end, src.height)
-
-        # Handle empty blocks (block entirely outside raster)
-        n_cols = max(0, col_end - col_start)
-        n_rows = max(0, row_end - row_start)
-
-        # Compute the actual aligned coordinates of the block
-        x_min_aligned = r_bounds.left + col_start * x_cellsize
-        y_max_aligned = r_bounds.top - row_start * y_cellsize
-
-        if n_cols == 0 or n_rows == 0:
-            array = np.full((max(1, n_rows), max(1, n_cols)),
-                            nodata_value, dtype=np.float64)
-            return (array, x_min_aligned, y_max_aligned,
-                    x_cellsize, y_cellsize)
-
-        window = rasterio.windows.Window(
-            col_start, row_start, n_cols, n_rows)
-
-        array = src.read(1, window=window)
-
-        # Replace nodata
-        if src.nodata is not None:
-            array = array.astype(np.float64)
-            array[array == src.nodata] = nodata_value
-
-        return (array, x_min_aligned, y_max_aligned,
-                x_cellsize, y_cellsize)
-
-
-def sample_raster_at_point_open(raster_path, x, y):
-    """Sample a raster value at a single x/y coordinate.
-
-    Parameters:
-        raster_path (str): Path to the raster file.
-        x, y (float): Coordinates in the raster's CRS.
-
-    Returns:
-        float: The raster value at (x, y), or None if nodata.
-    """
-    with _open_raster(raster_path) as src:
-        row, col = src.index(x, y)
-        val = src.read(1, window=((row, row + 1), (col, col + 1)))
-        result = float(val[0, 0])
-
-        if src.nodata is not None and result == src.nodata:
-            return None
-        return result
-
-
 # ---------------------------------------------------------------------------
 # Spatial processing
 # ---------------------------------------------------------------------------
@@ -680,3 +559,127 @@ def calc_channel_width_open(node_x, node_y, bank_geom, aspect, line_dis,
         to_bank_distance = node_pt.distance(nearest_pt)
 
     return (to_bank_distance)
+
+# ---------------------------------------------------------------------------
+# Raster Processing
+# ---------------------------------------------------------------------------
+
+def get_raster_info_open(raster_path):
+    """Get raster extent, cell size, and crs, and no data value.
+
+    Parameters:
+        raster_path (str): Path to the raster file.
+
+    Returns:
+        dict: Keys: 'x_cellsize', 'y_cellsize', 'x_min', 'y_min',
+            'x_max', 'y_max', 'crs', 'nodata'.
+    """
+    with _open_raster(raster_path) as src:
+        transform = src.transform
+        bounds = src.bounds
+
+        return {
+            "x_cellsize": abs(transform.a),
+            "y_cellsize": abs(transform.e),
+            "x_min": bounds.left,
+            "y_min": bounds.bottom,
+            "x_max": bounds.right,
+            "y_max": bounds.top,
+            "crs": CRS(src.crs),
+            "nodata": src.nodata,
+        }
+
+
+def raster_to_array_open(raster_path, x_min, y_min, x_max, y_max,
+                      nodata_value=-9999):
+    """Read a raster into a numpy array for a specified block extent.
+
+    Uses rasterio.windows.
+
+    Parameters:
+        raster_path (str): Path to the raster file.
+        x_min, y_min, x_max, y_max (float): Bounding box of the block
+            in map coordinates.
+        nodata_value (float): Value to use for nodata pixels in the
+            output array.
+
+    Returns:
+        tuple: (array, x_min_actual, y_max_actual, x_cellsize, y_cellsize)
+            where array is a 2D numpy array (row, col) and the min/max
+            values are the actual cell-aligned coordinates of the block.
+    """
+    with _open_raster(raster_path) as src:
+        x_cellsize = abs(src.transform.a)
+        y_cellsize = abs(src.transform.e)
+
+        # Clamp to raster extent
+        r_bounds = src.bounds
+        x_min = max(x_min, r_bounds.left)
+        y_min = max(y_min, r_bounds.bottom)
+        x_max = min(x_max, r_bounds.right)
+        y_max = min(y_max, r_bounds.top)
+
+        # Convert to row/col indices for precise windowing.
+        # Use round() for start indices because callers (e.g. step3)
+        # pre-align coordinates to cell corners — floating-point
+        # arithmetic can land just below the true integer (e.g.
+        # 1918.9999999999 instead of 1919), and int() truncation
+        # would shift the window by one cell.
+        col_start = round((x_min - r_bounds.left) / x_cellsize)
+        col_end = int(np.ceil((x_max - r_bounds.left) / x_cellsize))
+        row_start = round((r_bounds.top - y_max) / y_cellsize)
+        row_end = int(np.ceil((r_bounds.top - y_min) / y_cellsize))
+
+        # Clamp to valid raster dimensions
+        col_start = max(0, col_start)
+        row_start = max(0, row_start)
+        col_end = min(col_end, src.width)
+        row_end = min(row_end, src.height)
+
+        # Handle empty blocks (block entirely outside raster)
+        n_cols = max(0, col_end - col_start)
+        n_rows = max(0, row_end - row_start)
+
+        # Compute the actual aligned coordinates of the block
+        x_min_aligned = r_bounds.left + col_start * x_cellsize
+        y_max_aligned = r_bounds.top - row_start * y_cellsize
+
+        if n_cols == 0 or n_rows == 0:
+            array = np.full((max(1, n_rows), max(1, n_cols)),
+                            nodata_value, dtype=np.float64)
+            return (array, x_min_aligned, y_max_aligned,
+                    x_cellsize, y_cellsize)
+
+        window = rasterio.windows.Window(
+            col_start, row_start, n_cols, n_rows)
+
+        array = src.read(1, window=window)
+
+        # Replace nodata
+        if src.nodata is not None:
+            array = array.astype(np.float64)
+            array[array == src.nodata] = nodata_value
+
+        return (array, x_min_aligned, y_max_aligned,
+                x_cellsize, y_cellsize)
+
+
+def sample_raster_at_point_open(raster_path, x, y):
+    """Sample a raster value at a single x/y coordinate.
+
+    Parameters:
+        raster_path (str): Path to the raster file.
+        x, y (float): Coordinates in the raster's CRS.
+
+    Returns:
+        float: The raster value at (x, y), or None if nodata.
+    """
+    with _open_raster(raster_path) as src:
+        row, col = src.index(x, y)
+        val = src.read(1, window=((row, row + 1), (col, col + 1)))
+        result = float(val[0, 0])
+
+        if src.nodata is not None and result == src.nodata:
+            return None
+        return result
+

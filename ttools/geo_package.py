@@ -23,6 +23,53 @@ def set_geo_package(use_arcpy=False):
     global _use_arcpy
     _use_arcpy = use_arcpy
 
+# ---------------------------------------------------------------------------
+# CRS and field info
+# ---------------------------------------------------------------------------
+
+def get_crs(path):
+    """Get the CRS from a vector or raster file.
+
+    Parameters:
+        path (str): Path to the file.
+
+    Returns:
+        CRS: The coordinate reference system.
+    """
+    if _use_arcpy:
+        from ttools.arcpy_methods import get_crs_arcpy
+        return get_crs_arcpy(path)
+    else:
+        from ttools.open_methods import get_crs_open
+        return get_crs_open(path)
+
+
+def crs_equal(fc1, fc2):
+    """Compare CRS names for two feature class vector or raster paths using selected geo package."""
+    if _use_arcpy:
+        from ttools.arcpy_methods import crs_equal_arcpy
+        return crs_equal_arcpy(fc1, fc2)
+    else:
+        from ttools.open_methods import crs_equal_open
+        return crs_equal_open(fc1, fc2)
+
+
+def get_field_info(path, field_name):
+    """Get the data type for a feature class attribute field.
+
+    Parameters:
+        path (str): Path to the feature class.
+        field_name (str): Name of the field.
+
+    Returns:
+        str: The dtype of the field.
+    """
+    if _use_arcpy:
+        from ttools.arcpy_methods import get_field_info_arcpy
+        return get_field_info_arcpy(path, field_name)
+    else:
+        from ttools.open_methods import get_field_info_open
+        return get_field_info_open(path, field_name)
 
 # ---------------------------------------------------------------------------
 # Vector Read/Write
@@ -251,55 +298,6 @@ def calc_channel_width(node_x, node_y, bank_geom, aspect, line_dis, proj):
         from ttools.open_methods import calc_channel_width_open
         return calc_channel_width_open(node_x, node_y, bank_geom, aspect,
                                        line_dis, proj)
-
-
-# ---------------------------------------------------------------------------
-# CRS and field info
-# ---------------------------------------------------------------------------
-
-def get_crs(path):
-    """Get the CRS from a vector or raster file.
-
-    Parameters:
-        path (str): Path to the file.
-
-    Returns:
-        CRS: The coordinate reference system.
-    """
-    if _use_arcpy:
-        from ttools.arcpy_methods import get_crs_arcpy
-        return get_crs_arcpy(path)
-    else:
-        from ttools.open_methods import get_crs_open
-        return get_crs_open(path)
-
-
-def crs_equal(fc1, fc2):
-    """Compare CRS names for two feature class vector or raster paths using selected geo package."""
-    if _use_arcpy:
-        from ttools.arcpy_methods import crs_equal_arcpy
-        return crs_equal_arcpy(fc1, fc2)
-    else:
-        from ttools.open_methods import crs_equal_open
-        return crs_equal_open(fc1, fc2)
-
-
-def get_field_info(path, field_name):
-    """Get the data type for a feature class attribute field.
-
-    Parameters:
-        path (str): Path to the feature class.
-        field_name (str): Name of the field.
-
-    Returns:
-        str: The dtype of the field.
-    """
-    if _use_arcpy:
-        from ttools.arcpy_methods import get_field_info_arcpy
-        return get_field_info_arcpy(path, field_name)
-    else:
-        from ttools.open_methods import get_field_info_open
-        return get_field_info_open(path, field_name)
 
 
 # ---------------------------------------------------------------------------
