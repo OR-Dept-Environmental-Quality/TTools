@@ -9,7 +9,50 @@ import numpy as np
 import arcpy
 
 # ---------------------------------------------------------------------------
-# Vector
+# CRS and field info
+# ---------------------------------------------------------------------------
+
+def get_crs_arcpy(path):
+    """Get the CRS from a vector or raster.
+
+    Parameters:
+        path (str): Path to the file.
+
+    Returns:
+        arcpy.SpatialReference: The coordinate reference system.
+    """
+
+
+    desc = arcpy.Describe(path)
+    return desc.spatialReference
+
+
+def crs_equal_arcpy(fc1, fc2):
+    """Compare CRS names for two feature class vector or raster paths using arcpy."""
+    crs_a = get_crs_arcpy(fc1)
+    crs_b = get_crs_arcpy(fc2)
+    return crs_a.name == crs_b.name
+
+
+def get_field_info_arcpy(path, field_name):
+    """Get the data type for a feature class attribute field using arcpy.
+
+    Parameters:
+        path (str): Path to the feature class.
+        field_name (str): Name of the field.
+
+    Returns:
+        str: The arcpy field type (e.g. "Double", "String", "Integer").
+    """
+
+
+    fields = arcpy.ListFields(path, field_name)
+    if fields:
+        return fields[0].type
+    raise ValueError(f"Field '{field_name}' not found in {path}")
+
+# ---------------------------------------------------------------------------
+# Vector Read/Write
 # ---------------------------------------------------------------------------
 
 def fc_exists_arcpy(path):
@@ -168,7 +211,7 @@ def update_fc_arcpy(nodeDict, nodes_fc, addFields, nodes_to_query=None):
                 cursor.updateRow(row)
 
 
-# Field type mapping for sample feature classes (topo_fc, lc_point_fc)
+# Field types for sample feature classes (topo_fc, lc_point_fc)
 _SAMPLE_FIELD_TYPES = {
     "POINT_X": "DOUBLE",
     "POINT_Y": "DOUBLE",
@@ -269,48 +312,140 @@ def update_sample_fc_arcpy(point_list, sample_fc, fields_to_update,
             cursor.insertRow(row)
 
 
-def get_crs_arcpy(path):
-    """Get the CRS from a vector or raster.
+# ---------------------------------------------------------------------------
+# Spatial processing
+# ---------------------------------------------------------------------------
+
+def read_streamline_features_arcpy(streamline_fc, sid_field):
+    """Read streamline features and return stream IDs, geometries,
+    and lengths.
 
     Parameters:
-        path (str): Path to the file.
+        streamline_fc (str): Path to the stream centerline polyline
+            feature class.
+        sid_field (str): Name of the attribute field holding the unique
+            stream identifier.
 
     Returns:
-        arcpy.SpatialReference: The coordinate reference system.
+        list of tuple: Each tuple is (streamID, geometry, length) where
+            geometry is an arcpy Polyline and length is in the units
+            of projection.
     """
+    proj = arcpy.Describe(streamline_fc).spatialReference
+    incursorFields = ["SHAPE@", "SHAPE@LENGTH", sid_field]
+    features = []
+    with arcpy.da.SearchCursor(streamline_fc, incursorFields, "", proj) as Inrows:
+        for row in Inrows:
+            features.append((row[2], row[0], row[1]))
+    return features
 
 
-    desc = arcpy.Describe(path)
-    return desc.spatialReference
-
-
-def crs_equal_arcpy(fc1, fc2):
-    """Compare CRS names for two feature class vector or raster paths using arcpy."""
-    crs_a = get_crs_arcpy(fc1)
-    crs_b = get_crs_arcpy(fc2)
-    return crs_a.name == crs_b.name
-
-
-def get_field_info_arcpy(path, field_name):
-    """Get the data type for a feature class attribute field using arcpy.
+def position_along_line_arcpy(geom, fraction):
+    """Return the (x, y) coordinates at a fractional position along a line.
 
     Parameters:
-        path (str): Path to the feature class.
-        field_name (str): Name of the field.
+        geom (arcpy.Polyline): The line geometry.
+        fraction (float): Fractional position along the line (0.0 to 1.0).
 
     Returns:
-        str: The arcpy field type (e.g. "Double", "String", "Integer").
+        tuple: (x, y) coordinates.
+    """
+    pt = geom.positionAlongLine(fraction, True).centroid
+    return (pt.X, pt.Y)
+
+
+def transform_to_latlong_arcpy(x_list, y_list, proj):
+    """Transform coordinates from a projected CRS to decimal degrees (EPSG:4326).
+
+    Parameters:
+        x_list (list of float): X coordinates in the projected CRS.
+        y_list (list of float): Y coordinates in the projected CRS.
+        proj (arcpy.SpatialReference): The source coordinate reference system.
+
+    Returns:
+        tuple: (longs, lats) lists of decimal degree coordinates.
     """
 
+    # This selects the best geographic datum transformation for the
+    # input projection and extent. ListTransformations returns
+    # all the workable transformations with the best match first.
+    # when the nodes and target share same datum (e.g. WGS 84)
+    # the list is empty and no transformation needed.
+    proj_dd = arcpy.SpatialReference(4326)  # GCS_WGS_1984
+    extent = arcpy.Extent(min(x_list), min(y_list),
+                          max(x_list), max(y_list),
+                          spatial_reference=proj)
+    transforms = arcpy.ListTransformations(proj, proj_dd, extent)
+    transform_name = transforms[0] if transforms else ""
 
-    fields = arcpy.ListFields(path, field_name)
-    if fields:
-        return fields[0].type
-    raise ValueError(f"Field '{field_name}' not found in {path}")
+    longs = []
+    lats = []
+    for x, y in zip(x_list, y_list):
+        pt_geom = arcpy.PointGeometry(arcpy.Point(x, y), proj)
+        pt_dd = pt_geom.projectAs(proj_dd, transform_name)
+        longs.append(pt_dd.centroid.X)
+        lats.append(pt_dd.centroid.Y)
+    return (longs, lats)
+
+
+def read_polyline_geometry_arcpy(polyline_fc):
+    """Reads an input polyline into an arcpy polyline geometry object.
+
+    Parameters:
+        polyline_fc (str): Path to the polyline feature class.
+
+    Returns:
+        arcpy.Polyline: A single polyline geometry representing all features.
+    """
+    proj_polyline = arcpy.Describe(polyline_fc).spatialReference
+    poly_list = []
+    # Get the x and y of each vertex in the polyline and save
+    # it as a list.
+    for row in arcpy.da.SearchCursor(polyline_fc, ["SHAPE@"]):
+        for part in row[0]:
+            for pnt in part:
+                poly_list.append(arcpy.Point(pnt.X, pnt.Y))
+    poly_array = arcpy.Array(poly_list)
+    # put it into a geometry object.
+    poly_geom = arcpy.Polyline(poly_array, proj_polyline)
+    del row
+    return (poly_geom)
+
+
+def calc_channel_width_arcpy(node_x, node_y, bank_geom, aspect, line_dis,
+                             proj):
+    """Calculate the distance from a node to a bank along a
+    perpendicular transect.
+
+    Parameters:
+        node_x (float): Node X coordinate.
+        node_y (float): Node Y coordinate.
+        bank_geom (arcpy.Polyline): Bank geometry object.
+        aspect (float): Transect direction in degrees.
+        line_dis (float): Maximum search distance in spatial units.
+        proj (arcpy.SpatialReference): Coordinate reference system.
+
+    Returns:
+        float: Distance from node to bank in spatial units.
+    """
+    node_geom = arcpy.PointGeometry(arcpy.Point(node_x, node_y), proj)
+    pt1 = node_geom.pointFromAngleAndDistance(aspect, line_dis, "PLANAR")
+    line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj)
+    pt2 = line.intersect(bank_geom, 1)
+
+    if pt2.centroid:
+        to_bank_distance = node_geom.distanceTo(pt2)
+    else:
+        # No intersection = no bank 90 deg from aspect
+        # Find the minimum distance to bank, regardless of the angle
+        near_distance = bank_geom.queryPointAndDistance(node_geom.centroid)
+        to_bank_distance = near_distance[2]
+
+    return (to_bank_distance)
 
 
 # ---------------------------------------------------------------------------
-# Raster
+# Raster Processing
 # ---------------------------------------------------------------------------
 
 def get_raster_info_arcpy(raster_path):
@@ -410,135 +545,3 @@ def sample_raster_at_point_arcpy(raster_path, x, y):
     if val_str == "NoData" or val_str == "":
         return None
     return float(val_str)
-
-
-# ---------------------------------------------------------------------------
-# Spatial processing
-# ---------------------------------------------------------------------------
-
-def read_streamline_features_arcpy(streamline_fc, sid_field):
-    """Read streamline features and return stream IDs, geometries,
-    and lengths.
-
-    Parameters:
-        streamline_fc (str): Path to the stream centerline polyline
-            feature class.
-        sid_field (str): Name of the attribute field holding the unique
-            stream identifier.
-
-    Returns:
-        list of tuple: Each tuple is (streamID, geometry, length) where
-            geometry is an arcpy Polyline and length is in the units
-            of projection.
-    """
-    proj = arcpy.Describe(streamline_fc).spatialReference
-    incursorFields = ["SHAPE@", "SHAPE@LENGTH", sid_field]
-    features = []
-    with arcpy.da.SearchCursor(streamline_fc, incursorFields, "", proj) as Inrows:
-        for row in Inrows:
-            features.append((row[2], row[0], row[1]))
-    return features
-
-
-def position_along_line_arcpy(geom, fraction):
-    """Return the (x, y) coordinates at a fractional position along a line.
-
-    Parameters:
-        geom (arcpy.Polyline): The line geometry.
-        fraction (float): Fractional position along the line (0.0 to 1.0).
-
-    Returns:
-        tuple: (x, y) coordinates.
-    """
-    pt = geom.positionAlongLine(fraction, True).centroid
-    return (pt.X, pt.Y)
-
-
-def transform_to_latlong_arcpy(x_list, y_list, proj):
-    """Transform coordinates from a projected CRS to decimal degrees (EPSG:4326).
-
-    Parameters:
-        x_list (list of float): X coordinates in the projected CRS.
-        y_list (list of float): Y coordinates in the projected CRS.
-        proj (arcpy.SpatialReference): The source coordinate reference system.
-
-    Returns:
-        tuple: (longs, lats) lists of decimal degree coordinates.
-    """
-    
-    # This selects the best geographic datum transformation for the
-    # input projection and extent. ListTransformations returns
-    # all the workable transformations with the best match first.
-    # when the nodes and target share same datum (e.g. WGS 84)
-    # the list is empty and no transformation needed.
-    proj_dd = arcpy.SpatialReference(4326)  # GCS_WGS_1984
-    extent = arcpy.Extent(min(x_list), min(y_list),
-                          max(x_list), max(y_list),
-                          spatial_reference=proj)
-    transforms = arcpy.ListTransformations(proj, proj_dd, extent)
-    transform_name = transforms[0] if transforms else ""
-
-    longs = []
-    lats = []
-    for x, y in zip(x_list, y_list):
-        pt_geom = arcpy.PointGeometry(arcpy.Point(x, y), proj)
-        pt_dd = pt_geom.projectAs(proj_dd, transform_name)
-        longs.append(pt_dd.centroid.X)
-        lats.append(pt_dd.centroid.Y)
-    return (longs, lats)
-
-
-def read_polyline_geometry_arcpy(polyline_fc):
-    """Reads an input polyline into an arcpy polyline geometry object.
-
-    Parameters:
-        polyline_fc (str): Path to the polyline feature class.
-
-    Returns:
-        arcpy.Polyline: A single polyline geometry representing all features.
-    """
-    proj_polyline = arcpy.Describe(polyline_fc).spatialReference
-    poly_list = []
-    # Get the x and y of each vertex in the polyline and save
-    # it as a list.
-    for row in arcpy.da.SearchCursor(polyline_fc, ["SHAPE@"]):
-        for part in row[0]:
-            for pnt in part:
-                poly_list.append(arcpy.Point(pnt.X, pnt.Y))
-    poly_array = arcpy.Array(poly_list)
-    # put it into a geometry object.
-    poly_geom = arcpy.Polyline(poly_array, proj_polyline)
-    del row
-    return (poly_geom)
-
-
-def calc_channel_width_arcpy(node_x, node_y, bank_geom, aspect, line_dis,
-                             proj):
-    """Calculate the distance from a node to a bank along a
-    perpendicular transect.
-
-    Parameters:
-        node_x (float): Node X coordinate.
-        node_y (float): Node Y coordinate.
-        bank_geom (arcpy.Polyline): Bank geometry object.
-        aspect (float): Transect direction in degrees.
-        line_dis (float): Maximum search distance in spatial units.
-        proj (arcpy.SpatialReference): Coordinate reference system.
-
-    Returns:
-        float: Distance from node to bank in spatial units.
-    """
-    node_geom = arcpy.PointGeometry(arcpy.Point(node_x, node_y), proj)
-    pt1 = node_geom.pointFromAngleAndDistance(aspect, line_dis, "PLANAR")
-    line = arcpy.Polyline(arcpy.Array([node_geom.centroid, pt1.centroid]), proj)
-    pt2 = line.intersect(bank_geom, 1)
-
-    if pt2.centroid:
-        to_bank_distance = node_geom.distanceTo(pt2)
-    else:
-        # No intersection = no bank 90 deg from aspect
-        # Find the minimum distance to bank, regardless of the angle
-        near_distance = bank_geom.queryPointAndDistance(node_geom.centroid)
-        to_bank_distance = near_distance[2]
-
-    return (to_bank_distance)
