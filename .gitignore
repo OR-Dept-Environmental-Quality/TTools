@@ -3,3 +3,4 @@
 tests
 docs
 archive
+**/__pycache__/
