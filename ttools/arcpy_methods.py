@@ -9,7 +9,7 @@ import numpy as np
 import arcpy
 
 # ---------------------------------------------------------------------------
-# CRS and field info
+# CRS, field info, conversion factors
 # ---------------------------------------------------------------------------
 
 def get_crs_arcpy(path):
@@ -45,11 +45,23 @@ def get_field_info_arcpy(path, field_name):
         str: The arcpy field type (e.g. "Double", "String", "Integer").
     """
 
-
     fields = arcpy.ListFields(path, field_name)
     if fields:
         return fields[0].type
     raise ValueError(f"Field '{field_name}' not found in {path}")
+
+
+def to_meters_con_arcpy(inFeature):
+    """Returns the conversion factor to get from the
+    input spatial units to meters"""
+    try:
+        con_to_m = arcpy.Describe(inFeature).SpatialReference.metersPerUnit
+    except Exception:
+        raise ValueError(
+            "{0} has a coordinate system ".format(inFeature) +
+            "that is not projected or not recognized. Use a projected "
+            "coordinate system preferably in linear units of feet or meters.")
+    return con_to_m
 
 # ---------------------------------------------------------------------------
 # Vector Read/Write

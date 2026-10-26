@@ -10,10 +10,9 @@ from operator import itemgetter
 
 import numpy as np
 
-from ttools.utils import to_meters_con, from_meters_con, message
-from ttools.geo_package import (write_fc, get_crs, crs_equal, sample_raster_at_point,
-                            fc_exists, read_streamline_features,
-                            position_along_line, transform_to_latlong)
+from ttools.utils import from_meters_con, message
+from ttools.geo_package import (write_fc, get_crs, crs_equal, to_meters_con, sample_raster_at_point,
+                                fc_exists, read_streamline_features, position_along_line, transform_to_latlong)
 
 
 def create_node_list(streamline_fc, sid_field, node_dx, checkDirection, z_raster):

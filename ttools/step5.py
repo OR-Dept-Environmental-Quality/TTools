@@ -7,12 +7,9 @@ from datetime import timedelta
 from math import radians, sin, cos, ceil
 from collections import OrderedDict
 
-from ttools.utils import (from_meters_con,
-                          from_z_units_to_meters_con, coord_to_array,
-                          message)
-from ttools.geo_package import (read_fc, update_fc, update_sample_fc,
-                            get_crs, crs_equal, get_raster_info, raster_to_array,
-                            fc_exists, delete_fc)
+from ttools.utils import (from_meters_con, from_z_units_to_meters_con, coord_to_array, message)
+from ttools.geo_package import (read_fc, update_fc, update_sample_fc, get_crs, crs_equal,
+                                get_raster_info, raster_to_array, fc_exists, delete_fc)
 
 
 # -----------------------------------------------------------------------
