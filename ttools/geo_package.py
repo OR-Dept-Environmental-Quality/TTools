@@ -24,7 +24,7 @@ def set_geo_package(use_arcpy=False):
     _use_arcpy = use_arcpy
 
 # ---------------------------------------------------------------------------
-# CRS and field info
+# CRS, field info, conversion factors
 # ---------------------------------------------------------------------------
 
 def get_crs(path):
@@ -70,6 +70,25 @@ def get_field_info(path, field_name):
     else:
         from ttools.open_methods import get_field_info_open
         return get_field_info_open(path, field_name)
+
+
+def to_meters_con(inFeature):
+    """Returns the conversion factor to get from the
+    input spatial units to meters
+
+    Parameters:
+        inFeature (str): Path to the feature class.
+
+    Returns:
+        float: Conversion factor.
+    """
+
+    if _use_arcpy:
+        from ttools.arcpy_methods import to_meters_con_arcpy
+        return to_meters_con_arcpy(inFeature)
+    else:
+        from ttools.open_methods import to_meters_con_open
+        return to_meters_con_open(inFeature)
 
 # ---------------------------------------------------------------------------
 # Vector Read/Write

@@ -2,7 +2,7 @@
 Shared utility functions for TTools.
 """
 
-from ttools.geo_package import get_crs
+from ttools.geo_package import to_meters_con
 
 
 # -----------------------------------------------------------------------
@@ -42,28 +42,6 @@ def warning(msg):
 # -----------------------------------------------------------------------
 # Shared utility functions
 # -----------------------------------------------------------------------
-
-def to_meters_con(inFeature):
-    """Returns the conversion factor to get from the
-    input spatial units to meters"""
-    crs = get_crs(inFeature)
-
-    if crs.is_geographic:
-        raise ValueError(
-            "{0} has a coordinate system ".format(inFeature) +
-            "that is not projected or not recognized. Use a projected "
-            "coordinate system preferably in linear units of feet or meters."
-        )
-
-    cf = crs.axis_info[0].unit_conversion_factor
-    if cf is not None and cf > 0:
-        return cf
-
-    raise ValueError(
-        "Coordinate system is not projected or not recognized. Use a projected "
-        "coordinate system, preferably in linear units of feet or meters."
-    )
-
 
 def from_meters_con(inFeature):
     """Returns the conversion factor to get from meters to the

@@ -9,12 +9,9 @@ from collections import defaultdict
 
 import numpy as np
 
-from ttools.utils import (to_meters_con, from_meters_con,
-                          from_z_units_to_meters_con,
-                          message)
-from ttools.geo_package import (read_fc, update_fc, update_sample_fc,
-                            get_crs, crs_equal, get_raster_info, raster_to_array,
-                            fc_exists, delete_fc)
+from ttools.utils import (from_meters_con, from_z_units_to_meters_con, message)
+from ttools.geo_package import (read_fc, update_fc, update_sample_fc, get_crs, crs_equal, to_meters_con,
+                                get_raster_info, raster_to_array, fc_exists, delete_fc)
 
 
 def nested_dict():

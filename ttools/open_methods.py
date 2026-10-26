@@ -90,7 +90,7 @@ def _open_raster(raster_path):
 
 
 # ---------------------------------------------------------------------------
-# CRS and field info
+# CRS, field info, conversion factors
 # ---------------------------------------------------------------------------
 
 def get_crs_open(path):
@@ -145,6 +145,26 @@ def get_field_info_open(path, field_name):
     if field_name in gdf.columns:
         return str(gdf[field_name].dtype)
     raise ValueError(f"Field '{field_name}' not found in {path}")
+
+
+def to_meters_con_open(inFeature):
+    """Returns the conversion factor to get from the
+    input spatial units to meters"""
+    crs = get_crs_open(inFeature)
+
+    if crs.is_geographic:
+        raise ValueError(
+            "{0} has a coordinate system ".format(inFeature) +
+            "that is not projected or not recognized. Use a projected "
+            "coordinate system preferably in linear units of feet or meters.")
+
+    con_to_m =  crs.axis_info[0].unit_conversion_factor
+    if con_to_m is not None and con_to_m > 0:
+        return con_to_m
+
+    raise ValueError(
+        "Coordinate system is not projected or not recognized. Use a projected "
+        "coordinate system, preferably in linear units of feet or meters.")
 
 # ---------------------------------------------------------------------------
 # Vector Read/Write

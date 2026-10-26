@@ -7,8 +7,8 @@ import traceback
 from datetime import timedelta
 from math import ceil
 
-from ttools.utils import to_meters_con, message, warning
-from ttools.geo_package import (read_fc, get_crs, crs_equal, update_fc, fc_exists,
+from ttools.utils import message, warning
+from ttools.geo_package import (read_fc, get_crs, crs_equal, to_meters_con, update_fc, fc_exists,
                             read_polyline_geometry, calc_channel_width)
 
 

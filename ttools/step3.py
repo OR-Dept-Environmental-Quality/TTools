@@ -8,12 +8,8 @@ import itertools
 from math import ceil
 from collections import defaultdict
 
-from ttools.utils import (from_meters_con,
-                          from_z_units_to_meters_con, coord_to_array,
-                          message)
-from ttools.geo_package import (read_fc, update_fc,
-                            crs_equal, get_raster_info, raster_to_array,
-                            fc_exists)
+from ttools.utils import (from_meters_con, from_z_units_to_meters_con, coord_to_array, message)
+from ttools.geo_package import (read_fc, update_fc, crs_equal, get_raster_info, raster_to_array, fc_exists)
 
 
 def read_nodes_fc(nodes_fc, overwrite_data, addFields):
