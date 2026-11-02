@@ -52,7 +52,7 @@ def log_run(tool_name, params, log_dir=None):
         f.write(log_entry)
 
 # ------------------------------------------------------------
-
+import arcpy
 import sys
 import traceback
 
@@ -307,7 +307,7 @@ class SetupSolarModel:
                 raise FileNotFoundError(msg)
 
             from shadealator import hs
-            hs.setup.solar(nodes_fc, model_grouping_field, longsample, trans_count, transsample_count, transsample_distance,
+            hs.setup_solar(nodes_fc, model_grouping_field, longsample, trans_count, transsample_count, transsample_distance,
                            lccodes, canopy_data, heatsource8, lcsampmethod, emergent, modelstart, modelend,
                            offset, dt, outputdt, model_dir, inputdir, outputdir, csv_mode,
                            overwrite, usertxt, name)
