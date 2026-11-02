@@ -1,8 +1,8 @@
 """
-If you are using TTools from within the ESRI ArcPro toolbox, follow the TTools ArcPro instructions.
-You don't need to use this script.
+This script shows an example of how to run ttools from a Python script.
 
-If you want to run ttools from a Python script, this script shows an example of how to do that.
+If you are using TTools from within the ESRI ArcPro toolbox, follow the TTools ArcPro instructions.
+You don't need to use a script.
 """
 
 import os
