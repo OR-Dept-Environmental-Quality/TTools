@@ -54,7 +54,7 @@ def setup_solar(nodes_fc, model_grouping_field, longsample, trans_count, transsa
 
         folders.add(folder.casefold())
 
-    control_file = "HeatSourceControl" + ext
+    control_file = "HeatSource_Control" + ext
     lccodes_data = read_to_list(Path(lccodes).expanduser().resolve())
     control_files = []
     model_rows = []
