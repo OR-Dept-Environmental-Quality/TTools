@@ -259,7 +259,7 @@ def position_along_line(geom, fraction):
 
 
 def transform_to_latlong(x_list, y_list, proj):
-    """Transform coordinates from a projected CRS to decimal degrees.
+    """Transform coordinates from a projected CRS to decimal degrees (EPSG:4326).
 
     Parameters:
         x_list (list of float): X coordinates in the projected CRS.
