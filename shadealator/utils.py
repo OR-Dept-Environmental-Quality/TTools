@@ -3,14 +3,10 @@ import csv
 from pathlib import Path
 from openpyxl import Workbook, load_workbook
 
-# This function was pulled from heat source v 9.1.0 at commit 89efc28
-# It combines read_csv_to_list(...) and read_xlsx_to_list(...)
-# Also changed to allow strings for the input path: path = Path(path)
-def read_to_list(path, skiprows=0, skipcols=0, sheetname=None):
-    """Read a CSV file or Excel worksheet into a list of lists indexed by row number.
-
-    CSV values remain strings. Excel values retain their cell types, and
-    formulas return their saved results. Headers are included unless skipped.
+# This function was copied from heat source v 9.1.0 at commit 25a6e31
+def read_to_list(path, skiprows = 0, skipcols = 0, sheetname = None):
+    """
+    Reads a csv or xlsx table into a list of lists indexed by row number.
     """
     path = Path(path)
     if path.suffix.lower() == ".csv":
@@ -20,6 +16,7 @@ def read_to_list(path, skiprows=0, skipcols=0, sheetname=None):
                 next(reader)
             return [row[skipcols:] for row in reader if row]
 
+    # XLSX
     wb = load_workbook(filename=path, data_only=True)
     ws = wb.worksheets[0] if sheetname is None else wb[sheetname]
 
@@ -33,9 +30,7 @@ def read_to_list(path, skiprows=0, skipcols=0, sheetname=None):
     wb.close()
     return data
 
-# This function was copied from heat source v 9.1.0 at commit 89efc28
-# Changed to allow strings for the input path: path = Path(path), and
-# closes excel workbook using `finally: > wb.close`
+# This function was copied from heat source v 9.1.0 at commit 25a6e31
 def write_input(path, headers, rows, sheetname, csv_mode):
     """
     Write the input files to csv or xlsx.
@@ -72,5 +67,3 @@ def write_input(path, headers, rows, sheetname, csv_mode):
     except PermissionError as exc:
         msg = f"Cannot write file '{path}'. Check write permissions for this folder."
         raise PermissionError(msg) from exc
-    finally:
-        wb.close()
