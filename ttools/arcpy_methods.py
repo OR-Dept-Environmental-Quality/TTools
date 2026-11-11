@@ -401,27 +401,22 @@ def transform_to_latlong_arcpy(x_list, y_list, proj):
 
 
 def read_polyline_geometry_arcpy(polyline_fc):
-    """Reads an input polyline into an arcpy polyline geometry object.
+    """Reads input polyline feature and unions them into an arcpy polyline geometry object.
 
     Parameters:
         polyline_fc (str): Path to the polyline feature class.
 
     Returns:
-        arcpy.Polyline: A single polyline geometry representing all features.
+        arcpy.Polyline: A single unionized polyline geometry representing all features.
     """
     proj_polyline = arcpy.Describe(polyline_fc).spatialReference
-    poly_list = []
-    # Get the x and y of each vertex in the polyline and save
-    # it as a list.
-    for row in arcpy.da.SearchCursor(polyline_fc, ["SHAPE@"]):
-        for part in row[0]:
-            for pnt in part:
-                poly_list.append(arcpy.Point(pnt.X, pnt.Y))
-    poly_array = arcpy.Array(poly_list)
-    # put it into a geometry object.
-    poly_geom = arcpy.Polyline(poly_array, proj_polyline)
-    del row
-    return (poly_geom)
+
+    with arcpy.da.SearchCursor(polyline_fc, field_names=["SHAPE@"], spatial_reference=proj_polyline) as cursor:
+        poly_geom = next(cursor)[0]
+        for row in cursor:
+            poly_geom = poly_geom.union(row[0])
+
+    return poly_geom
 
 
 def calc_channel_width_arcpy(node_x, node_y, bank_geom, aspect, line_dis,
