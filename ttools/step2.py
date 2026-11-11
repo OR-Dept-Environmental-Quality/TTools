@@ -13,19 +13,13 @@ from ttools.utils import to_meters_con, message, warning, read_fc, update_fc
 
 
 def read_polyline_geometry(polyline_fc, proj_polyline):
-    """Reads an input polyline into an arcpy polyline geometry object."""
-    poly_list = []
-    # Get the x and y of each vertex in the polyline and save
-    # it as a list.
-    for row in arcpy.da.SearchCursor(polyline_fc, ["SHAPE@"]):
-        for part in row[0]:
-            for pnt in part:
-                poly_list.append(arcpy.Point(pnt.X, pnt.Y))
-    poly_array = arcpy.Array(poly_list)
-    # put it into a geometry object.
-    poly_geom = arcpy.Polyline(poly_array, proj_polyline)
-    del row
-    return (poly_geom)
+    """Reads input polyline feature and unions them into an arcpy polyline geometry object."""
+
+    with arcpy.da.SearchCursor(polyline_fc, field_names = ["SHAPE@"], spatial_reference=proj_polyline) as cursor:
+        poly_geom = next(cursor)[0]
+        for row in cursor:
+            poly_geom = poly_geom.union(row[0])
+    return poly_geom
 
 
 def calc_channel_width(node_geom, bank_geom, aspect, line_dis, proj_nodes):
