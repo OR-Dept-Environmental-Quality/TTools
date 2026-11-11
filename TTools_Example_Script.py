@@ -1,5 +1,5 @@
 """
-This script shows an example of how to run ttools from a Python script.
+This script shows an example of how to run ttools from a Python script using the open source geoprocessing packages.
 
 If you are using TTools from within the ESRI ArcPro toolbox, follow the TTools ArcPro instructions.
 You don't need to use a script.
@@ -37,9 +37,9 @@ sys.path.insert(0, os.path.dirname(ttools_package_folder))
 from ttools.geo_package import set_geo_package
 from ttools import step1, step2, step3, step4, step5_ortho, step5_star
 
-# Set arcpy as the geoprocessing package,
-# use_arcpy=False if using open source.
-set_geo_package(use_arcpy=True)
+# Set use_arcpy=False to use open source package methods.
+# Set use_arcpy=True to use arcpy as the geoprocessing package
+set_geo_package(use_arcpy=False)
 
 # ------------------------------------------------------------------------
 # TTools Step 1: Create Stream Nodes
