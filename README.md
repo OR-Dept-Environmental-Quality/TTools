@@ -4,14 +4,28 @@ Current Version: TTools 9.3
 
 ## About
 
-TTools is a collection of python scripts used to sample and assemble stream channel
+TTools is a collection of python tools used to sample and assemble stream channel
 and land cover geospatial data for input into the [Heat Source][1] model, Washington Department
 of Ecology's [Shade][2] model, or the shade input file for [CE-QUAL-W2][3].
 
-Requires
-Python 3.11+
+TTools enables users to segment stream centerlines into point features, measure channel width, compute stream 
+elevation and gradients, compute maximum topographic shade angles, and extract landcover metrics either using 
+radial (star) or orthogonal sampling methods. 
 
-TTools can optionally be used in conjunction with ESRI ArcGIS Pro 3.3+, although it is not required.
+Requires Python 3.11 to 3.13.
+
+TTools can be used with open source geoprocessing packages or optionally with ESRI ArcGIS Pro 3.3+.
+
+Open source methods require install of the following packages and their dependencies:
+ - fiona >= 1.10.1
+ - geopandas == 1.1.4
+ - numpy >= 1.24.3
+ - pandas >= 2.0.2
+ - pyproj >= 3.7.2
+ - rasterio >= 1.4.4, < 1.5
+ - shapely >= 2.1.2
+
+If using ESRI ArcGIS Pro 3.3+, only a valid ArcPro license with spatial analyst extension is needed.
 
 Previous TTools extensions for ESRI ArcView 3, ArcGIS 9 - 10.8 can be found here: http://www.oregon.gov/deq/wq/tmdls/Pages/TMDLs-Tools.aspx
 
@@ -72,7 +86,7 @@ See the TTools user guide or [ESRI documentation][5] for additional instructions
 
 TTools can be run from a Python script instead of using the ArcPro toolbox. There are two ways to run scripts:
 
-1. Open source methods, the default. Open source python packages are used for TTools geoprocessing instead of ESRI's arcpy. The relevant open source geospatial packages must be installed including `geopandas`, `rasterio`, `fiona`, `shapely`, `pyproj`, `pandas`, and `numpy`.
+1. Open source methods, the default. Open source python packages are used for TTools geoprocessing instead of ESRI's arcpy. The relevant open source geospatial packages and their dependencies must be installed including `geopandas`, `rasterio`, `fiona`, `shapely`, `pyproj`, `pandas`, and `numpy`.
 
 2. ArcPy methods. This uses ESRI's arcpy package for geospatial processing. There must be a valid ArcPro license with spatial analyst extension. The Python environment running the script must also be able to import arcpy. ESRI recommends running stand-along scripts that need arcpy by calling [propy.bat or proenv.bat][6]. Point the script to the `ttools` folder as shown in the example below, import ttools, and set the geopackage to `use_arcpy=True`.
 
@@ -115,9 +129,9 @@ sys.path.insert(0, os.path.dirname(ttools_package_folder))
 from ttools.geo_package import set_geo_package
 from ttools import step1, step2, step3, step4, step5_ortho, step5_star
 
-# Set arcpy as the geoprocessing package, 
-# use_arcpy=False if using open source.
-set_geo_package(use_arcpy=True)
+# Set use_arcpy=False to use open source package methods.
+# Set use_arcpy=True to use arcpy as the geoprocessing package
+set_geo_package(use_arcpy=False)
 
 # ------------------------------------------------------------------------
 # TTools Step 1: Create Stream Nodes
