@@ -86,9 +86,8 @@ See the TTools user guide or [ESRI documentation][5] for additional instructions
 
 TTools can be run from a Python script instead of using the ArcPro toolbox. There are two ways to run scripts:
 
-1. Open source methods, the default. Open source python packages are used for TTools geoprocessing instead of ESRI's arcpy. The relevant open source geospatial packages and their dependencies must be installed including `geopandas`, `rasterio`, `fiona`, `shapely`, `pyproj`, `pandas`, and `numpy`.
-
-2. ArcPy methods. This uses ESRI's arcpy package for geospatial processing. There must be a valid ArcPro license with spatial analyst extension. The Python environment running the script must also be able to import arcpy. ESRI recommends running stand-along scripts that need arcpy by calling [propy.bat or proenv.bat][6]. Point the script to the `ttools` folder as shown in the example below, import ttools, and set the geopackage to `use_arcpy=True`.
+1. Open source methods, the default. Open source python packages are used for TTools geoprocessing instead of ESRI's arcpy. The relevant open source geospatial packages and their dependencies must be installed. To install all required packages and ttools, navigate to the TTools folder (uppercase), open Terminal and run `python -m pip install ".[open]"`.
+2. ArcPy methods. This uses ESRI's arcpy package for geospatial processing. There must be a valid ArcPro license with spatial analyst extension. The Python environment running the script must also be able to import arcpy. ESRI recommends running stand-alone scripts that need arcpy by calling [propy.bat or proenv.bat][6]. Point the script to the `ttools` folder as shown in the example below, import ttools, and set the geopackage to `use_arcpy=True`.
 
 Documentation for each TTools step can be found in the user guide, in each ttools Python file e.g. `step1.py`, or using (`help(step1)`).
 
