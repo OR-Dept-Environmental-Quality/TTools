@@ -18,11 +18,11 @@ TTools can be used with open source geoprocessing packages or optionally with ES
 
 Open source methods require install of the following packages and their dependencies:
  - fiona >= 1.10.1
- - geopandas == 1.1.4
+ - geopandas => 1.1.3, < 1.2
  - numpy >= 1.24.3
  - pandas >= 2.0.2
  - pyproj >= 3.7.2
- - rasterio >= 1.4.4, < 1.5
+ - rasterio >= 1.4.3, < 1.5
  - shapely >= 2.1.2
 
 If using ESRI ArcGIS Pro 3.3+, only a valid ArcPro license with spatial analyst extension is needed.
